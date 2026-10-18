@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SOÑO · Café y desayunos</title>
+<meta name="description" content="SOÑO: café de especialidad, desayunos caseros y buenos ratos. Mira la carta, reserva tu mesa o pide para llevar.">
+<meta name="theme-color" content="#FBF7EB">
+<meta property="og:type" content="website">
+<meta property="og:title" content="SOÑO · Café y desayunos">
+<meta property="og:description" content="Café de especialidad, desayunos caseros y buenos ratos. Mira la carta, reserva tu mesa o pide para llevar.">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preload" href="/fuentes/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fuentes/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/styles.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<!-- Dibujos reutilizables -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-grano" viewBox="0 0 40 40">
+      <path class="trazo" d="M20 5 C30 5 35 14 33 23 C31 32 23 36 16 34 C8 32 5 24 7 16 C9 9 14 5 20 5 Z"/>
+      <path class="trazo" d="M19 6 C26 13 13 22 21 34"/>
+    </symbol>
+    <symbol id="i-cerrar" viewBox="0 0 20 20">
+      <path d="M4 4 L16 16 M16 4 L4 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-taza" viewBox="0 0 100 100">
+      <path class="trazo" d="M26 46 H74 C74 64 66 76 50 76 C34 76 26 64 26 46 Z"/>
+      <path class="trazo" d="M73 52 C84 50 88 60 80 66 C77 68 73 68 70 66"/>
+      <path class="trazo" d="M16 82 C36 74 64 74 84 82 C64 90 36 90 16 82 Z"/>
+      <path class="trazo vapor" d="M42 38 C38 32 46 28 42 20 C39 14 44 10 42 6"/>
+      <path class="trazo vapor vapor--b" d="M56 38 C52 32 60 28 56 20"/>
+    </symbol>
+    <symbol id="i-vaso" viewBox="0 0 100 100">
+      <path class="trazo" d="M29 30 H71"/>
+      <path class="trazo" d="M30 30 L34 82 C34 85 36 87 39 87 H61 C64 87 66 85 66 82 L70 30"/>
+      <path class="trazo" d="M32 44 C40 48 60 40 68 44"/>
+      <path class="trazo" d="M33 58 H67"/>
+      <path class="trazo vapor" d="M46 22 C43 17 49 14 46 9"/>
+      <path class="trazo vapor vapor--b" d="M56 22 C53 17 59 14 56 9"/>
+    </symbol>
+    <symbol id="i-vaso-alto" viewBox="0 0 100 100">
+      <path class="trazo" d="M31 14 H69"/>
+      <path class="trazo" d="M32 14 L36 86 C36 89 38 91 41 91 H59 C62 91 64 89 64 86 L68 14"/>
+      <path class="trazo" d="M33 30 C41 34 59 26 67 30"/>
+      <path class="trazo" d="M34 52 H66"/>
+      <path class="trazo" d="M35 68 C42 64 58 72 65 68"/>
+    </symbol>
+    <symbol id="i-coldbrew" viewBox="0 0 100 100">
+      <path class="trazo" d="M31 18 H69"/>
+      <path class="trazo" d="M32 18 L36 86 C36 89 38 91 41 91 H59 C62 91 64 89 64 86 L68 18"/>
+      <path class="trazo" d="M40 30 L49 27 L52 36 L43 39 Z"/>
+      <path class="trazo" d="M52 42 L61 40 L63 49 L54 51 Z"/>
+      <path class="trazo" d="M34 58 H66"/>
+      <path class="trazo" d="M58 4 L52 46"/>
+    </symbol>
+    <symbol id="i-cruasan" viewBox="0 0 100 100">
+      <path class="trazo" d="M10 62 C14 44 30 32 50 32 C70 32 86 44 90 62 C84 68 76 68 70 62 C64 70 36 70 30 62 C24 68 16 68 10 62 Z"/>
+      <path class="trazo" d="M30 62 C30 50 34 40 40 35"/>
+      <path class="trazo" d="M70 62 C70 50 66 40 60 35"/>
+      <path class="trazo" d="M50 33 C47 45 47 57 50 67"/>
+    </symbol>
+    <symbol id="i-tostada" viewBox="0 0 100 100">
+      <path class="trazo" d="M22 40 C18 26 30 16 50 16 C70 16 82 26 78 40 C76 44 72 45 72 48 V84 C72 87 70 89 67 89 H33 C30 89 28 87 28 84 V48 C28 45 24 44 22 40 Z"/>
+      <path class="trazo" d="M37 52 C43 48 55 56 63 52"/>
+      <path class="trazo" d="M37 64 C43 60 55 68 63 64"/>
+      <path class="trazo" d="M37 76 C43 72 55 80 63 76"/>
+    </symbol>
+    <symbol id="i-bol" viewBox="0 0 100 100">
+      <path class="trazo" d="M12 52 H88 C88 74 72 86 50 86 C28 86 12 74 12 52 Z"/>
+      <path class="trazo" d="M40 86 L42 92 H58 L60 86"/>
+      <circle class="trazo" cx="34" cy="44" r="7"/>
+      <circle class="trazo" cx="51" cy="40" r="8"/>
+      <circle class="trazo" cx="66" cy="45" r="5"/>
+      <path class="trazo vapor" d="M30 30 C27 25 33 22 30 17"/>
+      <path class="trazo vapor vapor--b" d="M70 32 C67 27 73 24 70 19"/>
+    </symbol>
+    <symbol id="i-bizcocho" viewBox="0 0 100 100">
+      <path class="trazo" d="M14 52 C14 40 26 32 50 32 C74 32 86 40 86 52 V78 C86 82 83 84 80 84 H20 C17 84 14 82 14 78 Z"/>
+      <path class="trazo" d="M28 42 C36 46 44 38 52 43 C58 46 64 40 72 44"/>
+      <path class="trazo" d="M38 54 V84"/>
+      <path class="trazo" d="M62 54 V84"/>
+    </symbol>
+    <symbol id="i-filtro" viewBox="0 0 100 100">
+      <path class="trazo" d="M22 26 H78"/>
+      <path class="trazo" d="M27 26 L42 52 H58 L73 26"/>
+      <path class="trazo" d="M40 32 L46 46 M60 32 L54 46"/>
+      <path class="trazo" d="M36 57 H64"/>
+      <path class="trazo vapor" d="M50 60 V63"/>
+      <path class="trazo" d="M33 67 H67 L64 84 C63 88 61 90 57 90 H43 C39 90 37 88 36 84 Z"/>
+    </symbol>
+    <symbol id="i-prensa" viewBox="0 0 100 100">
+      <path class="trazo" d="M36 10 H64"/>
+      <path class="trazo" d="M40 10 V30 M60 10 V30"/>
+      <path class="trazo" d="M34 30 H66 V66 H34 Z"/>
+      <path class="trazo" d="M40 42 H60"/>
+      <path class="trazo" d="M31 66 H69 L66 72 H34 Z"/>
+      <path class="trazo vapor" d="M50 75 V78"/>
+      <path class="trazo" d="M34 81 H66 L63 92 H37 Z"/>
+    </symbol>
+    <symbol id="i-chemex" viewBox="0 0 100 100">
+      <path class="trazo" d="M28 10 H72"/>
+      <path class="trazo" d="M29 10 L44 44 M71 10 L56 44"/>
+      <path class="trazo" d="M42 44 H58 V54 H42 Z"/>
+      <path class="trazo" d="M44 54 L26 84 C24 88 27 91 31 91 H69 C73 91 76 88 74 84 L56 54"/>
+      <path class="trazo" d="M33 74 H67"/>
+    </symbol>
+    <symbol id="i-camara" viewBox="0 0 100 100">
+      <path class="trazo" d="M18 34 H34 L40 26 H60 L66 34 H82 C85 34 88 37 88 40 V72 C88 75 85 78 82 78 H18 C15 78 12 75 12 72 V40 C12 37 15 34 18 34 Z"/>
+      <circle class="trazo" cx="50" cy="56" r="13"/>
+      <path class="trazo" d="M74 44 H76"/>
+    </symbol>
+    <clipPath id="logo-taza" clipPathUnits="userSpaceOnUse"><path d="M 191.4 430 L 274.6 430 L 237 515 Z"/></clipPath>
+    <symbol id="logo-sono" viewBox="183 293 243 238"><g fill="currentColor" stroke="currentColor" stroke-miterlimit="4"><g class="logo__cafe" clip-path="url(#logo-taza)" fill-opacity="0.76" stroke="none"><g class="logo__nivel"><path class="logo__ola" d="M 150 447.5 q 8 -3.2 16 0 t 16 0 t 16 0 t 16 0 t 16 0 t 16 0 t 16 0 t 16 0 t 16 0 t 16 0 t 16 0 t 16 0 V 520 H 150 Z"/></g></g><path d="M 267.76 422.20 C 267.13 419.63 262.39 415.92 258.71 419.04 C 253.40 423.54 248.22 431.88 236.36 423.80 C 228.65 418.55 223.70 416.97 218.27 421.59 C 210.59 428.12 216.76 445.49 217.37 443.94 C 217.98 442.41 215.19 434.08 218.83 428.76 C 222.94 422.72 229.76 424.57 235.83 429.62 C 244.17 436.58 253.80 438.06 260.37 434.57 C 264.45 432.38 269.37 428.66 267.77 422.20 Z M 267.76 422.20 " stroke-width="1.18" transform="matrix(0.998785, 0, 0, 0.998785, 0, 0.456587)"/><path d="M 361.56 298.05 C 332.33 300.04 309.64 324.24 309.64 353.42 C 309.80 383.97 334.69 408.64 365.36 408.64 C 396.02 408.64 420.92 383.97 421.08 353.42 C 421.08 338.05 414.67 323.35 403.39 312.86 C 392.11 302.36 376.96 297.00 361.56 298.05 Z M 363.16 321.36 C 372.08 320.75 380.86 323.86 387.40 329.93 C 393.93 336.01 397.65 344.52 397.67 353.42 C 397.54 371.10 383.12 385.37 365.36 385.37 C 347.61 385.37 333.19 371.10 333.06 353.42 C 333.08 336.52 346.23 322.52 363.16 321.36 Z M 363.16 321.36 " stroke-width="1.94" transform="matrix(0.998785, 0, 0, 0.998785, 0, 0.456587)"/><path d="M 361.85 414.80 C 332.62 416.79 309.93 440.99 309.93 470.17 C 310.09 500.71 334.99 525.39 365.65 525.39 C 396.31 525.39 421.21 500.71 421.37 470.17 C 421.37 454.79 414.97 440.10 403.68 429.61 C 392.40 419.11 377.25 413.75 361.85 414.80 Z M 363.45 438.11 C 372.37 437.50 381.15 440.61 387.69 446.68 C 394.23 452.76 397.95 461.26 397.96 470.17 C 397.83 487.85 383.41 502.12 365.66 502.12 C 347.91 502.12 333.48 487.85 333.35 470.17 C 333.38 453.27 346.53 439.26 363.45 438.11 Z M 363.45 438.11 " stroke-width="1.94" transform="matrix(0.998785, 0, 0, 0.998785, 0, 0.456587)"/><path d="M 303.76 379.34 C 300.14 401.87 276.68 412.66 243.85 407.65 C 222.87 404.46 207.20 394.58 194.72 382.92 C 181.57 370.63 194.90 354.27 205.19 364.16 C 212.05 370.76 222.43 377.84 228.45 380.11 C 245.86 386.65 264.41 387.48 273.61 382.96 C 283.07 378.31 282.91 364.56 265.95 363.30 C 258.85 362.76 235.79 361.83 223.83 356.28 C 206.28 348.15 201.59 334.81 206.86 319.40 C 216.03 292.56 269.40 292.38 287.60 311.95 C 297.63 322.74 287.85 332.48 280.46 328.84 C 244.99 311.37 232.66 320.91 231.21 326.63 C 230.11 330.94 232.31 341.11 266.21 341.45 C 295.89 341.74 306.92 359.61 303.76 379.34 Z M 303.76 379.34 " stroke-width="2.09" transform="matrix(0.998785, 0, 0, 0.998785, 0, 0.456587)"/><path d="M 282.75 466.34 C 283.04 488.16 283.01 496.85 284.12 518.31 C 284.69 529.28 300.84 526.91 303.05 518.04 C 304.78 511.14 303.74 496.86 303.27 475.31 C 302.62 446.26 301.14 429.02 297.63 420.94 C 294.32 413.31 282.35 411.07 274.39 424.77 C 246.01 473.56 237.80 500.91 231.34 494.58 C 227.41 490.74 218.10 467.78 207.19 421.30 C 204.97 411.83 190.40 411.12 188.38 423.12 C 186.58 433.86 192.25 459.07 197.79 476.16 C 202.26 489.92 210.17 507.04 216.74 515.23 C 228.35 529.72 240.09 532.35 256.84 502.35 C 263.54 490.36 273.66 469.16 276.35 464.59 C 278.65 460.68 282.69 461.01 282.76 466.36 Z M 282.75 466.34 " stroke-width="1.93" stroke-linejoin="round" transform="matrix(0.998785, 0, 0, 0.998785, 0, 0.456587)"/></g></symbol>
+    <symbol id="i-bolsa" viewBox="0 0 100 100">
+      <path class="trazo" d="M18 38 H82 L77 94 H23 Z"/>
+      <path class="trazo" d="M18 38 L25 29 H75 L82 38"/>
+      <path class="trazo" d="M38 38 C38 20 62 20 62 38"/>
+      <path class="trazo" d="M56 56 A12 12 0 1 0 63 75 A14 14 0 0 1 56 56 Z"/>
+    </symbol>
+    <symbol id="i-llevar" viewBox="0 0 100 100">
+      <path class="trazo" d="M34 22 C34 15 66 15 66 22"/>
+      <path class="trazo" d="M27 22 H73 L71 30 H29 Z"/>
+      <path class="trazo" d="M31 30 L37 92 H63 L69 30"/>
+      <path class="trazo" d="M33 50 H67 L65 70 H35 Z"/>
+      <path class="trazo vapor" d="M44 11 C41 7 47 5 44 1"/>
+      <path class="trazo vapor vapor--b" d="M56 11 C53 7 59 5 56 1"/>
+    </symbol>
+    <!-- Alérgenos (los 14 de declaración obligatoria) -->
+    <symbol id="al-gluten" viewBox="0 0 24 24"><path class="trazo" d="M12 22 V6 M12 8 C9 7 8 5 8 3 C10 3 12 5 12 8 C15 7 16 5 16 3 C14 3 12 5 12 8 M12 13 C9 12 8 10 8 8 C10 8 12 10 12 13 C15 12 16 10 16 8 C14 8 12 10 12 13 M12 18 C9 17 8 15 8 13 C10 13 12 15 12 18 C15 17 16 15 16 13 C14 13 12 15 12 18"/></symbol>
+    <symbol id="al-crustaceos" viewBox="0 0 24 24"><path class="trazo" d="M18 6 C10 4 5 9 6 15 C7 19 11 20 13 18 L16 21 M13 18 L16 16 M9 7 L11 11 M6 11 L10 13 M18 6 L22 3"/></symbol>
+    <symbol id="al-huevos" viewBox="0 0 24 24"><path class="trazo" d="M12 3 C8 3 5 10 5 14 C5 18 8 21 12 21 C16 21 19 18 19 14 C19 10 16 3 12 3 Z"/></symbol>
+    <symbol id="al-pescado" viewBox="0 0 24 24"><path class="trazo" d="M3 12 C6 7 12 6 16 9 L21 6 V18 L16 15 C12 18 6 17 3 12 Z M7.5 11 L7.6 11"/></symbol>
+    <symbol id="al-cacahuetes" viewBox="0 0 24 24"><path class="trazo" d="M12 3 C8 3 7 6 8 9 C9 11 8 12 7 14 C6 18 9 21 12 21 C15 21 18 18 17 14 C16 12 15 11 16 9 C17 6 16 3 12 3 Z M10 6.5 H14 M9.5 16 H14.5"/></symbol>
+    <symbol id="al-soja" viewBox="0 0 24 24"><path class="trazo" d="M4 19 C4 11 10 5 20 4 C20 13 14 19 4 19 Z"/><circle class="trazo" cx="9" cy="14.5" r="1.6"/><circle class="trazo" cx="12.5" cy="11" r="1.6"/><circle class="trazo" cx="16" cy="7.8" r="1.4"/></symbol>
+    <symbol id="al-lacteos" viewBox="0 0 24 24"><path class="trazo" d="M9 3 H15 V6 L17 9 V20 C17 21 16 22 15 22 H9 C8 22 7 21 7 20 V9 L9 6 Z M7 13 H17"/></symbol>
+    <symbol id="al-frutos" viewBox="0 0 24 24"><path class="trazo" d="M12 6 C7 6 4 10 4 14 C4 18 8 21 12 21 C16 21 20 18 20 14 C20 10 17 6 12 6 Z M6.5 9.5 C9 7.5 15 7.5 17.5 9.5 M12 6 V2.5"/></symbol>
+    <symbol id="al-apio" viewBox="0 0 24 24"><path class="trazo" d="M9 21 V10 M12 21 V8 M15 21 V10 M7 21 H17 M9 10 C6 8 6 5 8 4 M12 8 C11 5 12 3 14 2 M15 10 C18 8 18 5 16 4"/></symbol>
+    <symbol id="al-mostaza" viewBox="0 0 24 24"><path class="trazo" d="M10 2 H14 V5 L16 8 V21 H8 V8 L10 5 Z M8 12 H16"/></symbol>
+    <symbol id="al-sesamo" viewBox="0 0 24 24"><path class="trazo" d="M8 5 C10.5 5 11 8.5 9 10.5 C7 10.5 6 7 8 5 Z M16 9 C18.5 9 19 12.5 17 14.5 C15 14.5 14 11 16 9 Z M9 14 C11.5 14 12 17.5 10 19.5 C8 19.5 7 16 9 14 Z"/></symbol>
+    <symbol id="al-sulfitos" viewBox="0 0 24 24"><path class="trazo" d="M7 3 H17 C17 9 15 12 12 12 C9 12 7 9 7 3 Z M12 12 V20 M8 21 H16 M7.5 7 H16.5"/></symbol>
+    <symbol id="al-altramuces" viewBox="0 0 24 24"><path class="trazo" d="M5 9 C5 5 11 4 13 7 C15 10 11 14 8 13 C6 12 5 11 5 9 Z M12 16 C12 13 17 12 19 14 C21 17 17 21 14 20 C13 19 12 18 12 16 Z"/></symbol>
+    <symbol id="al-moluscos" viewBox="0 0 24 24"><path class="trazo" d="M3 14 C3 8 8 4 12 4 C16 4 21 8 21 14 L12 20 Z M12 20 V5 M12 20 L7 6 M12 20 L17 6 M12 20 L4 11 M12 20 L20 11"/></symbol>
+  </defs>
+</svg>
+
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+
+<header class="cabecera" id="cabecera">
+  <div class="wrap cabecera__fila">
+    <button class="marca" type="button" id="logo" aria-label="SOÑO. Acceso al panel de administración">
+      <svg class="logo" aria-hidden="true"><use href="#logo-sono"/></svg>
+    </button>
+    <nav class="menu" aria-label="Secciones">
+      <ul>
+        <li><a href="#nosotros">Nosotros</a></li>
+        <li><a href="#carta">Carta</a></li>
+        <li data-llevar><a href="#llevar">Para llevar</a></li>
+        <li data-galeria hidden><a href="#galeria">Galería</a></li>
+        <li><a href="#contacto">Visítanos</a></li>
+      </ul>
+    </nav>
+    <a class="boton boton--lleno boton--peque cabecera__reserva" href="#reservar" data-abrir-reserva>Reservar mesa</a>
+  </div>
+</header>
+
+<main id="contenido">
+  <section class="portada" aria-labelledby="t-portada">
+    <div class="wrap portada__centro">
+      <div class="portada__etiquetas">
+        <p class="meta">Café · Desayunos · Buenos ratos</p>
+        <p class="aviso-apertura" id="pegatina"><span class="aviso-apertura__punto" aria-hidden="true"></span>Abrimos pronto</p>
+      </div>
+      <h1 class="portada__titulo" id="t-portada">Despierta <em>tus sueños</em></h1>
+      <p class="portada__sub">Café rico, repostería casera y desayunos sin prisa en un rincón del barrio pensado para quedarse.</p>
+      <div class="acciones">
+        <a class="boton boton--lleno" href="#reservar" data-abrir-reserva>Reservar mesa</a>
+        <a class="boton boton--borde" href="#carta">Ver la carta</a>
+      </div>
+      <div class="portada__dibujo">
+        <svg viewBox="0 0 900 320" role="img" aria-label="Dibujo de una cafetera de filtro, una bolsa de café de SOÑO, una taza humeante y un cruasán">
+          <circle class="mancha" cx="540" cy="168" r="136"/>
+          <path class="trazo" d="M24 300 H876"/>
+          <use href="#i-chemex" x="56" y="112" width="200" height="206" style="--relleno: var(--lienzo)"/>
+          <g transform="translate(-60 -32)">
+            <path class="trazo lleno" d="M340 332 L346 150 L438 150 L444 332 Z"/>
+            <path class="trazo lleno" d="M346 150 L352 104 L432 104 L438 150 Z"/>
+            <path class="trazo" d="M352 104 L354 90 L430 90 L432 104"/>
+            <path class="trazo" d="M361 90 V104 M374 90 V104 M387 90 V104 M400 90 V104 M413 90 V104"/>
+            <path class="trazo" d="M349 127 H435"/>
+            <path class="trazo" d="M424 150 L428 332"/>
+            <rect class="trazo" x="358" y="190" width="56" height="84" rx="5"/>
+            <use href="#i-grano" x="373" y="200" width="26" height="26"/>
+            <text class="dibujo__texto" x="386" y="246" text-anchor="middle">SOÑO</text>
+            <text class="dibujo__texto dibujo__texto--peque" x="386" y="262" text-anchor="middle">café</text>
+          </g>
+          <g transform="translate(330 -100)">
+            <ellipse class="trazo lleno" cx="210" cy="376" rx="128" ry="24"/>
+            <ellipse class="trazo" cx="210" cy="371" rx="70" ry="12"/>
+            <path class="trazo" d="M304 282 C346 274 354 326 314 338 C307 340 299 339 292 335"/>
+            <path class="trazo lleno" d="M118 262 C118 334 160 366 210 366 C260 366 302 334 302 262 Z"/>
+            <ellipse class="trazo lleno" cx="210" cy="262" rx="92" ry="18"/>
+            <ellipse class="cafe" cx="210" cy="264" rx="78" ry="11"/>
+            <path class="espuma" d="M210 270 C196 262 192 256 200 254 C205 253 208 256 210 259 C212 256 215 253 220 254 C228 256 224 262 210 270 Z"/>
+            <path class="trazo vapor" d="M180 236 C164 212 196 198 180 172 C168 152 188 140 178 120"/>
+            <path class="trazo vapor vapor--b" d="M214 232 C198 204 230 188 214 156"/>
+            <path class="trazo vapor vapor--c" d="M248 236 C232 212 264 198 248 172"/>
+          </g>
+          <g transform="translate(338 -112)">
+            <ellipse class="trazo lleno" cx="452" cy="392" rx="92" ry="20"/>
+            <ellipse class="trazo" cx="452" cy="390" rx="58" ry="10"/>
+            <use href="#i-cruasan" x="392" y="320" width="122" height="100" style="--relleno: var(--lienzo)"/>
+          </g>
+          <use href="#i-grano" x="226" y="280" width="18" height="18"/>
+          <use href="#i-grano" x="246" y="286" width="14" height="14"/>
+          <use href="#i-grano" x="680" y="282" width="16" height="16"/>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="historia" id="nosotros" aria-labelledby="t-nosotros">
+    <div class="wrap historia__rejilla">
+      <div class="historia__texto" data-aparece>
+        <p class="meta">Nuestra historia</p>
+        <h2 class="titulo" id="t-nosotros">Un buen café sabe mejor en buena compañía</h2>
+        <p class="entradilla">SOÑO es un rincón del barrio para soñar despierto con un buen café. Cada taza se prepara con calma y cariño, y todo lo que sale de la cocina está pensado para disfrutarlo sin prisa.</p>
+        <ol class="principios">
+          <li><span class="principios__num">01</span><div><h3>Café rico y equilibrado</h3><p>Espresso y café de filtro preparados al momento, como te gusten.</p></div></li>
+          <li><span class="principios__num">02</span><div><h3>Hecho en casa</h3><p>Repostería, tostadas y avena para acompañar, cada día.</p></div></li>
+          <li><span class="principios__num">03</span><div><h3>Sin prisa</h3><p>Mesas para quedarse a charlar, leer o mirar por la ventana.</p></div></li>
+        </ol>
+      </div>
+      <div class="historia__dibujo" data-aparece>
+        <svg viewBox="0 0 420 360" aria-hidden="true">
+          <circle class="mancha mancha--clara" cx="210" cy="178" r="150"/>
+          <path class="trazo" d="M40 318 H380"/>
+          <use href="#i-taza" x="14" y="76" width="236" height="256" style="--relleno: var(--lienzo)"/>
+          <g transform="translate(420 0) scale(-1 1)">
+            <use href="#i-taza" x="14" y="76" width="236" height="256" style="--relleno: var(--lienzo)"/>
+          </g>
+          <path class="trazo" d="M200 70 C200 58 186 52 180 62 C174 72 192 84 210 96 C228 84 246 72 240 62 C234 52 220 58 220 70"/>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion" id="carta" aria-labelledby="t-carta">
+    <div class="wrap">
+      <div class="cabeza-centro" data-aparece>
+        <p class="meta">La carta</p>
+        <h2 class="titulo" id="t-carta">Los favoritos de la casa</h2>
+        <p class="cabeza-centro__nota">Toca cualquier producto para ver la descripción y los alérgenos.</p>
+      </div>
+      <ul class="favoritos" id="carta-favoritos" aria-label="Productos destacados"></ul>
+      <div class="carta" id="carta-grupos">
+        <p class="estado-vacio">Cargando la carta…</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion seccion--linea" id="llevar" aria-labelledby="t-llevar" data-llevar>
+    <div class="wrap dos-tarjetas">
+      <div class="tarjeta tarjeta--beige llevar__lado" data-aparece>
+        <div class="llevar__cabeza">
+          <p class="meta">Para llevar</p>
+          <h2 class="titulo" id="t-llevar">Tus favoritos para llevar</h2>
+          <p id="llevar-intro">Haz tu pedido aquí y pásate a recogerlo, o te lo llevamos a casa.</p>
+          <ul class="notas">
+            <li>Pago al recogerlo o al recibirlo</li>
+            <li>Te llamamos si hay cualquier duda</li>
+          </ul>
+        </div>
+        <svg class="llevar__dibujo" viewBox="0 0 360 250" aria-hidden="true">
+          <path class="trazo" d="M10 240 H350"/>
+          <use href="#i-bolsa" x="150" y="30" width="210" height="210" style="--relleno: var(--lienzo)"/>
+          <use href="#i-llevar" x="40" y="60" width="180" height="180" style="--relleno: var(--lienzo)"/>
+        </svg>
+      </div>
+
+      <div class="tarjeta llevar__pedido" data-aparece>
+      <form class="formulario" id="form-pedido" novalidate>
+        <div class="trampa" aria-hidden="true"><label for="pedido-web">No rellenar</label><input id="pedido-web" name="web" type="text" tabindex="-1" autocomplete="off"></div>
+
+        <fieldset class="pedido__grupo">
+          <legend>¿Cómo lo quieres? *</legend>
+          <div class="pedido__tipos">
+            <input class="oculto" type="radio" name="tipo" id="tipo-recoger" value="recoger" checked><label class="chip chip--tipo" for="tipo-recoger">Lo recojo en SOÑO</label>
+            <input class="oculto" type="radio" name="tipo" id="tipo-domicilio" value="domicilio" data-domicilio><label class="chip chip--tipo" for="tipo-domicilio" data-domicilio>Me lo traéis a casa</label>
+          </div>
+        </fieldset>
+
+        <fieldset class="pedido__grupo" id="campo-recogida">
+          <legend>¿Cuándo pasas a recogerlo? *</legend>
+          <div class="dias" id="recogida-dias"></div>
+          <div class="horas" id="recogida-horas"></div>
+          <p class="estado-vacio" id="recogida-nota" hidden></p>
+        </fieldset>
+
+        <div class="campos-dos">
+          <div class="campo">
+            <label for="pedido-nombre">Nombre *</label>
+            <input id="pedido-nombre" name="nombre" type="text" autocomplete="name" required>
+          </div>
+          <div class="campo">
+            <label for="pedido-telefono">Teléfono *</label>
+            <input id="pedido-telefono" name="telefono" type="tel" autocomplete="tel" inputmode="tel" required>
+          </div>
+        </div>
+
+        <div class="campo" id="campo-direccion" hidden>
+          <label for="pedido-direccion">Dirección de entrega *</label>
+          <input id="pedido-direccion" name="direccion" type="text" autocomplete="street-address">
+        </div>
+
+        <fieldset class="pedido__grupo">
+          <legend>Tu pedido *</legend>
+          <div class="pedido__lineas" id="pedido-lineas"></div>
+          <button class="boton boton--borde boton--mini" type="button" id="pedido-anadir">+ Añadir otro producto</button>
+        </fieldset>
+
+        <div class="campo">
+          <label for="pedido-notas">Peticiones especiales</label>
+          <textarea id="pedido-notas" name="notas" placeholder="Sin azúcar, leche de avena, que esté listo a las 9…" style="min-height:90px"></textarea>
+        </div>
+
+        <div class="pedido__total">
+          <span>Total</span>
+          <strong id="pedido-total">Elige al menos un producto</strong>
+        </div>
+        <button class="boton boton--lleno boton--ancho" type="submit">Enviar pedido</button>
+        <p class="aviso" id="aviso-pedido" aria-live="polite"></p>
+      </form>
+
+      <div class="confirmacion" id="confirmacion-pedido" hidden>
+        <svg viewBox="0 0 100 100" aria-hidden="true"><use href="#i-llevar"/></svg>
+        <h3>Pedido recibido</h3>
+        <p class="detalle" id="confirmacion-pedido-detalle"></p>
+        <p class="demo">Te llamaremos si hay cualquier duda. Se paga al recogerlo o al recibirlo.</p>
+        <button class="boton boton--borde" type="button" id="otro-pedido">Hacer otro pedido</button>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion seccion--linea" id="galeria" aria-labelledby="t-galeria" data-galeria hidden>
+    <div class="wrap">
+      <div class="cabeza-centro" data-aparece>
+        <p class="meta">Galería</p>
+        <h2 class="titulo" id="t-galeria">Momentos SOÑO</h2>
+        <p class="cabeza-centro__nota">¿Tienes una foto en SOÑO? Compártela y etiquétanos. <span class="dato-instagram"><span class="pendiente">Instagram por confirmar</span></span></p>
+      </div>
+      <ul class="galeria" id="galeria-lista"></ul>
+    </div>
+  </section>
+
+  <section class="seccion seccion--linea" id="contacto" aria-labelledby="t-contacto">
+    <div class="wrap">
+      <div class="dos-tarjetas">
+        <div class="tarjeta tarjeta--beige visita" data-aparece>
+          <div class="visita__texto">
+            <p class="meta">Visítanos</p>
+            <h2 class="titulo" id="t-contacto">Ven a vernos</h2>
+            <p>Sin reserva también eres bienvenido. Si venís en grupo o el fin de semana, mejor reserva y te guardamos la mesa.</p>
+            <a class="boton boton--lleno" href="#reservar" data-abrir-reserva>Reservar mesa</a>
+          </div>
+          <svg class="visita__dibujo" viewBox="0 0 400 290" role="img" aria-label="Dibujo de la fachada de SOÑO">
+            <path class="trazo" d="M14 272 H386"/>
+            <path class="trazo lleno" d="M62 272 V66 H338 V272"/>
+            <rect class="trazo lleno" x="144" y="80" width="112" height="36" rx="5"/>
+            <text class="dibujo__texto dibujo__texto--rotulo" x="200" y="105" text-anchor="middle">SOÑO</text>
+            <path class="trazo lleno" d="M54 130 H346 L334 164 H66 Z"/>
+            <path class="trazo" d="M100 130 L96 164 M146 130 L144 164 M200 130 V164 M254 130 L256 164 M300 130 L304 164"/>
+            <path class="trazo lleno" d="M66 164 q 11.33 16 22.67 0 t 22.67 0 t 22.67 0 t 22.67 0 t 22.67 0 t 22.67 0 t 22.67 0 t 22.67 0 t 22.67 0 t 22.67 0 t 22.67 0 t 22.67 0"/>
+            <rect class="trazo" x="84" y="194" width="114" height="78"/>
+            <path class="trazo" d="M84 252 H198"/>
+            <use href="#i-taza" x="104" y="206" width="46" height="46"/>
+            <use href="#i-cruasan" x="146" y="216" width="40" height="40"/>
+            <path class="trazo" d="M226 272 V192 H300 V272"/>
+            <rect class="trazo" x="240" y="204" width="46" height="38" rx="3"/>
+            <circle class="trazo" cx="290" cy="254" r="3"/>
+            <path class="trazo lleno" d="M312 272 L316 248 H334 L338 272 Z"/>
+            <path class="trazo" d="M325 248 C318 236 314 226 318 214 M325 248 C330 234 338 226 346 222 M325 248 C326 232 326 220 330 208"/>
+          </svg>
+        </div>
+        <div class="tarjeta" data-aparece>
+          <dl class="visita__datos">
+            <div><dt>Dirección</dt><dd id="dato-direccion"><span class="pendiente">Por confirmar</span></dd></div>
+            <div><dt>Horario</dt><dd id="dato-horario"><span class="pendiente">Por confirmar</span></dd></div>
+            <div><dt>Teléfono</dt><dd id="dato-telefono"><span class="pendiente">Por confirmar</span></dd></div>
+            <div><dt>Email</dt><dd id="dato-email"><span class="pendiente">Por confirmar</span></dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="escribenos">
+        <div class="escribenos__texto" data-aparece>
+          <p class="meta">Escríbenos</p>
+          <h3 class="titulo titulo--medio">Eventos, grupos o cualquier duda</h3>
+          <p>Cuéntanos qué necesitas y te respondemos lo antes posible.</p>
+        </div>
+        <form class="formulario" id="formulario-contacto" novalidate data-aparece>
+          <div class="trampa" aria-hidden="true"><label for="contacto-web">No rellenar</label><input id="contacto-web" name="web" type="text" tabindex="-1" autocomplete="off"></div>
+          <div class="campos-dos">
+            <div class="campo">
+              <label for="nombre">Nombre</label>
+              <input id="nombre" name="nombre" type="text" autocomplete="name" required>
+            </div>
+            <div class="campo">
+              <label for="correo">Email</label>
+              <input id="correo" name="correo" type="email" autocomplete="email" required>
+            </div>
+          </div>
+          <div class="campo">
+            <label for="mensaje">Mensaje</label>
+            <textarea id="mensaje" name="mensaje" required style="min-height:130px"></textarea>
+          </div>
+          <button class="boton boton--lleno" type="submit">Enviar mensaje</button>
+          <p class="aviso" id="aviso" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="pie">
+  <div class="wrap">
+    <div class="pie__tarjeta">
+      <div class="pie__marca">
+        <svg class="logo pie__logo" role="img" aria-label="SOÑO"><use href="#logo-sono"/></svg>
+        <p class="pie__lema">Café, desayunos<br>y buenos ratos.</p>
+      </div>
+      <div class="pie__columnas">
+        <div>
+          <p class="meta">La web</p>
+          <ul>
+            <li><a href="#reservar" data-abrir-reserva>Reservar mesa</a></li>
+            <li><a href="#carta">Carta</a></li>
+            <li data-llevar><a href="#llevar">Para llevar</a></li>
+            <li data-galeria hidden><a href="#galeria">Galería</a></li>
+            <li><a href="#contacto">Visítanos</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="meta">Síguenos</p>
+          <div class="redes" id="redes-pie"><span class="pendiente">Redes por confirmar</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="pie__legal">© 2026 SOÑO</p>
+  </div>
+</footer>
+
+<!-- Ventana: reservar mesa -->
+<dialog class="modal modal--reserva" id="modal-reserva" aria-labelledby="t-reserva">
+  <div class="modal__barra">
+    <div>
+      <p class="meta">Reservas</p>
+      <h2 class="modal__titulo" id="t-reserva">Reserva tu mesa</h2>
+    </div>
+    <button class="modal__cerrar" type="button" data-cerrar aria-label="Cerrar reservas"><svg viewBox="0 0 20 20" aria-hidden="true"><use href="#i-cerrar"/></svg></button>
+  </div>
+
+  <div class="reserva">
+    <form id="form-reserva" novalidate>
+      <div>
+        <div class="trampa" aria-hidden="true"><label for="reserva-web">No rellenar</label><input id="reserva-web" name="web" type="text" tabindex="-1" autocomplete="off"></div>
+        <p>Elige el día, la hora y cuántos vais a venir. Te guardamos el sitio.</p>
+
+        <fieldset>
+          <legend>Día</legend>
+          <div class="dias" id="dias"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Hora</legend>
+          <p class="reserva__grupo-horas">Mañana</p>
+          <div class="horas" id="horas-manana"></div>
+          <p class="reserva__grupo-horas">Tarde</p>
+          <div class="horas" id="horas-tarde"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Personas</legend>
+          <div class="personas">
+            <button class="paso" type="button" id="menos" aria-label="Una persona menos">−</button>
+            <output id="personas" aria-live="polite">2</output>
+            <button class="paso" type="button" id="mas" aria-label="Una persona más">+</button>
+            <span class="ayuda">Máximo 8 por reserva</span>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Tus datos</legend>
+          <div class="campos-dos">
+            <div class="campo">
+              <label for="reserva-nombre">Nombre</label>
+              <input id="reserva-nombre" name="nombre" type="text" autocomplete="name" required>
+            </div>
+            <div class="campo">
+              <label for="reserva-telefono">Teléfono</label>
+              <input id="reserva-telefono" name="telefono" type="tel" autocomplete="tel" inputmode="tel" required>
+            </div>
+          </div>
+          <div class="campo">
+            <label for="reserva-notas">Comentarios (opcional)</label>
+            <textarea id="reserva-notas" name="notas" placeholder="Trona para un bebé, mesa junto a la ventana…" style="min-height:90px"></textarea>
+          </div>
+        </fieldset>
+
+        <div class="reserva__resumen">
+          <p id="resumen">Mesa para 2</p>
+          <button class="boton boton--lleno" type="submit">Reservar mesa</button>
+        </div>
+        <p class="aviso" id="aviso-reserva" aria-live="polite"></p>
+      </div>
+    </form>
+
+    <div class="confirmacion" id="confirmacion" hidden>
+      <svg viewBox="0 0 100 100" aria-hidden="true"><use href="#i-taza"/></svg>
+      <h3>Reserva recibida</h3>
+      <p class="detalle" id="confirmacion-detalle"></p>
+      <p class="demo">Te esperamos. Si surge cualquier problema, te llamaremos al teléfono que nos has dejado.</p>
+      <div class="acciones">
+        <button class="boton boton--lleno" type="button" data-cerrar>Listo</button>
+        <button class="boton boton--borde" type="button" id="otra-reserva">Hacer otra reserva</button>
+      </div>
+    </div>
+
+    <ul class="reserva__notas">
+      <li>Grupos de más de 8 personas: escríbenos y lo organizamos.</li>
+      <li>Para cambiar o cancelar una reserva, escríbenos desde la sección de contacto.</li>
+    </ul>
+  </div>
+</dialog>
+
+<!-- Ventana: producto ampliado -->
+<dialog class="modal modal--producto" id="modal-producto" aria-labelledby="producto-nombre">
+  <div class="producto">
+    <button class="modal__cerrar" type="button" data-cerrar aria-label="Cerrar producto"><svg viewBox="0 0 20 20" aria-hidden="true"><use href="#i-cerrar"/></svg></button>
+    <div class="producto__visual" id="producto-visual">
+      <svg class="dibujo" id="producto-dibujo" viewBox="0 0 100 100" role="img" aria-label=""><use id="producto-icono" href="#i-taza"/></svg>
+      <img id="producto-img" alt="" hidden>
+    </div>
+    <div class="producto__info">
+      <p class="meta" id="producto-categoria"></p>
+      <h3 class="producto__nombre" id="producto-nombre"></h3>
+      <p class="producto__precio" id="producto-precio"></p>
+      <p class="producto__desc" id="producto-desc"></p>
+      <ul class="producto__etiquetas" id="producto-etiquetas"></ul>
+      <div class="producto__alergenos">
+        <p class="meta">Alérgenos</p>
+        <ul class="alergenos" id="producto-alergenos"></ul>
+        <p class="producto__nota">Si tienes alguna alergia o intolerancia, pregúntanos antes de pedir.</p>
+      </div>
+      <div class="producto__nav">
+        <button class="boton boton--borde boton--mini" type="button" id="producto-anterior" aria-label="Producto anterior">‹ Anterior</button>
+        <button class="boton boton--borde boton--mini" type="button" id="producto-siguiente" aria-label="Producto siguiente">Siguiente ›</button>
+        <span class="producto__cuenta" id="producto-cuenta"></span>
+      </div>
+      <div class="producto__acciones">
+        <button class="boton boton--borde boton--peque" type="button" id="producto-llevar" data-llevar>Añadir al pedido para llevar</button>
+        <a class="boton boton--lleno boton--peque" href="#reservar" data-abrir-reserva>Reservar mesa</a>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- Ventana: acceso al panel -->
+<dialog class="modal modal--login" id="modal-login" aria-labelledby="t-login">
+  <div class="login">
+    <button class="modal__cerrar" type="button" data-cerrar aria-label="Cerrar acceso"><svg viewBox="0 0 20 20" aria-hidden="true"><use href="#i-cerrar"/></svg></button>
+    <svg class="logo login__logo" aria-hidden="true"><use href="#logo-sono"/></svg>
+    <div>
+      <p class="meta">Panel de SOÑO</p>
+      <h2 class="modal__titulo" id="t-login">Entrar</h2>
+    </div>
+    <form id="form-login" novalidate>
+      <div class="campo">
+        <label for="login-usuario">Usuario</label>
+        <input id="login-usuario" name="usuario" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      </div>
+      <div class="campo">
+        <label for="login-clave">Contraseña</label>
+        <input id="login-clave" name="clave" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="boton boton--lleno" type="submit">Entrar al panel</button>
+      <p class="aviso" id="aviso-login" aria-live="polite"></p>
+    </form>
+  </div>
+</dialog>
+
+<!-- Ventana: panel de administración -->
+<dialog class="modal modal--admin" id="modal-admin" aria-labelledby="t-admin">
+  <div class="admin__cabecera">
+    <div class="admin__fila">
+      <div>
+        <p class="meta">Panel de SOÑO</p>
+        <h2 class="admin__titulo" id="t-admin">Editar la web</h2>
+      </div>
+      <div class="admin__herramientas">
+        <button class="boton boton--borde boton--mini" type="button" id="cerrar-sesion">Cerrar sesión</button>
+        <button class="modal__cerrar" type="button" data-cerrar aria-label="Cerrar panel"><svg viewBox="0 0 20 20" aria-hidden="true"><use href="#i-cerrar"/></svg></button>
+      </div>
+    </div>
+    <div class="admin__pestanas" role="tablist" aria-label="Secciones del panel">
+      <button class="pestana" type="button" role="tab" id="tab-carta" data-pestana="carta" aria-controls="admin-cuerpo" aria-selected="true">Carta</button>
+      <button class="pestana" type="button" role="tab" id="tab-fotos" data-pestana="fotos" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Fotos</button>
+      <button class="pestana" type="button" role="tab" id="tab-horarios" data-pestana="horarios" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Horarios</button>
+      <button class="pestana" type="button" role="tab" id="tab-datos" data-pestana="datos" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Ajustes</button>
+      <button class="pestana" type="button" role="tab" id="tab-reservas" data-pestana="reservas" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Reservas</button>
+      <button class="pestana" type="button" role="tab" id="tab-pedidos" data-pestana="pedidos" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Pedidos</button>
+      <button class="pestana" type="button" role="tab" id="tab-mensajes" data-pestana="mensajes" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Mensajes</button>
+    </div>
+  </div>
+  <p class="admin__aviso" id="admin-aviso" hidden></p>
+  <div class="admin__cuerpo" id="admin-cuerpo" role="tabpanel" aria-labelledby="tab-carta"></div>
+  <div class="admin__pie">
+    <p class="admin__estado" id="admin-estado" aria-live="polite"></p>
+    <button class="boton boton--borde boton--peque" type="button" id="admin-descartar">Descartar cambios</button>
+    <button class="boton boton--lleno boton--peque" type="button" id="admin-guardar">Guardar cambios</button>
+  </div>
+</dialog>
+</body>
+</html>

@@ -1,0 +1,50 @@
+version: '3.8'
+
+# Stack de Portainer para SOÑO · versión 2 (método "Web editor").
+# Descarga el código de GitHub en cada arranque y lo pone en marcha.
+# No necesita instalar dependencias ni compilar: el servidor solo usa Node.
+
+services:
+  sono2-web:
+    image: node:22-slim
+    container_name: sono2_web
+    working_dir: /app
+    restart: unless-stopped
+    ports:
+      - "3071:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATA_DIR=/app/data
+      - TZ=Europe/Madrid
+      - TRUST_PROXY=true
+      - ADMIN_USER=soño
+      # Misma contraseña que en el stack «sono»
+      - ADMIN_PASSWORD=cambia-esta-clave
+    volumes:
+      - sono2_datos:/app/data
+    command: >
+      /bin/sh -c "
+      echo 'Preparando entorno...' &&
+      (command -v git > /dev/null || (apt-get update && apt-get install -y --no-install-recommends git ca-certificates)) &&
+
+      echo 'Sincronizando con GitHub...' &&
+      if [ ! -d '.git' ]; then
+        git init -q &&
+        git remote add origin https://github.com/marcogugliandolo/sono2.git ;
+      fi &&
+      git fetch --depth 1 origin main &&
+      git reset --hard origin/main &&
+
+      echo 'Arrancando SOÑO 2...' &&
+      exec node server.js
+      "
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/salud').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+
+volumes:
+  sono2_datos:
