@@ -32,6 +32,14 @@ const MAX_MENSAJES = 1000;
 const MAX_PEDIDOS = 3000;
 
 const MAX_GRUPOS = 12;
+/* Zonas del local que se pueden elegir al reservar (el tipo decide el dibujo del plano) */
+const TIPOS_ZONA = ['mesas', 'terraza', 'lectura', 'barra'];
+const MAX_ZONAS = 6;
+const ZONAS_INICIALES = [
+  { id: 'interior', nombre: 'Interior', tipo: 'mesas', activa: true },
+  { id: 'lectura', nombre: 'Zona de lectura', tipo: 'lectura', activa: true },
+  { id: 'terraza', nombre: 'Terraza', tipo: 'terraza', activa: true }
+];
 const ICONOS = ['taza', 'vaso', 'vaso-alto', 'coldbrew', 'cruasan', 'tostada', 'bol', 'bizcocho', 'filtro', 'prensa', 'chemex', 'llevar'];
 const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const ALERGENOS = ['gluten', 'crustaceos', 'huevos', 'pescado', 'cacahuetes', 'soja', 'lacteos', 'frutos', 'apio', 'mostaza', 'sesamo', 'sulfitos', 'altramuces', 'moluscos'];
@@ -223,6 +231,7 @@ async function completarContenido() {
     cambiado = true;
   }
   if (contenido.datos.paraLlevar === undefined) { contenido.datos.paraLlevar = true; cambiado = true; }
+  if (!Array.isArray(contenido.datos.zonas)) { contenido.datos.zonas = ZONAS_INICIALES.map((z) => Object.assign({}, z)); cambiado = true; }
   if (contenido.datos.domicilio === undefined) { contenido.datos.domicilio = true; cambiado = true; }
   if (cambiado) await guardarArchivo('contenido.json', contenido);
 }
@@ -330,6 +339,16 @@ function validarDatos(d) {
   if (instagram && !/^[A-Za-z0-9._]{1,30}$/.test(instagram)) throw errorCliente('El usuario de Instagram solo puede tener letras, números, puntos y guiones bajos.');
   const whatsapp = texto(d.whatsapp, 25);
   if (whatsapp && whatsapp.replace(/[^\d]/g, '').length < 9) throw errorCliente('Revisa el WhatsApp: escribe el número de teléfono, con al menos 9 cifras.');
+  const vistas = new Set();
+  const zonas = (Array.isArray(d.zonas) ? d.zonas : ZONAS_INICIALES).slice(0, MAX_ZONAS).map((z) => {
+    if (!z || typeof z !== 'object') throw errorCliente('Hay una zona con un formato no válido.');
+    const id = String(z.id || '');
+    if (!RE_ID.test(id) || vistas.has(id)) throw errorCliente('Hay una zona con un identificador repetido o no válido.');
+    vistas.add(id);
+    const nombre = texto(z.nombre, 30);
+    if (!nombre) throw errorCliente('Hay una zona del local sin nombre.');
+    return { id, nombre, tipo: TIPOS_ZONA.includes(z.tipo) ? z.tipo : 'mesas', activa: z.activa !== false };
+  });
   return {
     direccion: texto(d.direccion, 160),
     email,
@@ -338,7 +357,8 @@ function validarDatos(d) {
     whatsapp,
     abrimosPronto: d.abrimosPronto !== false,
     paraLlevar: d.paraLlevar !== false,
-    domicilio: d.domicilio !== false
+    domicilio: d.domicilio !== false,
+    zonas
   };
 }
 
@@ -565,6 +585,13 @@ async function api(req, res, pathname) {
     if (!nombre) throw errorCliente('Escribe tu nombre para guardar la mesa.');
     const telefono = texto(datos.telefono, 25);
     if (telefono.replace(/[^\d]/g, '').length < 9) throw errorCliente('Revisa el teléfono: necesitamos al menos 9 cifras para avisarte.');
+    // Zona: vacía = donde haya sitio; si no, una de las zonas activas
+    const idZona = String(datos.zona || '');
+    let zona = null;
+    if (idZona) {
+      zona = (contenido.datos.zonas || []).find((z) => z.id === idZona && z.activa);
+      if (!zona) throw errorCliente('Esa zona ya no se puede reservar. Elige otra o «Donde haya sitio».');
+    }
     if (!permitirEnvio('reserva', ip, 8, 3600000)) throw errorCliente('Has hecho muchas reservas seguidas. Si necesitas más, escríbenos.', 429);
     if (reservas.length >= MAX_RESERVAS) throw errorCliente('No podemos aceptar más reservas ahora mismo. Escríbenos, por favor.', 503);
     const reserva = {
@@ -573,13 +600,15 @@ async function api(req, res, pathname) {
       fecha,
       hora,
       personas,
+      zona: zona ? zona.id : null,
+      zonaNombre: zona ? zona.nombre : null,
       nombre,
       telefono,
       notas: textoLargo(datos.notas, 500)
     };
     reservas.push(reserva);
     await guardarArchivo('reservas.json', reservas);
-    console.log('[soño] Nueva reserva:', fecha, hora, personas + ' pers.');
+    console.log('[soño] Nueva reserva:', fecha, hora, personas + ' pers.', zona ? zona.nombre : '');
     return enviarJSON(res, 201, { ok: true });
   }
 

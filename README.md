@@ -12,6 +12,10 @@ Segunda versión de la web de SOÑO. Tiene las mismas funciones que la primera (
 
 Encima de las cajas de la carta salen 4 productos destacados en tarjetas. Para elegirlos, añade la etiqueta `Favorito` a los productos en el panel (pestaña **Carta**). Si hay menos de 4 marcados, el resto se completa solo con un producto de cada sección, primero los que tienen foto.
 
+## Zonas al reservar
+
+Al reservar mesa se puede elegir zona en un mini plano: interior, zona de lectura, terraza (dibujada fuera del local) o «Donde haya sitio». En **Ajustes → Zonas para reservar** se renombran, se añaden (hasta 6, con dibujo de mesas, terraza, lectura o barra) y se desactivan. La zona elegida aparece en cada reserva del panel.
+
 ## Estructura
 
 ```

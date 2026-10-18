@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SOÑO · Café y desayunos</title>
+<title>SOÑO</title>
 <meta name="description" content="SOÑO: café de especialidad, desayunos caseros y buenos ratos. Mira la carta, reserva tu mesa o pide para llevar.">
 <meta name="theme-color" content="#FBF7EB">
 <meta property="og:type" content="website">
-<meta property="og:title" content="SOÑO · Café y desayunos">
+<meta property="og:title" content="SOÑO">
 <meta property="og:description" content="Café de especialidad, desayunos caseros y buenos ratos. Mira la carta, reserva tu mesa o pide para llevar.">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -21,6 +21,10 @@
 <!-- Dibujos reutilizables -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
+    <symbol id="i-zona-mesas" viewBox="0 0 120 60"><circle class="trazo" cx="18" cy="32" r="8"/><circle class="trazo" cx="5" cy="32" r="3.2"/><circle class="trazo" cx="31" cy="32" r="3.2"/><circle class="trazo" cx="18" cy="18" r="3.2"/><circle class="trazo" cx="18" cy="46" r="3.2"/><circle class="trazo" cx="60" cy="32" r="8"/><circle class="trazo" cx="47" cy="32" r="3.2"/><circle class="trazo" cx="73" cy="32" r="3.2"/><circle class="trazo" cx="60" cy="18" r="3.2"/><circle class="trazo" cx="60" cy="46" r="3.2"/><circle class="trazo" cx="102" cy="32" r="8"/><circle class="trazo" cx="89" cy="32" r="3.2"/><circle class="trazo" cx="115" cy="32" r="3.2"/><circle class="trazo" cx="102" cy="18" r="3.2"/><circle class="trazo" cx="102" cy="46" r="3.2"/></symbol>
+    <symbol id="i-zona-terraza" viewBox="0 0 120 60"><circle class="trazo" cx="32" cy="30" r="15"/><path class="trazo" d="M32 15 V45 M17 30 H47 M21.4 19.4 L42.6 40.6 M21.4 40.6 L42.6 19.4"/><circle class="trazo" cx="10" cy="30" r="3.5"/><circle class="trazo" cx="54" cy="30" r="3.5"/><circle class="trazo" cx="88" cy="30" r="15"/><path class="trazo" d="M88 15 V45 M73 30 H103 M77.4 19.4 L98.6 40.6 M77.4 40.6 L98.6 19.4"/><circle class="trazo" cx="66" cy="30" r="3.5"/><circle class="trazo" cx="110" cy="30" r="3.5"/></symbol>
+    <symbol id="i-zona-lectura" viewBox="0 0 120 60"><path class="trazo" d="M8 8 H112 V18 H8 Z M20 8 V18 M30 8 V18 M38 8 V18 M52 8 V18 M60 8 V18 M74 8 V18 M84 8 V18 M98 8 V18"/><path class="trazo" d="M24 30 H50 V52 H24 Z M24 30 V52 M28 30 V36 H46 V30"/><path class="trazo" d="M70 30 H96 V52 H70 Z M74 30 V36 H92 V30"/><circle class="trazo" cx="60" cy="44" r="5"/></symbol>
+    <symbol id="i-zona-barra" viewBox="0 0 120 60"><path class="trazo" d="M8 10 H112 V22 H8 Z"/><circle class="trazo" cx="22" cy="38" r="5"/><circle class="trazo" cx="42" cy="38" r="5"/><circle class="trazo" cx="62" cy="38" r="5"/><circle class="trazo" cx="82" cy="38" r="5"/><circle class="trazo" cx="102" cy="38" r="5"/></symbol>
     <symbol id="i-grano" viewBox="0 0 40 40">
       <path class="trazo" d="M20 5 C30 5 35 14 33 23 C31 32 23 36 16 34 C8 32 5 24 7 16 C9 9 14 5 20 5 Z"/>
       <path class="trazo" d="M19 6 C26 13 13 22 21 34"/>
@@ -164,9 +168,32 @@
         <li><a href="#contacto">Visítanos</a></li>
       </ul>
     </nav>
-    <a class="boton boton--lleno boton--peque cabecera__reserva" href="#reservar" data-abrir-reserva>Reservar mesa</a>
+    <div class="cabecera__acciones">
+      <a class="boton boton--lleno boton--peque cabecera__reserva" href="#reservar" data-abrir-reserva>Reservar mesa</a>
+      <button class="menu-boton" type="button" id="menu-boton" aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
+        <span class="menu-boton__raya" aria-hidden="true"></span>
+        <span class="menu-boton__raya" aria-hidden="true"></span>
+      </button>
+    </div>
   </div>
 </header>
+
+<!-- Menú del móvil (fuera de la cabecera para que ocupe toda la pantalla) -->
+<div class="menu-movil" id="menu-movil" hidden>
+  <nav class="menu-movil__nav" aria-label="Menú">
+    <ul>
+      <li><a href="#nosotros">Nosotros</a></li>
+      <li><a href="#carta">Carta</a></li>
+      <li data-llevar><a href="#llevar">Para llevar</a></li>
+      <li data-galeria hidden><a href="#galeria">Galería</a></li>
+      <li><a href="#contacto">Visítanos</a></li>
+    </ul>
+  </nav>
+  <div class="menu-movil__pie">
+    <a class="boton boton--lleno boton--ancho" href="#reservar" data-abrir-reserva>Reservar mesa</a>
+    <p class="meta">Café · Desayunos · Buenos ratos</p>
+  </div>
+</div>
 
 <main id="contenido">
   <section class="portada" aria-labelledby="t-portada">
@@ -492,6 +519,12 @@
             <button class="paso" type="button" id="mas" aria-label="Una persona más">+</button>
             <span class="ayuda">Máximo 8 por reserva</span>
           </div>
+        </fieldset>
+
+        <fieldset id="campo-zona">
+          <legend>Zona</legend>
+          <p class="reserva__grupo-horas">Toca en el plano dónde te gustaría sentarte.</p>
+          <div class="plano" id="plano-zonas"></div>
         </fieldset>
 
         <fieldset>

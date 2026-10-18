@@ -24,6 +24,17 @@
     { id: 'prensa', nombre: 'Prensa francesa' }, { id: 'chemex', nombre: 'Chemex' }, { id: 'llevar', nombre: 'Para llevar' }
   ];
   var MAX_GRUPOS = 12;
+  /* Zonas del local para reservar */
+  var TIPOS_ZONA = [
+    { id: 'mesas', nombre: 'Mesas' }, { id: 'terraza', nombre: 'Terraza (fuera)' },
+    { id: 'lectura', nombre: 'Zona de lectura' }, { id: 'barra', nombre: 'Barra' }
+  ];
+  var ZONAS_INICIALES = [
+    { id: 'interior', nombre: 'Interior', tipo: 'mesas', activa: true },
+    { id: 'lectura', nombre: 'Zona de lectura', tipo: 'lectura', activa: true },
+    { id: 'terraza', nombre: 'Terraza', tipo: 'terraza', activa: true }
+  ];
+  var MAX_ZONAS = 6;
   var DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   var PIES_GALERIA = ['El local', 'La barra', 'Latte art', 'Desayunos', 'Buenos ratos'];
   var CLAVE_DE = { carta: 'carta', fotos: 'galeria', horarios: 'horario', datos: 'datos' };
@@ -456,6 +467,8 @@
 
   function pintarDatos() {
     var d = estado.datos || {};
+    pintarZonas();
+    actualizarResumen();
     ponerDato('dato-direccion', d.direccion);
     ponerDato('dato-email', d.email);
     ponerDato('dato-telefono', d.telefono);
@@ -541,6 +554,60 @@
     diasEl.appendChild(label);
   }
 
+  function zonasActivas() {
+    var d = estado.datos || {};
+    return (Array.isArray(d.zonas) ? d.zonas : ZONAS_INICIALES).filter(function (z) { return z.activa !== false; });
+  }
+  function nombreZona(id) {
+    var z = zonasActivas().filter(function (x) { return x.id === id; })[0];
+    return z ? z.nombre : '';
+  }
+  /* Mini plano: las zonas de dentro van en el local; la terraza, fuera */
+  function pintarZonas() {
+    var cont = $('plano-zonas');
+    var elegida = seleccion('zona') || '';
+    var zonas = zonasActivas();
+    $('campo-zona').hidden = !zonas.length;
+    cont.innerHTML = '';
+    if (!zonas.length) return;
+    function opcion(z, cls) {
+      var id = 'zona-' + (z ? z.id : 'cualquiera');
+      var input = el('input', 'oculto');
+      input.type = 'radio';
+      input.name = 'zona';
+      input.id = id;
+      input.value = z ? z.id : '';
+      input.checked = (z ? z.id : '') === elegida;
+      input.defaultChecked = !z;
+      var label = el('label', cls);
+      label.htmlFor = id;
+      if (z) {
+        var dib = svgUso('zona-' + z.tipo);
+        dib.setAttribute('viewBox', '0 0 120 60');
+        label.appendChild(dib);
+      }
+      label.appendChild(el('span', null, z ? z.nombre : 'Donde haya sitio'));
+      return [input, label];
+    }
+    var cualquiera = el('div', 'plano__cualquiera');
+    opcion(null, 'chip chip--zona').forEach(function (n) { cualquiera.appendChild(n); });
+    cont.appendChild(cualquiera);
+    var dentro = zonas.filter(function (z) { return z.tipo !== 'terraza'; });
+    var fuera = zonas.filter(function (z) { return z.tipo === 'terraza'; });
+    if (dentro.length) {
+      var local = el('div', 'plano__local');
+      dentro.forEach(function (z) { opcion(z, 'zona').forEach(function (n) { local.appendChild(n); }); });
+      cont.appendChild(local);
+      cont.appendChild(el('p', 'plano__entrada', '↑ Entrada'));
+    }
+    if (fuera.length) {
+      var ext = el('div', 'plano__fuera');
+      fuera.forEach(function (z) { opcion(z, 'zona').forEach(function (n) { ext.appendChild(n); }); });
+      cont.appendChild(ext);
+    }
+    if (!formReserva.querySelector('input[name="zona"]:checked')) $('zona-cualquiera').checked = true;
+  }
+
   function seleccion(nombre) {
     var e = formReserva.querySelector('input[name="' + nombre + '"]:checked');
     return e ? e.value : null;
@@ -556,6 +623,8 @@
     var partes = ['Mesa para ' + personas];
     partes.push(dia !== null ? dias[+dia] : 'elige día');
     partes.push(hora ? 'a las ' + hora : 'elige hora');
+    var zona = seleccion('zona');
+    if (zona) partes.push(nombreZona(zona));
     resumen.textContent = partes.join(' · ');
   }
 
@@ -580,13 +649,16 @@
       fecha: fechas[+dia],
       hora: hora,
       personas: personas,
+      zona: seleccion('zona') || '',
       nombre: nombre,
       telefono: telefono,
       notas: formReserva.notas.value,
       web: formReserva.web.value
     }).then(function () {
       avisoReserva.textContent = '';
-      detalle.textContent = 'Mesa para ' + textoPersonas(personas) + ', ' + dias[+dia] + ' a las ' + hora + ', a nombre de ' + nombre + '.';
+      var zonaElegida = nombreZona(seleccion('zona') || '');
+      detalle.textContent = 'Mesa para ' + textoPersonas(personas) + ', ' + dias[+dia] + ' a las ' + hora +
+        (zonaElegida ? ', zona ' + zonaElegida : '') + ', a nombre de ' + nombre + '.';
       formReserva.hidden = true;
       confirmacion.hidden = false;
       modalReserva.scrollTop = 0;
@@ -935,6 +1007,7 @@
     if (k === 'datos' && b.abrimosPronto === undefined) b.abrimosPronto = true;
     if (k === 'datos' && b.paraLlevar === undefined) b.paraLlevar = true;
     if (k === 'datos' && b.domicilio === undefined) b.domicilio = true;
+    if (k === 'datos' && !Array.isArray(b.zonas)) b.zonas = clonar(ZONAS_INICIALES);
     if (k === 'carta') b.productos.forEach(function (p) { if (!Array.isArray(p.alergenos)) p.alergenos = []; });
     return b;
   }
@@ -1325,6 +1398,45 @@
     campos.appendChild(casilla);
     cuerpo.appendChild(campos);
 
+    var gz = el('section', 'admin__grupo');
+    gz.appendChild(el('h3', null, 'Zonas para reservar'));
+    gz.appendChild(el('p', 'admin__ayuda', 'Salen en un mini plano al reservar mesa. Las de tipo «Terraza» se dibujan fuera del local. Desmarca una zona para que no se pueda elegir.'));
+    var listaZonas = el('div', 'zonas-admin');
+    b.zonas.forEach(function (z, n) {
+      var fila = el('div', 'zona-admin');
+      fila.appendChild(campoTexto('adm-zona-nombre-' + z.id, 'Nombre', z.nombre, function (v) { z.nombre = v; }, { maxlength: '30', placeholder: 'Terraza' }));
+      var campoTipo = el('div', 'campo');
+      var lt = el('label', null, 'Dibujo'); lt.htmlFor = 'adm-zona-tipo-' + z.id;
+      var sel = el('select'); sel.id = 'adm-zona-tipo-' + z.id;
+      TIPOS_ZONA.forEach(function (t) {
+        var o = el('option', null, t.nombre); o.value = t.id;
+        if (t.id === z.tipo) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', function () { z.tipo = sel.value; marcar(); });
+      campoTipo.appendChild(lt); campoTipo.appendChild(sel);
+      fila.appendChild(campoTipo);
+      var lab = el('label', 'casilla');
+      var ch = el('input'); ch.type = 'checkbox'; ch.id = 'adm-zona-activa-' + z.id; ch.checked = z.activa !== false;
+      ch.addEventListener('change', function () { z.activa = ch.checked; marcar(); });
+      lab.appendChild(ch); lab.appendChild(document.createTextNode('Se puede reservar'));
+      fila.appendChild(lab);
+      fila.appendChild(botonBorrar('Quitar zona', function () { b.zonas.splice(n, 1); marcar(); pintarPanel(); }));
+      listaZonas.appendChild(fila);
+    });
+    gz.appendChild(listaZonas);
+    var nuevaZona = botonMini('+ Añadir zona', function () {
+      var z = { id: 'z' + Date.now().toString(36), nombre: '', tipo: 'mesas', activa: true };
+      b.zonas.push(z);
+      marcar();
+      pintarPanel();
+      var campo = $('adm-zona-nombre-' + z.id);
+      if (campo) enfocarEnPanel(campo);
+    });
+    nuevaZona.disabled = b.zonas.length >= MAX_ZONAS;
+    gz.appendChild(nuevaZona);
+    cuerpo.appendChild(gz);
+
     var grupo = el('section', 'admin__grupo');
     grupo.appendChild(el('h3', null, 'Pedidos para llevar'));
     var camposLlevar = el('div', 'admin__campos');
@@ -1388,6 +1500,7 @@
     var n = el('span'); n.appendChild(el('strong', null, x.nombre)); datos.appendChild(n);
     var tel = el('a', null, x.telefono); tel.href = 'tel:' + x.telefono.replace(/[^\d+]/g, ''); datos.appendChild(tel);
     t.appendChild(datos);
+    if (x.zonaNombre) t.appendChild(el('p', 'registro__recogida', 'Zona: ' + x.zonaNombre));
     if (x.notas) t.appendChild(el('p', 'registro__texto', x.notas));
     var acc = el('div', 'acciones-mini');
     acc.appendChild(botonBorrar('Borrar reserva', function () {
@@ -1520,6 +1633,11 @@
         if (!RE_HORA.test(todas[j])) return 'La hora «' + todas[j] + '» no es válida. Escríbela así: 09:30.';
       }
     }
+    if (k === 'datos') {
+      for (var z = 0; z < b.zonas.length; z++) {
+        if (!texto(b.zonas[z].nombre)) return 'Hay una zona sin nombre (la ' + (z + 1) + 'ª). Escríbelo o quita la zona.';
+      }
+    }
     if (k === 'datos' && texto(b.email) && texto(b.email).indexOf('@') < 1) {
       return 'Revisa el email: parece que le falta la @.';
     }
@@ -1600,6 +1718,28 @@
       if (!sesionCaducada(err)) mostrarEstado(err.message, true);
     });
   }
+
+  /* ---------- Menú del móvil ---------- */
+  (function () {
+    var boton = $('menu-boton');
+    var panel = $('menu-movil');
+    if (!boton || !panel) return;
+    function poner(abierto) {
+      boton.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+      boton.setAttribute('aria-label', abierto ? 'Cerrar menú' : 'Abrir menú');
+      panel.hidden = !abierto;
+      document.documentElement.classList.toggle('menu-abierto', abierto);
+    }
+    boton.addEventListener('click', function () { poner(boton.getAttribute('aria-expanded') !== 'true'); });
+    // Al tocar cualquier enlace del menú se cierra (y la página baja a esa sección)
+    panel.addEventListener('click', function (e) { if (e.target.closest('a')) poner(false); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !panel.hidden) { poner(false); boton.focus(); }
+    });
+    var ancho = window.matchMedia('(min-width: 761px)');
+    var alCambiar = function () { if (ancho.matches) poner(false); };
+    if (ancho.addEventListener) ancho.addEventListener('change', alCambiar); else if (ancho.addListener) ancho.addListener(alCambiar);
+  })();
 
   /* ---------- Cabecera y aparición suave de los bloques ---------- */
   (function () {
