@@ -1,0 +1,327 @@
+{
+  "carta": {
+    "categorias": [
+      {
+        "id": "espresso",
+        "nombre": "Barra de espresso",
+        "desc": "Bebidas con siropes y especias caseras.",
+        "icono": "taza"
+      },
+      {
+        "id": "desayunos",
+        "nombre": "Desayunos",
+        "desc": "Bollería, tostadas y avena para acompañar.",
+        "icono": "cruasan"
+      },
+      {
+        "id": "filtro",
+        "nombre": "Café de filtro",
+        "desc": "Cafés de origen que realzan cada matiz.",
+        "icono": "filtro"
+      }
+    ],
+    "productos": [
+      {
+        "id": "p01",
+        "cat": "espresso",
+        "nombre": "Espresso",
+        "precio": "1,30",
+        "icono": "taza",
+        "desc": "Un trago corto e intenso, con una crema densa por encima. Para empezar el día con los ojos bien abiertos.",
+        "etiquetas": [
+          "Caliente",
+          "Corto",
+          "Intenso"
+        ],
+        "foto": null,
+        "alergenos": []
+      },
+      {
+        "id": "p02",
+        "cat": "espresso",
+        "nombre": "Cortado",
+        "precio": "1,50",
+        "icono": "vaso",
+        "desc": "Espresso con un chorrito de leche caliente que lo suaviza sin taparlo.",
+        "etiquetas": [
+          "Caliente",
+          "Con leche"
+        ],
+        "foto": null,
+        "alergenos": [
+          "lacteos"
+        ]
+      },
+      {
+        "id": "p03",
+        "cat": "espresso",
+        "nombre": "Café con leche",
+        "precio": "1,80",
+        "icono": "taza",
+        "desc": "El de toda la vida: espresso y leche cremosa a partes iguales.",
+        "etiquetas": [
+          "Caliente",
+          "Con leche"
+        ],
+        "foto": null,
+        "alergenos": [
+          "lacteos"
+        ]
+      },
+      {
+        "id": "p04",
+        "cat": "espresso",
+        "nombre": "Capuchino",
+        "precio": "2,20",
+        "icono": "taza",
+        "desc": "Espresso, leche y una buena capa de espuma. Con cacao por encima si te apetece.",
+        "etiquetas": [
+          "Caliente",
+          "Con espuma"
+        ],
+        "foto": null,
+        "alergenos": [
+          "lacteos"
+        ]
+      },
+      {
+        "id": "p05",
+        "cat": "espresso",
+        "nombre": "Latte de vainilla",
+        "precio": "2,80",
+        "icono": "vaso-alto",
+        "desc": "Latte suave con sirope de vainilla hecho en casa.",
+        "etiquetas": [
+          "Caliente o frío",
+          "Sirope casero"
+        ],
+        "foto": null,
+        "alergenos": [
+          "lacteos"
+        ]
+      },
+      {
+        "id": "p06",
+        "cat": "desayunos",
+        "nombre": "Cruasán",
+        "precio": "1,80",
+        "icono": "cruasan",
+        "desc": "Hojaldrado y dorado, para mojar en el café o tomar solo.",
+        "etiquetas": [
+          "Recién hecho"
+        ],
+        "foto": null,
+        "alergenos": [
+          "gluten",
+          "huevos",
+          "lacteos"
+        ]
+      },
+      {
+        "id": "p07",
+        "cat": "desayunos",
+        "nombre": "Tostada con tomate y aceite",
+        "precio": "2,50",
+        "icono": "tostada",
+        "desc": "Pan tostado con tomate rallado, aceite de oliva virgen extra y una pizca de sal.",
+        "etiquetas": [
+          "Clásico"
+        ],
+        "foto": null,
+        "alergenos": [
+          "gluten"
+        ]
+      },
+      {
+        "id": "p08",
+        "cat": "desayunos",
+        "nombre": "Tostada de aguacate",
+        "precio": "4,50",
+        "icono": "tostada",
+        "desc": "Aguacate machacado con lima, semillas y un toque de pimienta.",
+        "etiquetas": [
+          "Vegetariano"
+        ],
+        "foto": null,
+        "alergenos": [
+          "gluten",
+          "sesamo"
+        ]
+      },
+      {
+        "id": "p09",
+        "cat": "desayunos",
+        "nombre": "Bol de avena con fruta",
+        "precio": "4,80",
+        "icono": "bol",
+        "desc": "Avena cremosa con fruta de temporada, canela y un hilo de miel.",
+        "etiquetas": [
+          "Fruta de temporada"
+        ],
+        "foto": null,
+        "alergenos": [
+          "gluten",
+          "lacteos",
+          "frutos"
+        ]
+      },
+      {
+        "id": "p10",
+        "cat": "desayunos",
+        "nombre": "Bizcocho del día",
+        "precio": "2,50",
+        "icono": "bizcocho",
+        "desc": "Cada día uno distinto, recién horneado. Pregunta cuál toca hoy.",
+        "etiquetas": [
+          "Casero",
+          "Cambia cada día"
+        ],
+        "foto": null,
+        "alergenos": [
+          "gluten",
+          "huevos",
+          "lacteos"
+        ]
+      },
+      {
+        "id": "p11",
+        "cat": "filtro",
+        "nombre": "V60, origen del mes",
+        "precio": "3,00",
+        "icono": "filtro",
+        "desc": "Café de filtro limpio y aromático, con el grano que elijamos cada mes.",
+        "etiquetas": [
+          "Caliente",
+          "Cambia cada mes"
+        ],
+        "foto": null,
+        "alergenos": []
+      },
+      {
+        "id": "p12",
+        "cat": "filtro",
+        "nombre": "AeroPress",
+        "precio": "3,00",
+        "icono": "prensa",
+        "desc": "Extracción con presión suave: cuerpo redondo y poca acidez.",
+        "etiquetas": [
+          "Caliente"
+        ],
+        "foto": null,
+        "alergenos": []
+      },
+      {
+        "id": "p13",
+        "cat": "filtro",
+        "nombre": "Chemex para dos",
+        "precio": "5,50",
+        "icono": "chemex",
+        "desc": "Una jarra para compartir, de sabor limpio y ligero.",
+        "etiquetas": [
+          "Para compartir"
+        ],
+        "foto": null,
+        "alergenos": []
+      },
+      {
+        "id": "p14",
+        "cat": "filtro",
+        "nombre": "Cold brew",
+        "precio": "3,20",
+        "icono": "coldbrew",
+        "desc": "Café infusionado en frío durante horas y servido con hielo.",
+        "etiquetas": [
+          "Frío"
+        ],
+        "foto": null,
+        "alergenos": []
+      }
+    ]
+  },
+  "galeria": {
+    "fotos": [
+      {
+        "id": "g1",
+        "pie": "El local",
+        "foto": null
+      },
+      {
+        "id": "g2",
+        "pie": "La barra",
+        "foto": null
+      },
+      {
+        "id": "g3",
+        "pie": "Latte art",
+        "foto": null
+      },
+      {
+        "id": "g4",
+        "pie": "Desayunos",
+        "foto": null
+      },
+      {
+        "id": "g5",
+        "pie": "Buenos ratos",
+        "foto": null
+      }
+    ]
+  },
+  "horario": {
+    "dias": [
+      {
+        "dia": "Lunes",
+        "texto": ""
+      },
+      {
+        "dia": "Martes",
+        "texto": ""
+      },
+      {
+        "dia": "Miércoles",
+        "texto": ""
+      },
+      {
+        "dia": "Jueves",
+        "texto": ""
+      },
+      {
+        "dia": "Viernes",
+        "texto": ""
+      },
+      {
+        "dia": "Sábado",
+        "texto": ""
+      },
+      {
+        "dia": "Domingo",
+        "texto": ""
+      }
+    ],
+    "manana": [
+      "08:30",
+      "09:00",
+      "09:30",
+      "10:00",
+      "10:30",
+      "11:00"
+    ],
+    "tarde": [
+      "16:30",
+      "17:00",
+      "17:30",
+      "18:00",
+      "18:30",
+      "19:00"
+    ]
+  },
+  "datos": {
+    "direccion": "",
+    "email": "",
+    "telefono": "",
+    "instagram": "",
+    "abrimosPronto": true,
+    "paraLlevar": true,
+    "domicilio": true
+  }
+}
