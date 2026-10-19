@@ -1184,15 +1184,13 @@
   /* ---------- Reseñas ----------
      Las publicadas salen en un slider de tarjetas (3 a la vez en el ordenador, 2 en la tableta
      y 1 asomando la siguiente en el móvil), con la nota media arriba. Se pasa con el dedo,
-     con las flechas o arrastrando con el ratón; la barra de abajo indica por dónde vas.
+     arrastrando con el ratón o con el teclado; la barra de abajo indica por dónde vas.
      Las nuevas llegan al panel «por revisar» y no salen hasta que el personal las publica. */
   var modalResena = $('modal-resena');
   var formResena = $('form-resena');
   var listaResenas = $('resenas-lista');
   var controlesResenas = $('resenas-controles');
   var barraResenas = $('resenas-progreso');
-  var anteriorResenas = $('resenas-anterior');
-  var siguienteResenas = $('resenas-siguiente');
   var opiniones = { lista: [], total: 0, media: 0, cargadas: false, error: false };
   var NOTAS_ESTRELLAS = ['Toca las estrellas para valorar', 'Mal', 'Regular', 'Bien', 'Muy bien', '¡Genial!'];
   var valorResena = 0;
@@ -1309,19 +1307,9 @@
     });
   }
 
-  /* El slider: flechas, barra de progreso y arrastre con el ratón */
+  /* El slider: barra de progreso y arrastre con el ratón */
   function suaveONo() {
     return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
-  }
-  function anchoTarjeta() {
-    var t = listaResenas.querySelector('.resena');
-    var hueco = parseFloat(getComputedStyle(listaResenas).columnGap) || 0;
-    return t ? t.getBoundingClientRect().width + hueco : listaResenas.clientWidth;
-  }
-  function pasoResenas() {
-    var ancho = anchoTarjeta();
-    var hueco = parseFloat(getComputedStyle(listaResenas).columnGap) || 0;
-    return ancho * Math.max(1, Math.floor((listaResenas.clientWidth + hueco + 4) / ancho));
   }
   function actualizarSlider() {
     var max = listaResenas.scrollWidth - listaResenas.clientWidth;
@@ -1333,8 +1321,6 @@
     var pos = Math.min(1, Math.max(0, listaResenas.scrollLeft / max));
     barraResenas.style.width = (visible * 100).toFixed(2) + '%';
     barraResenas.style.left = (pos * (1 - visible) * 100).toFixed(2) + '%';
-    anteriorResenas.disabled = listaResenas.scrollLeft <= 4;
-    siguienteResenas.disabled = listaResenas.scrollLeft >= max - 4;
   }
   var sliderPendiente = false;
   listaResenas.addEventListener('scroll', function () {
@@ -1343,8 +1329,6 @@
     requestAnimationFrame(function () { sliderPendiente = false; actualizarSlider(); });
   }, { passive: true });
   window.addEventListener('resize', actualizarSlider);
-  anteriorResenas.addEventListener('click', function () { listaResenas.scrollBy({ left: -pasoResenas(), behavior: suaveONo() }); });
-  siguienteResenas.addEventListener('click', function () { listaResenas.scrollBy({ left: pasoResenas(), behavior: suaveONo() }); });
 
   // Arrastrar con el ratón (con el dedo ya se desliza solo)
   (function () {
