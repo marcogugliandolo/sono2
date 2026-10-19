@@ -12,6 +12,14 @@ Segunda versión de la web de SOÑO. Tiene las mismas funciones que la primera (
 
 Justo después de la portada hay una sección, «Así preparamos tu café». Al bajar, el dibujo se queda fijo en el centro y la taza (la misma de la portada, más grande) se llena en tres pasos: la cafetera sirve el café (60 ml), la leche (hasta 220 ml) y después la espuma (250 ml). Al terminar aparecen un corazón en la espuma y el vapor, y la página sigue. Siempre es la misma cafetera, con el mismo tamaño. Con «reducir movimiento» activado en el sistema, o en pantallas muy bajas, la taza aparece ya llena y sin efecto.
 
+## Historial: volver a una versión anterior
+
+Cada vez que se guardan cambios desde el panel en la **carta**, las **fotos**, los **horarios** o los **ajustes**, queda una versión en la pestaña **Historial** con la fecha y un resumen de lo que cambió («Precio de Capuchino: 2,20 € → 2,50 €», «Borrado: Cold brew», «Dirección: …»). Se puede filtrar por parte de la web.
+
+**Volver a esta versión** deja esa parte de la web como estaba en ese momento; el resto no se toca. La versión de antes de volver también se guarda, así que se puede deshacer. Se guardan las últimas 30 versiones de cada parte (en `versiones.json`). La primera vez que arranca, se guarda cómo estaba la web como punto de partida.
+
+El historial es para lo que se cambia desde el panel. Las reservas, pedidos, mensajes y socios del club no entran (cada uno tiene su propia pestaña).
+
 ## Club SOÑO: tarjeta de sellos
 
 Los clientes se hacen socios desde la web (sección «Club»): nombre, email, teléfono opcional y una contraseña. Al entrar se abre su tarjeta en una ventana con los sellos (una taza por desayuno), su código QR y los últimos movimientos. Mientras la tarjeta está abierta se actualiza sola, así ven el sello en cuanto se lo ponéis. Con `#tarjeta` al final de la dirección (por ejemplo `https://tu-dominio/#tarjeta`) se abre la tarjeta directamente; pueden guardarlo como acceso en el móvil.
@@ -103,7 +111,7 @@ Las reservas, los pedidos y los mensajes de cada web siguen separados.
 
 ## Copia de seguridad
 
-Todo está en el volumen del stack (Portainer lo llama `sono2_sono2_datos`): `contenido.json`, `reservas.json`, `pedidos.json`, `mensajes.json`, `socios.json`, `secreto.json` y la carpeta `fotos/`.
+Todo está en el volumen del stack (Portainer lo llama `sono2_sono2_datos`): `contenido.json`, `reservas.json`, `pedidos.json`, `mensajes.json`, `socios.json`, `secreto.json`, `versiones.json` y la carpeta `fotos/`.
 
 ```bash
 docker run --rm -v sono2_sono2_datos:/datos -v "$PWD":/copia alpine \

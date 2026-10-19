@@ -30,6 +30,7 @@ const MAX_FOTO = 10 * 1024 * 1024;
 const MAX_RESERVAS = 3000;
 const MAX_MENSAJES = 1000;
 const MAX_PEDIDOS = 3000;
+const MAX_VERSIONES_SECCION = 30;  // versiones que se guardan de cada parte de la web
 
 const MAX_GRUPOS = 12;
 /* Zonas del local que se pueden elegir al reservar (el tipo decide el dibujo del plano) */
@@ -96,6 +97,7 @@ const envios = new Map();          // 'tipo:ip' -> [marcas de tiempo]
 let socios = [];                   // socios del club
 let secretoClub = null;            // firma las sesiones de los socios (se guarda en la carpeta de datos)
 const intentosSocio = new Map();   // ip -> { fallos, bloqueadoHasta }
+let versiones = [];                // historial de lo que se guarda desde el panel
 
 /* ---------- Utilidades ---------- */
 function normalizarUsuario(u) {
@@ -212,6 +214,12 @@ async function iniciarDatos() {
   mensajes = await leerArchivo('mensajes.json', []);
   pedidos = await leerArchivo('pedidos.json', []);
   socios = await leerArchivo('socios.json', []);
+  versiones = await leerArchivo('versiones.json', []);
+  if (!versiones.length) {
+    // Punto de partida: cómo estaba la web cuando se activó el historial
+    ['datos', 'horario', 'galeria', 'carta'].forEach((s) => registrarVersion(s, contenido[s], ['Cómo estaba la web al empezar a guardar versiones']));
+    await guardarArchivo('versiones.json', versiones);
+  }
   const secreto = await leerArchivo('secreto.json', null);
   if (secreto && /^[a-f0-9]{64}$/.test(secreto.clave || '')) {
     secretoClub = Buffer.from(secreto.clave, 'hex');
@@ -729,8 +737,13 @@ async function apiClub(req, res, pathname, metodo, ip) {
     exigirAdmin(req);
     const datos = await leerJSON(req);
     if (typeof datos.activo !== 'boolean') throw errorCliente('Indica si el club queda activo o no.');
+    const antes = contenido.datos;
     contenido.datos = Object.assign({}, contenido.datos, { club: Object.assign({}, ajustesClub(), { activo: datos.activo }) });
     await guardarArchivo('contenido.json', contenido);
+    if (antes.club.activo !== datos.activo) {
+      registrarVersion('datos', contenido.datos, resumenCambios('datos', antes, contenido.datos));
+      await guardarArchivo('versiones.json', versiones);
+    }
     console.log('[soño] Club ' + (datos.activo ? 'activado' : 'desactivado'));
     return enviarJSON(res, 200, { club: ajustesClub() });
   }
@@ -794,12 +807,134 @@ async function apiClub(req, res, pathname, metodo, ip) {
   return enviarJSON(res, 404, { error: 'No encontrado.' });
 }
 
+/* ---------- Historial de versiones ----------
+   Cada vez que se guarda una parte de la web desde el panel (carta, fotos, horarios
+   o ajustes) queda una copia con un resumen de lo que cambió. Volver a una versión
+   la guarda como versión nueva, así que también se puede deshacer. */
+const NOMBRE_SECCION = { carta: 'Carta', galeria: 'Fotos', horario: 'Horarios', datos: 'Ajustes' };
+const fVersion = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+function registrarVersion(seccion, datos, resumen) {
+  versiones.unshift({
+    id: crypto.randomBytes(6).toString('hex'),
+    fecha: new Date().toISOString(),
+    seccion,
+    resumen: resumen && resumen.length ? resumen : ['Cambios guardados'],
+    datos: JSON.parse(JSON.stringify(datos))
+  });
+  // Se quedan las últimas de cada parte
+  const cuenta = {};
+  versiones = versiones.filter((v) => (cuenta[v.seccion] = (cuenta[v.seccion] || 0) + 1) <= MAX_VERSIONES_SECCION);
+}
+
+function resumenCambios(seccion, a, b) {
+  const lineas = [];
+  const vacio = (v) => (v === '' || v === null || v === undefined ? 'vacío' : String(v));
+  const siNo = (v) => (v ? 'sí' : 'no');
+  const igual = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+  a = a || {};
+  b = b || {};
+  if (seccion === 'carta') {
+    const gA = new Map((a.categorias || []).map((g) => [g.id, g]));
+    const gB = new Map((b.categorias || []).map((g) => [g.id, g]));
+    gB.forEach((g, id) => {
+      const v = gA.get(id);
+      if (!v) lineas.push('Nuevo grupo: ' + g.nombre);
+      else {
+        if (v.nombre !== g.nombre) lineas.push('Grupo «' + v.nombre + '» pasa a llamarse «' + g.nombre + '»');
+        if (v.desc !== g.desc) lineas.push('Frase del grupo «' + g.nombre + '»');
+        if (v.icono !== g.icono) lineas.push('Dibujo del grupo «' + g.nombre + '»');
+      }
+    });
+    gA.forEach((g, id) => { if (!gB.has(id)) lineas.push('Grupo borrado: ' + g.nombre); });
+    const ordenA = (a.categorias || []).map((g) => g.id).filter((id) => gB.has(id));
+    const ordenB = (b.categorias || []).map((g) => g.id).filter((id) => gA.has(id));
+    if (!igual(ordenA, ordenB)) lineas.push('Orden de los grupos');
+    const pA = new Map((a.productos || []).map((x) => [x.id, x]));
+    const pB = new Map((b.productos || []).map((x) => [x.id, x]));
+    pB.forEach((x, id) => {
+      const v = pA.get(id);
+      if (!v) { lineas.push('Nuevo: ' + x.nombre + ' (' + x.precio + ' €)'); return; }
+      if (v.nombre !== x.nombre) lineas.push('«' + v.nombre + '» pasa a llamarse «' + x.nombre + '»');
+      if (v.precio !== x.precio) lineas.push('Precio de ' + x.nombre + ': ' + v.precio + ' € → ' + x.precio + ' €');
+      if (v.desc !== x.desc) lineas.push('Descripción de ' + x.nombre);
+      if (!igual(v.alergenos, x.alergenos)) lineas.push('Alérgenos de ' + x.nombre);
+      if (!igual(v.etiquetas, x.etiquetas)) lineas.push('Etiquetas de ' + x.nombre);
+      if (v.foto !== x.foto) lineas.push(x.foto ? (v.foto ? 'Foto nueva de ' : 'Foto añadida a ') + x.nombre : 'Foto quitada de ' + x.nombre);
+      if (v.cat !== x.cat) lineas.push(x.nombre + ' cambia de grupo');
+    });
+    pA.forEach((x, id) => { if (!pB.has(id)) lineas.push('Borrado: ' + x.nombre); });
+  } else if (seccion === 'galeria') {
+    const fa = a.fotos || [], fb = b.fotos || [];
+    for (let i = 0; i < Math.max(fa.length, fb.length); i++) {
+      const x = fa[i] || {}, y = fb[i] || {};
+      if (x.foto !== y.foto) lineas.push('Foto ' + (i + 1) + ': ' + (!y.foto ? 'quitada' : x.foto ? 'cambiada' : 'añadida'));
+      if ((x.pie || '') !== (y.pie || '')) lineas.push('Pie de la foto ' + (i + 1) + ': ' + vacio(y.pie));
+    }
+  } else if (seccion === 'horario') {
+    const dA = new Map((a.dias || []).map((d) => [d.dia, d.texto]));
+    (b.dias || []).forEach((d) => {
+      if ((dA.get(d.dia) || '') !== d.texto) lineas.push(d.dia + ': ' + vacio(dA.get(d.dia)) + ' → ' + vacio(d.texto));
+    });
+    if (!igual(a.manana, b.manana)) lineas.push('Horas para reservar por la mañana');
+    if (!igual(a.tarde, b.tarde)) lineas.push('Horas para reservar por la tarde');
+  } else if (seccion === 'datos') {
+    [['direccion', 'Dirección'], ['email', 'Email'], ['telefono', 'Teléfono'], ['instagram', 'Instagram'], ['whatsapp', 'WhatsApp']].forEach((c) => {
+      if ((a[c[0]] || '') !== (b[c[0]] || '')) lineas.push(c[1] + ': ' + vacio(a[c[0]]) + ' → ' + vacio(b[c[0]]));
+    });
+    [['abrimosPronto', 'Aviso «Abrimos pronto»'], ['paraLlevar', 'Pedidos para llevar'], ['domicilio', 'Entrega a domicilio']].forEach((c) => {
+      if (a[c[0]] !== b[c[0]]) lineas.push(c[1] + ': ' + siNo(b[c[0]]));
+    });
+    if (!igual(a.zonas, b.zonas)) lineas.push('Zonas para reservar');
+    const ca = a.club || {}, cb = b.club || {};
+    if (ca.activo !== cb.activo) lineas.push('Club: ' + (cb.activo ? 'activado' : 'desactivado'));
+    if (ca.sellos !== cb.sellos) lineas.push('Sellos de la tarjeta del club: ' + vacio(ca.sellos) + ' → ' + cb.sellos);
+    if (ca.premio !== cb.premio) lineas.push('Premio del club: ' + cb.premio);
+  }
+  if (!lineas.length) return ['Cambios guardados'];
+  return lineas.length > 8 ? lineas.slice(0, 7).concat(['y ' + (lineas.length - 7) + ' cambios más']) : lineas;
+}
+
+function apiVersiones(req, res, pathname, metodo) {
+  exigirAdmin(req);
+  if (pathname === '/api/versiones' && metodo === 'GET') {
+    const vistas = new Set();
+    return enviarJSON(res, 200, {
+      versiones: versiones.map((v) => {
+        const actual = !vistas.has(v.seccion);
+        vistas.add(v.seccion);
+        return { id: v.id, fecha: v.fecha, seccion: v.seccion, nombre: NOMBRE_SECCION[v.seccion], resumen: v.resumen, actual };
+      })
+    });
+  }
+  const m = pathname.match(/^\/api\/versiones\/([a-f0-9]{12})\/restaurar$/);
+  if (m && metodo === 'POST') {
+    return (async () => {
+      const v = versiones.find((x) => x.id === m[1]);
+      if (!v) throw errorCliente('Esa versión ya no está en el historial.', 404);
+      const ultima = versiones.find((x) => x.seccion === v.seccion);
+      if (ultima === v) throw errorCliente('Esa ya es la versión que se ve en la web.', 409);
+      const limpio = VALIDADORES[v.seccion](JSON.parse(JSON.stringify(v.datos)));
+      const antes = contenido[v.seccion];
+      contenido = Object.assign({}, contenido, { [v.seccion]: limpio });
+      await guardarArchivo('contenido.json', contenido);
+      const cambios = resumenCambios(v.seccion, antes, limpio).filter((l) => l !== 'Cambios guardados');
+      registrarVersion(v.seccion, limpio, ['Vuelta a la versión del ' + fVersion.format(new Date(v.fecha))].concat(cambios).slice(0, 8));
+      await guardarArchivo('versiones.json', versiones);
+      console.log('[soño] Restaurada una versión de', NOMBRE_SECCION[v.seccion]);
+      return enviarJSON(res, 200, { seccion: v.seccion, valor: limpio });
+    })();
+  }
+  return enviarJSON(res, 404, { error: 'No encontrado.' });
+}
+
 /* ---------- Rutas de la API ---------- */
 async function api(req, res, pathname) {
   const metodo = req.method;
   const ip = ipCliente(req);
 
   if (pathname.startsWith('/api/club/')) return apiClub(req, res, pathname, metodo, ip);
+  if (pathname === '/api/versiones' || pathname.startsWith('/api/versiones/')) return apiVersiones(req, res, pathname, metodo);
 
   if (pathname === '/api/contenido' && metodo === 'GET') {
     return enviarJSON(res, 200, contenido);
@@ -846,8 +981,13 @@ async function api(req, res, pathname) {
     exigirAdmin(req);
     const clave = mContenido[1];
     const limpio = VALIDADORES[clave](await leerJSON(req));
+    const antes = contenido[clave];
     contenido = Object.assign({}, contenido, { [clave]: limpio });
     await guardarArchivo('contenido.json', contenido);
+    if (JSON.stringify(antes) !== JSON.stringify(limpio)) {
+      registrarVersion(clave, limpio, resumenCambios(clave, antes, limpio));
+      await guardarArchivo('versiones.json', versiones);
+    }
     return enviarJSON(res, 200, { ok: true, [clave]: limpio });
   }
 

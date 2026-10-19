@@ -1204,6 +1204,26 @@ input:focus-visible + .alergeno-chip { outline: 2px solid var(--cafe); outline-o
 .boton--peligro-lleno { background: var(--alerta); border-color: var(--alerta); color: #fff; }
 @media (hover: hover) { .boton--peligro-lleno:hover { background: #7E2812; border-color: #7E2812; } }
 
+/* Panel: historial de versiones */
+.historial__filtros { display: flex; flex-wrap: wrap; gap: 6px; }
+.historial__filtro {
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--linea-fuerte);
+  border-radius: 999px;
+  background: var(--superficie);
+  color: var(--cafe);
+  font: 500 0.875rem/1 var(--f-cuerpo);
+  cursor: pointer;
+}
+.historial__filtro[aria-pressed="true"] { background: var(--cafe); border-color: var(--cafe); color: var(--lienzo); }
+.historial__filtro:focus-visible { outline: 2px solid var(--cafe); outline-offset: 2px; }
+.version--actual { border-color: var(--cafe); }
+.version__actual { font-family: var(--f-mono); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; background: var(--beige); }
+.version__cambios { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 0.9375rem; }
+.version__cambios li { padding-left: 16px; position: relative; }
+.version__cambios li::before { content: "–"; position: absolute; left: 0; color: var(--cafe-suave); }
+
 /* Panel: pestaña Club */
 .club-admin__estado {
   display: grid;
