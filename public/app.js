@@ -1182,14 +1182,18 @@
   });
 
   /* ---------- Reseñas ----------
-     Las publicadas salen en tarjetas, de 6 en 6, con la nota media arriba.
+     Las publicadas salen en un slider de tarjetas (3 a la vez en el ordenador, 2 en la tableta
+     y 1 asomando la siguiente en el móvil), con la nota media arriba. Se pasa con el dedo,
+     con las flechas o arrastrando con el ratón; la barra de abajo indica por dónde vas.
      Las nuevas llegan al panel «por revisar» y no salen hasta que el personal las publica. */
   var modalResena = $('modal-resena');
   var formResena = $('form-resena');
   var listaResenas = $('resenas-lista');
-  var botonMasResenas = $('resenas-mas');
-  var POR_TANDA = 6;
-  var opiniones = { lista: [], total: 0, media: 0, cargadas: false, error: false, mostradas: POR_TANDA };
+  var controlesResenas = $('resenas-controles');
+  var barraResenas = $('resenas-progreso');
+  var anteriorResenas = $('resenas-anterior');
+  var siguienteResenas = $('resenas-siguiente');
+  var opiniones = { lista: [], total: 0, media: 0, cargadas: false, error: false };
   var NOTAS_ESTRELLAS = ['Toca las estrellas para valorar', 'Mal', 'Regular', 'Bien', 'Muy bien', '¡Genial!'];
   var valorResena = 0;
 
@@ -1220,9 +1224,8 @@
     cont.setAttribute('aria-label', (n % 1 ? numeroBonito(n) : String(n)) + ' de 5 estrellas');
   }
 
-  function tarjetaResena(r, i, nueva) {
-    var li = el('li', 'resena' + (nueva ? ' resena--nueva' : ''));
-    li.style.setProperty('--i', i % POR_TANDA);
+  function tarjetaResena(r) {
+    var li = el('li', 'resena');
     var cab = el('div', 'resena__cabeza');
     var est = el('span', 'estrellas estrellas--peque');
     dibujarEstrellas(est, r.estrellas);
@@ -1252,7 +1255,7 @@
     return li;
   }
 
-  function pintarResenas(desde) {
+  function pintarResenas() {
     var activas = resenasActivas();
     document.querySelectorAll('[data-resenas]').forEach(function (n) { n.hidden = !activas; });
     if (!activas) {
@@ -1266,8 +1269,7 @@
       $('resenas-total').textContent = opiniones.total === 1 ? '1 reseña' : opiniones.total + ' reseñas';
     }
     listaResenas.innerHTML = '';
-    var visibles = opiniones.lista.slice(0, opiniones.mostradas);
-    listaResenas.classList.toggle('resenas--pocas', visibles.length > 0 && visibles.length < 3);
+    listaResenas.scrollLeft = 0;
     if (opiniones.error) {
       listaResenas.appendChild(el('li', 'estado-vacio', 'Ahora mismo no se pueden cargar las reseñas.'));
     } else if (opiniones.cargadas && !opiniones.lista.length) {
@@ -1283,10 +1285,107 @@
       vacio.appendChild(b);
       listaResenas.appendChild(vacio);
     } else {
-      visibles.forEach(function (r, i) { listaResenas.appendChild(tarjetaResena(r, i, desde !== undefined && i >= desde)); });
+      opiniones.lista.forEach(function (r) { listaResenas.appendChild(tarjetaResena(r)); });
+      marcarResenasLargas();
     }
-    botonMasResenas.hidden = !opiniones.cargadas || opiniones.mostradas >= opiniones.lista.length;
+    actualizarSlider();
   }
+
+  /* Las reseñas largas se cortan a unas líneas, con «Leer entera» para verlas completas */
+  function marcarResenasLargas() {
+    listaResenas.querySelectorAll('.resena').forEach(function (li) {
+      var cortados = li.querySelectorAll('.resena__texto p, .resena__respuesta p:last-child');
+      var hayMas = Array.prototype.some.call(cortados, function (p) { return p.scrollHeight > p.clientHeight + 2; });
+      if (!hayMas) return;
+      var b = el('button', 'resena__mas', 'Leer entera');
+      b.type = 'button';
+      b.setAttribute('aria-expanded', 'false');
+      b.addEventListener('click', function () {
+        var abierta = li.classList.toggle('es-entera');
+        b.textContent = abierta ? 'Leer menos' : 'Leer entera';
+        b.setAttribute('aria-expanded', abierta ? 'true' : 'false');
+      });
+      li.querySelector('.resena__texto').appendChild(b);
+    });
+  }
+
+  /* El slider: flechas, barra de progreso y arrastre con el ratón */
+  function suaveONo() {
+    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  }
+  function anchoTarjeta() {
+    var t = listaResenas.querySelector('.resena');
+    var hueco = parseFloat(getComputedStyle(listaResenas).columnGap) || 0;
+    return t ? t.getBoundingClientRect().width + hueco : listaResenas.clientWidth;
+  }
+  function pasoResenas() {
+    var ancho = anchoTarjeta();
+    var hueco = parseFloat(getComputedStyle(listaResenas).columnGap) || 0;
+    return ancho * Math.max(1, Math.floor((listaResenas.clientWidth + hueco + 4) / ancho));
+  }
+  function actualizarSlider() {
+    var max = listaResenas.scrollWidth - listaResenas.clientWidth;
+    var desliza = max > 4 && !!listaResenas.querySelector('.resena');
+    controlesResenas.hidden = !desliza;
+    listaResenas.classList.toggle('desliza', desliza);
+    if (!desliza) return;
+    var visible = listaResenas.clientWidth / listaResenas.scrollWidth;
+    var pos = Math.min(1, Math.max(0, listaResenas.scrollLeft / max));
+    barraResenas.style.width = (visible * 100).toFixed(2) + '%';
+    barraResenas.style.left = (pos * (1 - visible) * 100).toFixed(2) + '%';
+    anteriorResenas.disabled = listaResenas.scrollLeft <= 4;
+    siguienteResenas.disabled = listaResenas.scrollLeft >= max - 4;
+  }
+  var sliderPendiente = false;
+  listaResenas.addEventListener('scroll', function () {
+    if (sliderPendiente) return;
+    sliderPendiente = true;
+    requestAnimationFrame(function () { sliderPendiente = false; actualizarSlider(); });
+  }, { passive: true });
+  window.addEventListener('resize', actualizarSlider);
+  anteriorResenas.addEventListener('click', function () { listaResenas.scrollBy({ left: -pasoResenas(), behavior: suaveONo() }); });
+  siguienteResenas.addEventListener('click', function () { listaResenas.scrollBy({ left: pasoResenas(), behavior: suaveONo() }); });
+
+  // Arrastrar con el ratón (con el dedo ya se desliza solo)
+  (function () {
+    var arrastre = null;
+    listaResenas.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'mouse' || e.button !== 0 || !listaResenas.classList.contains('desliza')) return;
+      arrastre = { x: e.clientX, inicio: listaResenas.scrollLeft, movido: false, id: e.pointerId };
+    });
+    listaResenas.addEventListener('pointermove', function (e) {
+      if (!arrastre) return;
+      var dx = e.clientX - arrastre.x;
+      if (!arrastre.movido) {
+        if (Math.abs(dx) < 6) return;
+        arrastre.movido = true;
+        listaResenas.classList.add('arrastrando');
+        try { listaResenas.setPointerCapture(arrastre.id); } catch (err) { /* sin captura, también vale */ }
+      }
+      listaResenas.scrollLeft = arrastre.inicio - dx;
+    });
+    function soltar() {
+      if (!arrastre) return;
+      var movido = arrastre.movido;
+      arrastre = null;
+      if (!movido) return;
+      listaResenas.classList.remove('arrastrando');
+      // Queda encajada en la tarjeta más cercana
+      var primera = listaResenas.firstElementChild;
+      var mejor = 0;
+      Array.prototype.forEach.call(listaResenas.children, function (li) {
+        var x = li.offsetLeft - primera.offsetLeft;
+        if (Math.abs(x - listaResenas.scrollLeft) < Math.abs(mejor - listaResenas.scrollLeft)) mejor = x;
+      });
+      listaResenas.scrollTo({ left: mejor, behavior: suaveONo() });
+      // El clic que sigue al arrastre no cuenta (no abre «Leer entera» sin querer)
+      function parar(ev) { ev.stopPropagation(); ev.preventDefault(); }
+      listaResenas.addEventListener('click', parar, true);
+      setTimeout(function () { listaResenas.removeEventListener('click', parar, true); }, 0);
+    }
+    listaResenas.addEventListener('pointerup', soltar);
+    listaResenas.addEventListener('pointercancel', soltar);
+  })();
 
   function cargarResenas() {
     if (!resenasActivas()) { pintarResenas(); return; }
@@ -1302,14 +1401,6 @@
       pintarResenas();
     });
   }
-
-  botonMasResenas.addEventListener('click', function () {
-    var antes = opiniones.mostradas;
-    opiniones.mostradas += POR_TANDA;
-    pintarResenas(antes);
-    var primera = listaResenas.children[antes];
-    if (primera) { primera.tabIndex = -1; primera.focus({ preventScroll: true }); }
-  });
 
   /* Ventana para escribir una reseña: estrellas, nombre y comentario */
   function pintarEstrellasElegidas(n) {
