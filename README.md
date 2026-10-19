@@ -8,9 +8,9 @@ Segunda versión de la web de SOÑO. Tiene las mismas funciones que la primera (
 - **Panel**: se abre tocando el logo de la cabecera. Usa el mismo usuario y contraseña que la primera web: `ADMIN_USER` y `ADMIN_PASSWORD`.
 - **Servidor**: Node.js sin dependencias. Guarda todo en la carpeta de datos (un volumen de Docker).
 
-## Portada: el vaso que se llena
+## La taza que se llena
 
-Al bajar por la portada, el dibujo se queda fijo en el centro y el vaso se llena en tres pasos: espresso doble (60 ml), leche (hasta 240 ml) y espuma. Al terminar sale el vapor y la página sigue. Abajo se ven los tres pasos y los mililitros. Con «reducir movimiento» activado en el sistema, o en pantallas muy bajas, el vaso aparece ya lleno y sin efecto.
+Justo después de la portada hay una sección, «Así preparamos tu café». Al bajar, el dibujo se queda fijo en el centro y la taza (la misma de la portada, más grande) se llena en tres pasos: la cafetera sirve el café (60 ml), la jarra añade la leche (hasta 220 ml) y después la espuma (250 ml). Al terminar aparecen un corazón en la espuma y el vapor, y la página sigue. La cafetera y la jarra tienen el mismo tamaño. Con «reducir movimiento» activado en el sistema, o en pantallas muy bajas, la taza aparece ya llena y sin efecto.
 
 ## Novedad: favoritos
 
