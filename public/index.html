@@ -208,45 +208,94 @@
         <a class="boton boton--lleno" href="#reservar" data-abrir-reserva>Reservar mesa</a>
         <a class="boton boton--borde" href="#carta">Ver la carta</a>
       </div>
-      <div class="portada__dibujo">
-        <svg viewBox="0 0 900 320" role="img" aria-label="Dibujo de una cafetera de filtro, una bolsa de café de SOÑO, una taza humeante y un cruasán">
-          <circle class="mancha" cx="540" cy="168" r="136"/>
-          <path class="trazo" d="M24 300 H876"/>
-          <use href="#i-chemex" x="56" y="112" width="200" height="206" style="--relleno: var(--lienzo)"/>
-          <g transform="translate(-60 -32)">
-            <path class="trazo lleno" d="M340 332 L346 150 L438 150 L444 332 Z"/>
-            <path class="trazo lleno" d="M346 150 L352 104 L432 104 L438 150 Z"/>
-            <path class="trazo" d="M352 104 L354 90 L430 90 L432 104"/>
-            <path class="trazo" d="M361 90 V104 M374 90 V104 M387 90 V104 M400 90 V104 M413 90 V104"/>
-            <path class="trazo" d="M349 127 H435"/>
-            <path class="trazo" d="M424 150 L428 332"/>
-            <rect class="trazo" x="358" y="190" width="56" height="84" rx="5"/>
-            <use href="#i-grano" x="373" y="200" width="26" height="26"/>
-            <text class="dibujo__texto" x="386" y="246" text-anchor="middle">SOÑO</text>
-            <text class="dibujo__texto dibujo__texto--peque" x="386" y="262" text-anchor="middle">café</text>
-          </g>
-          <g transform="translate(330 -100)">
-            <ellipse class="trazo lleno" cx="210" cy="376" rx="128" ry="24"/>
-            <ellipse class="trazo" cx="210" cy="371" rx="70" ry="12"/>
-            <path class="trazo" d="M304 282 C346 274 354 326 314 338 C307 340 299 339 292 335"/>
-            <path class="trazo lleno" d="M118 262 C118 334 160 366 210 366 C260 366 302 334 302 262 Z"/>
-            <ellipse class="trazo lleno" cx="210" cy="262" rx="92" ry="18"/>
-            <ellipse class="cafe" cx="210" cy="264" rx="78" ry="11"/>
-            <path class="espuma" d="M210 270 C196 262 192 256 200 254 C205 253 208 256 210 259 C212 256 215 253 220 254 C228 256 224 262 210 270 Z"/>
-            <path class="trazo vapor" d="M180 236 C164 212 196 198 180 172 C168 152 188 140 178 120"/>
-            <path class="trazo vapor vapor--b" d="M214 232 C198 204 230 188 214 156"/>
-            <path class="trazo vapor vapor--c" d="M248 236 C232 212 264 198 248 172"/>
-          </g>
-          <g transform="translate(338 -112)">
-            <ellipse class="trazo lleno" cx="452" cy="392" rx="92" ry="20"/>
-            <ellipse class="trazo" cx="452" cy="390" rx="58" ry="10"/>
-            <use href="#i-cruasan" x="392" y="320" width="122" height="100" style="--relleno: var(--lienzo)"/>
-          </g>
-          <use href="#i-grano" x="226" y="280" width="18" height="18"/>
-          <use href="#i-grano" x="246" y="286" width="14" height="14"/>
-          <use href="#i-grano" x="680" y="282" width="16" height="16"/>
-        </svg>
+    </div>
+
+    <!-- Escena: el vaso se llena al bajar por la página (app.js mueve los niveles) -->
+    <div class="escena" id="escena">
+      <div class="wrap escena__fijo" id="escena-fijo">
+        <div class="portada__dibujo">
+          <svg id="escena-svg" viewBox="0 0 900 400" role="img" aria-label="Dibujo de un vaso que se llena de espresso, leche y espuma al bajar por la página, junto a una cafetera de filtro, una bolsa de café de SOÑO y un cruasán">
+            <defs>
+              <clipPath id="vaso-dentro"><path d="M451 153 H589 L576 364 H464 Z"/></clipPath>
+            </defs>
+            <circle class="mancha" cx="520" cy="232" r="142"/>
+            <path class="trazo" d="M24 380 H876"/>
+            <g transform="translate(0 80)">
+              <use href="#i-chemex" x="56" y="112" width="200" height="206" style="--relleno: var(--lienzo)"/>
+              <g transform="translate(-60 -32)">
+                <path class="trazo lleno" d="M340 332 L346 150 L438 150 L444 332 Z"/>
+                <path class="trazo lleno" d="M346 150 L352 104 L432 104 L438 150 Z"/>
+                <path class="trazo" d="M352 104 L354 90 L430 90 L432 104"/>
+                <path class="trazo" d="M361 90 V104 M374 90 V104 M387 90 V104 M400 90 V104 M413 90 V104"/>
+                <path class="trazo" d="M349 127 H435"/>
+                <path class="trazo" d="M424 150 L428 332"/>
+                <rect class="trazo" x="358" y="190" width="56" height="84" rx="5"/>
+                <use href="#i-grano" x="373" y="200" width="26" height="26"/>
+                <text class="dibujo__texto" x="386" y="246" text-anchor="middle">SOÑO</text>
+                <text class="dibujo__texto dibujo__texto--peque" x="386" y="262" text-anchor="middle">café</text>
+              </g>
+              <g transform="translate(338 -112)">
+                <ellipse class="trazo lleno" cx="452" cy="392" rx="92" ry="20"/>
+                <ellipse class="trazo" cx="452" cy="390" rx="58" ry="10"/>
+                <use href="#i-cruasan" x="392" y="320" width="122" height="100" style="--relleno: var(--lienzo)"/>
+              </g>
+              <use href="#i-grano" x="226" y="280" width="18" height="18"/>
+              <use href="#i-grano" x="246" y="286" width="14" height="14"/>
+              <use href="#i-grano" x="606" y="284" width="16" height="16"/>
+            </g>
+
+            <!-- Chorros: de la jarra al líquido -->
+            <rect class="chorro chorro--espresso" id="chorro-espresso" x="498.5" y="70" width="3" height="0" rx="1.5"/>
+            <rect class="chorro chorro--leche" id="chorro-leche" x="497.5" y="70" width="5" height="0" rx="2.5"/>
+            <rect class="chorro chorro--espuma" id="chorro-espuma" x="498.5" y="70" width="3" height="0" rx="1.5"/>
+
+            <!-- Vaso: cristal, líquido por capas y contorno -->
+            <path class="vaso__cristal" d="M445 150 L460 380 H580 L595 150 Z"/>
+            <g clip-path="url(#vaso-dentro)">
+              <g class="capa" id="capa-espuma" transform="translate(0 170.2)">
+                <g class="ola ola--c"><path class="liquido liquido--espuma" d="M420 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 V 260 H 420 Z"/></g>
+                <circle class="burbuja" cx="474" cy="9" r="1.8"/><circle class="burbuja" cx="497" cy="14" r="1.3"/>
+                <circle class="burbuja" cx="521" cy="8" r="2.2"/><circle class="burbuja" cx="546" cy="13" r="1.5"/>
+                <circle class="burbuja" cx="568" cy="9" r="1.9"/>
+              </g>
+              <g class="capa" id="capa-leche" transform="translate(0 196.0)">
+                <g class="ola"><path class="liquido liquido--leche" d="M420 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 V 260 H 420 Z"/></g>
+              </g>
+              <g class="capa" id="capa-espresso" transform="translate(0 325.0)">
+                <g class="ola ola--b"><path class="liquido liquido--espresso" d="M420 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 q 10 -3 20 0 t 20 0 V 260 H 420 Z"/></g>
+              </g>
+            </g>
+            <path class="trazo" d="M445 150 L460 380 H580 L595 150"/>
+            <path class="trazo" d="M442 150 H598"/>
+            <path class="trazo" d="M461.5 364 H578.5"/>
+            <path class="trazo vaso__brillo" d="M458 176 L467 334"/>
+            <path class="trazo" d="M588.6 325.0 H596.6"/><text class="vaso__ml" x="601.6" y="329.0">60 ml</text>
+            <path class="trazo" d="M591.4 282.0 H599.4"/><text class="vaso__ml" x="604.4" y="286.0">120 ml</text>
+            <path class="trazo" d="M594.2 239.0 H602.2"/><text class="vaso__ml" x="607.2" y="243.0">180 ml</text>
+            <path class="trazo" d="M597.0 196.0 H605.0"/><text class="vaso__ml" x="610.0" y="200.0">240 ml</text>
+
+            <!-- Jarras: la pequeña sirve el espresso; la grande, la leche y la espuma -->
+            <g class="jarra" id="jarra-espresso" transform="translate(500 70) rotate(-18) scale(0.62)" opacity="0"><path class="trazo lleno" d="M0 0 Q8 1 15 5 H66 L70 80 Q70 88 62 88 H18 Q10 88 10 80 L13.5 16 Q7 9 0 0 Z"/><path class="trazo" d="M69 20 C90 20 94 30 94 44 C94 58 88 66 70 68"/><path class="trazo" d="M12.4 34 H67.2"/></g>
+            <g class="jarra" id="jarra-leche" transform="translate(500 70) rotate(-18)" opacity="0"><path class="trazo lleno" d="M0 0 Q8 1 15 5 H66 L70 80 Q70 88 62 88 H18 Q10 88 10 80 L13.5 16 Q7 9 0 0 Z"/><path class="trazo" d="M69 20 C90 20 94 30 94 44 C94 58 88 66 70 68"/><path class="trazo" d="M12.4 34 H67.2"/></g>
+
+            <!-- Vapor cuando el café está listo -->
+            <g class="escena__vapor" id="escena-vapor">
+              <path class="trazo vapor" d="M492 136 C480 116 504 104 492 82 C484 68 496 58 490 44"/>
+              <path class="trazo vapor vapor--b" d="M520 132 C508 110 532 98 520 72"/>
+              <path class="trazo vapor vapor--c" d="M548 136 C536 116 560 104 548 82"/>
+            </g>
+          </svg>
+        </div>
+        <div class="escena__pie" aria-hidden="true">
+          <ol class="escena__pasos">
+            <li class="escena__paso" id="paso-1"><span>Espresso</span><span class="escena__barra"><span></span></span></li>
+            <li class="escena__paso" id="paso-2"><span>Leche</span><span class="escena__barra"><span></span></span></li>
+            <li class="escena__paso" id="paso-3"><span>Espuma</span><span class="escena__barra"><span></span></span></li>
+          </ol>
+          <p class="escena__texto"><span id="escena-texto">Tu café con leche, listo</span> <span class="escena__ml" id="escena-ml">276 ml</span></p>
+        </div>
       </div>
+      <div class="escena__recorrido" aria-hidden="true"></div>
     </div>
   </section>
 

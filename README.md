@@ -8,6 +8,10 @@ Segunda versión de la web de SOÑO. Tiene las mismas funciones que la primera (
 - **Panel**: se abre tocando el logo de la cabecera. Usa el mismo usuario y contraseña que la primera web: `ADMIN_USER` y `ADMIN_PASSWORD`.
 - **Servidor**: Node.js sin dependencias. Guarda todo en la carpeta de datos (un volumen de Docker).
 
+## Portada: el vaso que se llena
+
+Al bajar por la portada, el dibujo se queda fijo en el centro y el vaso se llena en tres pasos: espresso doble (60 ml), leche (hasta 240 ml) y espuma. Al terminar sale el vapor y la página sigue. Abajo se ven los tres pasos y los mililitros. Con «reducir movimiento» activado en el sistema, o en pantallas muy bajas, el vaso aparece ya lleno y sin efecto.
+
 ## Novedad: favoritos
 
 Encima de las cajas de la carta salen 4 productos destacados en tarjetas. Para elegirlos, añade la etiqueta `Favorito` a los productos en el panel (pestaña **Carta**). Si hay menos de 4 marcados, el resto se completa solo con un producto de cada sección, primero los que tienen foto.
