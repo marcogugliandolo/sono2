@@ -1,6 +1,6 @@
 # SOÑO · web de la cafetería (versión 2, minimalista)
 
-Segunda versión de la web de SOÑO. Tiene las mismas funciones que la primera (repo `sono`): carta con alérgenos, pedidos para llevar, galería, reservas de mesa, formulario de contacto y el mismo panel para editarlo todo sin tocar código. Cambia el diseño.
+Segunda versión de la web de SOÑO. Tiene las mismas funciones que la primera (repo `sono`): carta con alérgenos, pedidos para llevar, galería, reservas de mesa, formulario de contacto y el mismo panel para editarlo todo sin tocar código. Cambia el diseño, y añade el Club SOÑO, las reseñas, el historial de versiones y los textos legales con el aviso de cookies.
 
 - **Diseño**: basado en la plantilla de Canva «Cafe Website in Cream Blue Orange Handdrawn Human-centric Style», en versión minimalista. Tiene portada centrada con un bodegón dibujado a línea, franja de «Nuestra historia», carta con tarjetas de favoritos y una caja por sección, bloques de dos tarjetas para «Para llevar» y «Visítanos», y pie en tarjeta.
 - **Marca**: el mismo logo SOÑO en vector (el café de la Ñ se mueve) y los colores oficiales: marrón rgb(86, 41, 18) · #562912 y beige rgb(243, 224, 166) · #F3E0A6. El fondo general es un beige muy aclarado (#FBF7EB).
@@ -18,7 +18,7 @@ Cada vez que se guardan cambios desde el panel en la **carta**, las **fotos**, l
 
 **Volver a esta versión** deja esa parte de la web como estaba en ese momento; el resto no se toca. La versión de antes de volver también se guarda, así que se puede deshacer. Se guardan las últimas 30 versiones de cada parte (en `versiones.json`). La primera vez que arranca, se guarda cómo estaba la web como punto de partida.
 
-El historial es para lo que se cambia desde el panel. Las reservas, pedidos, mensajes y socios del club no entran (cada uno tiene su propia pestaña).
+El historial es para lo que se cambia desde el panel. Las reservas, pedidos, mensajes, socios del club y reseñas no entran (cada uno tiene su propia pestaña). Tampoco los interruptores del club y de las reseñas: volver a una versión de Ajustes no los enciende ni los apaga.
 
 ## Club SOÑO: tarjeta de sellos
 
@@ -38,6 +38,31 @@ Los socios pueden darse de baja ellos mismos desde su tarjeta (se borran sus dat
 
 Los datos del club están en `socios.json` y la clave que firma las sesiones en `secreto.json`, dentro del volumen de datos. Si se pierde `secreto.json`, los socios solo tienen que volver a entrar.
 
+## Reseñas
+
+Sección «Lo que nos contáis», después de la galería. Arriba sale la nota media (por ejemplo, 4,6 con 12 reseñas) y debajo las reseñas en tarjetas, de 6 en 6 con «Ver más reseñas». Cualquiera puede escribir una desde «Escribir una reseña»: estrellas del 1 al 5, nombre (como quiera que salga), comentario y la casilla para aceptar que se publique. Si quien escribe tiene abierta su tarjeta del club, la reseña sale con la etiqueta «Socio del club».
+
+Las reseñas **no salen en la web hasta que se publican** desde el panel, pestaña **Reseñas**:
+- **Reseñas activas en la web**: interruptor arriba de la pestaña, como el del club. Se guarda al momento. Desactivado, la sección y el enlace del menú desaparecen y nadie puede escribir; las reseñas se guardan para cuando se vuelva a activar.
+- Filtros **Por revisar**, **Publicadas**, **Ocultas** y **Todas**. La pestaña muestra cuántas hay por revisar, por ejemplo «Reseñas (2)».
+- En cada reseña: **Publicar**, **Ocultar** (deja de salir en la web pero no se borra), **Responder** (la respuesta sale debajo, firmada por SOÑO) y **Borrar**.
+
+Conviene publicar también las negativas si son respetuosas: es lo que dice el aviso legal («publicamos tanto las buenas como las malas») y lo que da confianza. Solo se dejan fuera las que tienen insultos, datos de otras personas, publicidad o nada que ver con SOÑO. Las reseñas no se pueden editar, solo publicar, ocultar, responder o borrar.
+
+Con `#escribir-resena` al final de la dirección (por ejemplo `https://tu-dominio/#escribir-resena`) se abre directamente la ventana para escribir una; sirve para un QR en las mesas o en el ticket.
+
+Para evitar spam: hay una trampa para bots, cada IP puede enviar 3 reseñas por hora y como mucho se guardan 200 por revisar. Se guardan en `resenas.json`.
+
+## Cookies, aviso legal y privacidad
+
+- **Aviso de cookies**: un aviso pequeño abajo a la izquierda, la primera vez que se entra. La web solo usa cookies técnicas (la de la tarjeta del club y la del panel), que no necesitan consentimiento (artículo 22.2 de la LSSI), así que el aviso solo informa: «Entendido» lo cierra y no vuelve a salir en ese navegador. No hay botón de rechazar porque no hay nada que rechazar. **Si algún día se añade Google Analytics, un mapa de Google, un vídeo de YouTube o el píxel de Meta, entonces sí habría que pedir permiso antes** (con «Aceptar» y «Rechazar» igual de visibles) y actualizar la política de cookies.
+- **Textos legales en su propia página**: `/aviso-legal`, `/privacidad` y `/cookies` (una sola página con tres pestañas). Se enlazan desde el pie de la web, y cada formulario (reservas, pedidos, «Escríbenos», club y reseñas) lleva una línea corta que explica para qué se usan los datos, con el enlace a la política de privacidad.
+- Los textos se rellenan solos con **Ajustes → Datos legales**: titular (nombre y apellidos o razón social), NIF o CIF, domicilio y email para privacidad (si se dejan vacíos, se usan la dirección y el email de contacto) y los datos del Registro Mercantil si es una sociedad. Mientras falten el titular o el NIF, el panel avisa y en la página sale «Por completar». La fecha de «Última actualización» cambia sola cuando se tocan estos datos.
+- Los textos se adaptan a lo que está activo (pedidos para llevar, club y reseñas) y cuentan lo que hace la web de verdad: qué datos se guardan, para qué y cuánto tiempo. Si se cambia algo de eso en el código, hay que cambiarlo también en `public/legal.js`.
+- Son una base pensada para esta web, no asesoramiento legal: conviene que la gestoría o un abogado los revise antes de abrir. Si la web va detrás de Cloudflare u otro servicio fuera de la UE, también habría que mencionarlo en la política de privacidad.
+
+**Borrado automático** (lo que dice la política de privacidad): las reservas se borran 90 días después de su fecha, los pedidos a los 30 días y los mensajes al año. Se hace al arrancar y cada 6 horas.
+
 ## Novedad: favoritos
 
 Encima de las cajas de la carta salen 4 productos destacados en tarjetas. Para elegirlos, añade la etiqueta `Favorito` a los productos en el panel (pestaña **Carta**). Si hay menos de 4 marcados, el resto se completa solo con un producto de cada sección, primero los que tienen foto.
@@ -52,6 +77,8 @@ Al reservar mesa se puede elegir zona en un mini plano: interior, zona de lectur
 server.js              servidor web y API
 datos-iniciales.json   carta y horarios de partida (solo se usan el primer arranque)
 public/                la web: index.html, styles.css, app.js, tipografías
+public/legal.html      página de aviso legal, privacidad y cookies (el texto está en legal.js)
+public/cookies.js      aviso de cookies (lo usan la web y la página legal)
 public/vendor/         librerías del QR del club (dibujarlo y leerlo con la cámara), con sus licencias
 stack-portainer.yml    stack para el «Web editor» de Portainer (descarga el código de GitHub)
 Dockerfile             imagen de la web
@@ -111,7 +138,7 @@ Las reservas, los pedidos y los mensajes de cada web siguen separados.
 
 ## Copia de seguridad
 
-Todo está en el volumen del stack (Portainer lo llama `sono2_sono2_datos`): `contenido.json`, `reservas.json`, `pedidos.json`, `mensajes.json`, `socios.json`, `secreto.json`, `versiones.json` y la carpeta `fotos/`.
+Todo está en el volumen del stack (Portainer lo llama `sono2_sono2_datos`): `contenido.json`, `reservas.json`, `pedidos.json`, `mensajes.json`, `socios.json`, `resenas.json`, `secreto.json`, `versiones.json` y la carpeta `fotos/`.
 
 ```bash
 docker run --rm -v sono2_sono2_datos:/datos -v "$PWD":/copia alpine \
