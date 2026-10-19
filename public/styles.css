@@ -1389,10 +1389,10 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 .zona-admin .boton { margin-bottom: 6px; }
 
 /* ---------- Reseñas ---------- */
-.resenas__lado { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; }
+.resenas__lado { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 16px 28px; margin-top: 6px; }
 .resenas__media { display: flex; align-items: center; gap: 14px; }
 .resenas__nota { font-family: var(--f-titulo); font-size: clamp(3rem, 5vw, 4rem); line-height: 0.9; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.resenas__media-texto { display: grid; gap: 6px; }
+.resenas__media-texto { display: grid; gap: 6px; justify-items: start; text-align: left; }
 .resenas__total { font-family: var(--f-mono); font-size: 0.75rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cafe-suave); }
 .estrellas { display: inline-flex; gap: 3px; color: var(--cafe); }
 .estrellas svg { width: 20px; height: 20px; --grosor: 1.5; overflow: visible; }
@@ -1665,7 +1665,7 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 }
 @media (max-width: 640px) {
   .resenas__vacio { grid-template-columns: minmax(0, 1fr); justify-items: start; }
-  .resenas__lado { width: 100%; justify-content: space-between; }
+  .resenas__lado { flex-direction: column; gap: 18px; }
   /* En el móvil el slider llega hasta los bordes de la pantalla y asoma la siguiente tarjeta */
   .resenas { gap: 12px; margin-inline: -20px; padding-inline: 20px; scroll-padding-inline: 20px; }
   .resena { flex-basis: 86%; gap: 14px; padding: 22px; }
