@@ -1091,39 +1091,42 @@ input:focus-visible + .icono-chip { outline: 2px solid var(--cafe); outline-offs
 input:checked + .alergeno-chip { background: var(--cafe); border-color: var(--cafe); color: var(--lienzo); }
 input:focus-visible + .alergeno-chip { outline: 2px solid var(--cafe); outline-offset: 2px; }
 
-/* ---------- Club SOÑO ---------- */
+/* ---------- Club SOÑO ----------
+   Explicación, ejemplo de tarjeta y botones en un mismo recuadro beige, como «Para llevar» */
 .club {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
-  gap: clamp(32px, 6vw, 96px);
-  align-items: center;
+  grid-template-areas: "texto muestra" "acciones muestra";
+  gap: 28px clamp(32px, 6vw, 88px);
+  align-items: start;
 }
-.club__texto { display: grid; gap: 20px; justify-items: start; min-width: 0; }
+.club__texto { grid-area: texto; display: grid; gap: 18px; justify-items: start; min-width: 0; }
+.club__muestra { grid-area: muestra; align-self: center; display: grid; place-items: center; min-width: 0; }
+.club__acciones { grid-area: acciones; min-width: 0; }
+.club .meta { color: var(--cafe); }
 .club__intro { font-size: clamp(1.0625rem, 1.5vw, 1.2rem); line-height: 1.55; max-width: 44ch; }
 .club__intro strong { font-weight: 600; }
 .club__pasos { list-style: none; margin: 0; padding: 0; display: grid; width: 100%; max-width: 520px; }
-.club__pasos li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; padding-block: 14px; border-top: 1px solid var(--linea); }
-.club__pasos li:last-child { border-bottom: 1px solid var(--linea); }
-.club__num { font-family: var(--f-mono); font-size: 0.8125rem; color: var(--cafe-suave); padding-top: 3px; }
+.club__pasos li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; padding-block: 14px; border-top: 1px solid rgba(86, 41, 18, 0.2); }
+.club__pasos li:last-child { border-bottom: 1px solid rgba(86, 41, 18, 0.2); }
+.club__num { font-family: var(--f-mono); font-size: 0.8125rem; padding-top: 3px; }
 .club__pasos h3 { font-size: 1.0625rem; font-weight: 550; line-height: 1.35; }
 .club__pasos p { color: var(--cafe-suave); font-size: 0.9375rem; }
 .club__socio { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
 .club__hola { color: var(--cafe-suave); }
-.club__muestra { display: grid; place-items: center; min-width: 0; }
+/* El ejemplo de tarjeta, en claro sobre el recuadro beige */
 .club__carton {
   width: min(100%, 420px);
   display: grid;
   gap: 20px;
-  padding: clamp(22px, 3vw, 32px);
-  border-radius: 16px;
-  background: var(--beige);
+  padding: clamp(20px, 3vw, 30px);
+  border-radius: 14px;
+  background: var(--superficie);
+  border: 1px solid rgba(86, 41, 18, 0.12);
   transform: rotate(-2deg);
 }
 .club__carton-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.club__carton-cabeza .meta { color: var(--cafe); }
 .club__carton-logo { width: 46px; }
-.club__carton .sello:not(.sello--puesto) { background: var(--beige-suave); }
-.club__carton .sello--puesto { background: var(--lienzo); }
 .club__carton-pie { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-family: var(--f-mono); font-size: 0.75rem; letter-spacing: 0.04em; }
 
 /* Sellos: una taza por desayuno */
@@ -1225,6 +1228,7 @@ input:focus-visible + .alergeno-chip { outline: 2px solid var(--cafe); outline-o
 .club-admin__marco { position: absolute; inset: 16%; border: 2px solid rgba(255, 253, 247, 0.9); border-radius: 14px; box-shadow: 0 0 0 999px rgba(30, 14, 6, 0.35); pointer-events: none; }
 .club-admin__cancelar { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: var(--superficie); }
 .club-admin__aviso { min-height: 1.5em; margin: 0; }
+.club-admin__aviso.es-ok { padding: 10px 14px; border-radius: 10px; background: var(--beige); font-weight: 500; }
 .club-admin__quien { max-width: 360px; }
 .club-admin__ficha { display: grid; gap: 16px; padding: clamp(16px, 2.6vw, 26px); border-radius: var(--r-tarjeta); border: 1.5px solid var(--cafe); background: var(--superficie); }
 .club-admin__ficha-cabeza { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
@@ -1339,7 +1343,7 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 }
 @media (max-width: 900px) {
   .historia__rejilla, .escribenos, .dos-tarjetas { grid-template-columns: minmax(0, 1fr); }
-  .club { grid-template-columns: minmax(0, 1fr); }
+  .club { grid-template-columns: minmax(0, 1fr); grid-template-areas: "texto" "muestra" "acciones"; }
   .club__carton { transform: rotate(-1deg); }
   .historia__dibujo svg { width: min(100%, 340px); }
   .favoritos { grid-template-columns: repeat(2, minmax(0, 1fr)); }

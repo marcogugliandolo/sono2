@@ -440,33 +440,37 @@
   </section>
 
   <section class="seccion seccion--linea" id="club" aria-labelledby="t-club" data-club>
-    <div class="wrap club">
-      <div class="club__texto" data-aparece>
-        <p class="meta">Club SOÑO</p>
-        <h2 class="titulo" id="t-club">Tu tarjeta de desayunos</h2>
-        <p class="club__intro">Hazte socio gratis. Cada desayuno suma un sello y, al completar la tarjeta, <strong id="club-premio">un desayuno gratis</strong> corre de nuestra cuenta.</p>
-        <ol class="club__pasos">
-          <li><span class="club__num">01</span><div><h3>Hazte socio</h3><p>Con tu email y una contraseña. Es gratis.</p></div></li>
-          <li><span class="club__num">02</span><div><h3>Enseña tu QR</h3><p>Al pedir, abre tu tarjeta en el móvil y te ponemos el sello.</p></div></li>
-          <li><span class="club__num">03</span><div><h3>Completa la tarjeta</h3><p>Con <span id="club-n">10</span> sellos, el premio es tuyo.</p></div></li>
-        </ol>
-        <div class="acciones" id="club-acciones">
-          <button class="boton boton--lleno" type="button" data-club-alta>Unirme al club</button>
-          <button class="boton boton--borde" type="button" data-club-entrar>Ya soy socio</button>
+    <div class="wrap">
+      <div class="club tarjeta tarjeta--beige" data-aparece>
+        <div class="club__texto">
+          <p class="meta">Club SOÑO</p>
+          <h2 class="titulo" id="t-club">Tu tarjeta de desayunos</h2>
+          <p class="club__intro">Hazte socio gratis. Cada desayuno suma un sello y, al completar la tarjeta, <strong id="club-premio">un desayuno gratis</strong> corre de nuestra cuenta.</p>
+          <ol class="club__pasos">
+            <li><span class="club__num">01</span><div><h3>Hazte socio</h3><p>Con tu email y una contraseña. Es gratis.</p></div></li>
+            <li><span class="club__num">02</span><div><h3>Enseña tu QR</h3><p>Al pedir, abre tu tarjeta en el móvil y te ponemos el sello.</p></div></li>
+            <li><span class="club__num">03</span><div><h3>Completa la tarjeta</h3><p>Con <span id="club-n">10</span> sellos, el premio es tuyo.</p></div></li>
+          </ol>
         </div>
-        <div class="club__socio" id="club-acciones-socio" hidden>
-          <button class="boton boton--lleno" type="button" data-abrir-tarjeta>Ver mi tarjeta</button>
-          <p class="club__hola" id="club-hola"></p>
-        </div>
-      </div>
-      <div class="club__muestra" data-aparece aria-hidden="true">
-        <div class="club__carton">
-          <div class="club__carton-cabeza">
-            <svg class="logo club__carton-logo"><use href="#logo-sono"/></svg>
-            <p class="meta">Tarjeta de desayunos</p>
+        <div class="club__muestra" aria-hidden="true">
+          <div class="club__carton">
+            <div class="club__carton-cabeza">
+              <svg class="logo club__carton-logo"><use href="#logo-sono"/></svg>
+              <p class="meta">Tarjeta de desayunos</p>
+            </div>
+            <div class="tarjeta-sellos" id="club-muestra-sellos"></div>
+            <p class="club__carton-pie"><span>4 de 10</span><span>Premio al completarla</span></p>
           </div>
-          <div class="tarjeta-sellos" id="club-muestra-sellos"></div>
-          <p class="club__carton-pie"><span>4 de 10</span><span>Desayuno gratis al completarla</span></p>
+        </div>
+        <div class="club__acciones">
+          <div class="acciones" id="club-acciones">
+            <button class="boton boton--lleno" type="button" data-club-alta>Unirme al club</button>
+            <button class="boton boton--borde" type="button" data-club-entrar>Ya soy socio</button>
+          </div>
+          <div class="club__socio" id="club-acciones-socio" hidden>
+            <button class="boton boton--lleno" type="button" data-abrir-tarjeta>Ver mi tarjeta</button>
+            <p class="club__hola" id="club-hola"></p>
+          </div>
         </div>
       </div>
     </div>
