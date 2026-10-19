@@ -1723,10 +1723,10 @@
      Va justo después de la portada. El dibujo se queda fijo en el centro mientras
      se recorre «.escena__recorrido». p va de 0 (taza vacía) a 1 (café listo):
        0,00–0,33  la cafetera sirve el café (60 ml)
-       0,33–0,66  la jarra añade la leche (hasta 220 ml)
-       0,66–0,90  la jarra pone la espuma (hasta 250 ml)
+       0,33–0,66  la misma cafetera añade la leche (hasta 220 ml)
+       0,66–0,90  y después la espuma (hasta 250 ml)
        0,90–1,00  sale el vapor y aparece el corazón en la espuma
-     La cafetera y la jarra tienen siempre el mismo tamaño.
+     Siempre es la misma cafetera, con el mismo tamaño.
      Sin JavaScript, o con «reducir movimiento», se ve la taza ya llena. */
   (function () {
     var escena = $('escena');
@@ -1743,14 +1743,13 @@
     var corazon = $('corazon');
     var chorros = { cafe: $('chorro-cafe'), leche: $('chorro-leche'), espuma: $('chorro-espuma') };
     var cafetera = $('cafetera');
-    var jarra = $('jarra');
     var vapor = $('escena-vapor');
     var pasos = [$('paso-1'), $('paso-2'), $('paso-3')];
     var barras = pasos.map(function (li) { return li.querySelector('.escena__barra > span'); });
     var textoEl = $('escena-texto');
     var mlEl = $('escena-ml');
-    var PICO = { x: 300, y: 74 };     // pico de la cafetera y de la jarra (en el dibujo)
-    var ESCALA = 1.15;                // tamaño de la cafetera y la jarra: el mismo para las dos
+    var PICO = { x: 300, y: 74 };     // pico de la cafetera (en el dibujo)
+    var ESCALA = 1.15;                // tamaño de la cafetera: no cambia en toda la escena
     var reducido = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
 
     function entre(v, a, b) { return Math.min(b, Math.max(a, v)); }
@@ -1812,13 +1811,13 @@
       elipse(superficie, yEspuma);
       superficie.style.opacity = fEspuma > 0.004 ? '1' : '0';
 
-      // Cafetera y jarra: se inclinan para servir y vuelven; mismo tamaño las dos
-      var giroCafetera = -18 - 40 * (suave(tramo(p, 0, 0.05)) - suave(tramo(p, 0.28, 0.33)));
-      var giroJarra = -18 - 40 * (suave(tramo(p, 0.36, 0.4)) - suave(tramo(p, 0.86, 0.91)));
-      cafetera.setAttribute('transform', 'translate(' + PICO.x + ' ' + PICO.y + ') rotate(' + giroCafetera.toFixed(2) + ') scale(' + ESCALA + ')');
-      jarra.setAttribute('transform', 'translate(' + PICO.x + ' ' + PICO.y + ') rotate(' + giroJarra.toFixed(2) + ') scale(' + ESCALA + ')');
-      cafetera.setAttribute('opacity', (1 - tramo(p, 0.31, 0.35)).toFixed(3));
-      jarra.setAttribute('opacity', (tramo(p, 0.33, 0.37) * (1 - tramo(p, 0.91, 0.95))).toFixed(3));
+      // La cafetera se inclina para servir el café, se endereza un momento,
+      // vuelve a inclinarse para la leche y la espuma, y al final desaparece
+      var inclinaCafe = suave(tramo(p, 0, 0.05)) - suave(tramo(p, 0.28, 0.33));
+      var inclinaLeche = suave(tramo(p, 0.36, 0.4)) - suave(tramo(p, 0.86, 0.91));
+      var giro = -18 - 40 * Math.max(inclinaCafe, inclinaLeche);
+      cafetera.setAttribute('transform', 'translate(' + PICO.x + ' ' + PICO.y + ') rotate(' + giro.toFixed(2) + ') scale(' + ESCALA + ')');
+      cafetera.setAttribute('opacity', (1 - tramo(p, 0.91, 0.95)).toFixed(3));
 
       // Chorros: del pico a la superficie, solo mientras se sirve
       var fondo = enDibujoY(yEspuma) + 1;
