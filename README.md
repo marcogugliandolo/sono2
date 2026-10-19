@@ -12,6 +12,23 @@ Segunda versión de la web de SOÑO. Tiene las mismas funciones que la primera (
 
 Justo después de la portada hay una sección, «Así preparamos tu café». Al bajar, el dibujo se queda fijo en el centro y la taza (la misma de la portada, más grande) se llena en tres pasos: la cafetera sirve el café (60 ml), la leche (hasta 220 ml) y después la espuma (250 ml). Al terminar aparecen un corazón en la espuma y el vapor, y la página sigue. Siempre es la misma cafetera, con el mismo tamaño. Con «reducir movimiento» activado en el sistema, o en pantallas muy bajas, la taza aparece ya llena y sin efecto.
 
+## Club SOÑO: tarjeta de sellos
+
+Los clientes se hacen socios desde la web (sección «Club»): nombre, email, teléfono opcional y una contraseña. Al entrar se abre su tarjeta en una ventana con los sellos (una taza por desayuno), su código QR y los últimos movimientos. Mientras la tarjeta está abierta se actualiza sola, así ven el sello en cuanto se lo ponéis. Con `#tarjeta` al final de la dirección (por ejemplo `https://tu-dominio/#tarjeta`) se abre la tarjeta directamente; pueden guardarlo como acceso en el móvil.
+
+En el panel, pestaña **Club**:
+- **Escanear QR**: abre la cámara del móvil o la tablet y lee el QR del socio. La cámara del navegador solo funciona si la web va por **https** (con su dominio); por `http://IP:puerto` no. Mientras tanto, se puede escribir el **código** que sale debajo del QR (por ejemplo `BZ4Z-4BAR`).
+- **+1 sello**, **−1** para corregir y **Canjear premio** cuando la tarjeta está completa (la tarjeta vuelve a empezar y lo que sobre se conserva).
+- **Quién atiende**: el nombre que escribáis sale en la tarjeta del socio («Sello añadido por Marta»). Se recuerda en cada dispositivo.
+- **Nueva contraseña** para quien la haya olvidado: se enseña una vez para dársela al socio y cierra sus sesiones abiertas.
+- **Borrar socio**, y una lista de socios con buscador por nombre, email, teléfono o código.
+
+En **Ajustes → Club SOÑO** se elige cuántos sellos tiene la tarjeta (de 3 a 20; por defecto 10), cuál es el premio y si el club se muestra en la web.
+
+Los socios pueden darse de baja ellos mismos desde su tarjeta (se borran sus datos). Las contraseñas se guardan cifradas (scrypt) y la sesión del socio dura 120 días. Al recoger nombre, email y teléfono, conviene mencionarlo en la política de privacidad de la cafetería.
+
+Los datos del club están en `socios.json` y la clave que firma las sesiones en `secreto.json`, dentro del volumen de datos. Si se pierde `secreto.json`, los socios solo tienen que volver a entrar.
+
 ## Novedad: favoritos
 
 Encima de las cajas de la carta salen 4 productos destacados en tarjetas. Para elegirlos, añade la etiqueta `Favorito` a los productos en el panel (pestaña **Carta**). Si hay menos de 4 marcados, el resto se completa solo con un producto de cada sección, primero los que tienen foto.
@@ -26,6 +43,7 @@ Al reservar mesa se puede elegir zona en un mini plano: interior, zona de lectur
 server.js              servidor web y API
 datos-iniciales.json   carta y horarios de partida (solo se usan el primer arranque)
 public/                la web: index.html, styles.css, app.js, tipografías
+public/vendor/         librerías del QR del club (dibujarlo y leerlo con la cámara), con sus licencias
 stack-portainer.yml    stack para el «Web editor» de Portainer (descarga el código de GitHub)
 Dockerfile             imagen de la web
 docker-compose.yml     stack para Portainer con la imagen de GitHub
@@ -84,7 +102,7 @@ Las reservas, los pedidos y los mensajes de cada web siguen separados.
 
 ## Copia de seguridad
 
-Todo está en el volumen del stack (Portainer lo llama `sono2_sono2_datos`): `contenido.json`, `reservas.json`, `pedidos.json`, `mensajes.json` y la carpeta `fotos/`.
+Todo está en el volumen del stack (Portainer lo llama `sono2_sono2_datos`): `contenido.json`, `reservas.json`, `pedidos.json`, `mensajes.json`, `socios.json`, `secreto.json` y la carpeta `fotos/`.
 
 ```bash
 docker run --rm -v sono2_sono2_datos:/datos -v "$PWD":/copia alpine \

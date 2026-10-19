@@ -467,6 +467,7 @@
 
   function pintarDatos() {
     var d = estado.datos || {};
+    pintarClub();
     pintarZonas();
     actualizarResumen();
     ponerDato('dato-direccion', d.direccion);
@@ -933,6 +934,247 @@
     });
   });
 
+  /* ---------- Club SOÑO: tarjeta de sellos ----------
+     El socio entra con su email y contraseña y ve su tarjeta en una ventana:
+     los sellos (tazas), su QR para enseñarlo en la barra y los últimos movimientos.
+     Mientras la tarjeta está abierta se actualiza sola, así el sello aparece al momento. */
+  var socio = null;
+  var modalClub = $('modal-club');
+  var modalTarjeta = $('modal-tarjeta');
+  var fCorta = new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  var fMesAnio = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' });
+
+  function ajustesClub() {
+    var c = (estado.datos && estado.datos.club) || {};
+    return { activo: c.activo !== false, sellos: c.sellos || 10, premio: c.premio || 'un desayuno gratis' };
+  }
+  function codigoBonito(c) { return c ? c.slice(0, 4) + '-' + c.slice(4) : ''; }
+
+  /* Tazas de la tarjeta: las selladas, rellenas y un poco giradas, como un sello de goma */
+  function pintarSellos(cont, puestos, necesarios, nuevoDesde) {
+    cont.innerHTML = '';
+    var columnas = necesarios <= 5 ? necesarios : necesarios <= 10 ? Math.ceil(necesarios / 2) : 5;
+    cont.style.setProperty('--columnas', columnas);
+    for (var i = 0; i < necesarios; i++) {
+      var hueco = el('span', 'sello' + (i < puestos ? ' sello--puesto' : ''));
+      hueco.style.setProperty('--giro', ((i * 37) % 13 - 6) + 'deg');
+      if (i < puestos && nuevoDesde !== undefined && i >= nuevoDesde) hueco.classList.add('sello--nuevo');
+      hueco.appendChild(svgUso('taza'));
+      cont.appendChild(hueco);
+    }
+  }
+
+  /* QR de la tarjeta: «SONO:» + código. Se dibuja como SVG nítido */
+  function pintarQR(cont, codigo) {
+    cont.innerHTML = '';
+    if (typeof window.qrcode !== 'function' || !codigo) {
+      cont.appendChild(el('p', 'estado-vacio', 'Enseña este código en la barra: ' + codigoBonito(codigo)));
+      return;
+    }
+    var qr = window.qrcode(0, 'M');
+    qr.addData('SONO:' + codigo);
+    qr.make();
+    var n = qr.getModuleCount();
+    var margen = 2;
+    var d = '';
+    for (var f = 0; f < n; f++) {
+      for (var c = 0; c < n; c++) if (qr.isDark(f, c)) d += 'M' + (c + margen) + ' ' + (f + margen) + 'h1v1h-1z';
+    }
+    var ns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + (n + margen * 2) + ' ' + (n + margen * 2));
+    svg.setAttribute('shape-rendering', 'crispEdges');
+    svg.setAttribute('aria-hidden', 'true');
+    var fondo = document.createElementNS(ns, 'rect');
+    fondo.setAttribute('width', '100%'); fondo.setAttribute('height', '100%'); fondo.setAttribute('class', 'qr__fondo');
+    var puntos = document.createElementNS(ns, 'path');
+    puntos.setAttribute('d', d); puntos.setAttribute('class', 'qr__puntos');
+    svg.appendChild(fondo); svg.appendChild(puntos);
+    cont.appendChild(svg);
+  }
+
+  function textoMovimiento(m) {
+    var quien = m.por ? ' por ' + m.por : '';
+    if (m.tipo === 'sello') return { texto: (m.n > 1 ? m.n + ' sellos añadidos' : 'Sello añadido') + quien, valor: '+' + m.n };
+    if (m.tipo === 'quitar') return { texto: (m.n > 1 ? m.n + ' sellos corregidos' : 'Sello corregido') + quien, valor: '−' + m.n };
+    if (m.tipo === 'canje') return { texto: 'Desayuno gratis canjeado' + quien, valor: 'Premio' };
+    return { texto: 'Te uniste al club', valor: '' };
+  }
+  function pintarMovimientos(ul, historial, vacio) {
+    ul.innerHTML = '';
+    if (!historial || !historial.length) { ul.appendChild(el('li', 'estado-vacio', vacio)); return; }
+    historial.forEach(function (m) {
+      var x = textoMovimiento(m);
+      var li = el('li', 'movimiento movimiento--' + m.tipo);
+      var t = el('span', 'movimiento__texto');
+      t.appendChild(document.createTextNode(x.texto));
+      t.appendChild(el('span', 'movimiento__fecha', ' · ' + fCorta.format(new Date(m.t))));
+      li.appendChild(t);
+      li.appendChild(el('span', 'movimiento__valor', x.valor));
+      ul.appendChild(li);
+    });
+  }
+
+  var sellosVistos = null;
+  function pintarTarjeta() {
+    if (!socio) return;
+    var necesarios = socio.necesarios;
+    var completa = socio.sellos >= necesarios;
+    var puestos = Math.min(socio.sellos, necesarios);
+    $('tarjeta-nombre').textContent = 'Hola, ' + socio.nombre.split(' ')[0];
+    // Si ha entrado un sello nuevo mientras está abierta, se anima
+    var desde = sellosVistos !== null && socio.sellos > sellosVistos ? Math.min(sellosVistos, necesarios) : undefined;
+    pintarSellos($('tarjeta-sellos'), puestos, necesarios, desde);
+    sellosVistos = socio.sellos;
+    $('tarjeta-sellos').setAttribute('aria-label', puestos + ' de ' + necesarios + ' sellos');
+    $('tarjeta-barra').style.transform = 'scaleX(' + (puestos / necesarios).toFixed(3) + ')';
+    var estadoEl = $('tarjeta-estado');
+    estadoEl.classList.toggle('es-premio', completa);
+    var faltan = necesarios - socio.sellos;
+    estadoEl.textContent = completa
+      ? '¡Tarjeta completa! Tienes ' + socio.premio + '. Enseña el QR al pedir.'
+      : faltan === 1 ? 'Te falta 1 sello para ' + socio.premio + '.'
+      : 'Llevas ' + socio.sellos + ' de ' + necesarios + '. Te faltan ' + faltan + ' sellos para ' + socio.premio + '.';
+    pintarQR($('tarjeta-qr'), socio.codigo);
+    $('tarjeta-codigo').textContent = codigoBonito(socio.codigo);
+    pintarMovimientos($('tarjeta-historial'), socio.historial, 'Aún no hay movimientos.');
+    var total = socio.total === 1 ? '1 desayuno' : socio.total + ' desayunos';
+    $('tarjeta-total').textContent = total + ' con nosotros · socio desde ' + fMesAnio.format(new Date(socio.desde));
+  }
+
+  function pintarClub() {
+    var c = ajustesClub();
+    document.querySelectorAll('[data-club]').forEach(function (n) { n.hidden = !c.activo && !socio; });
+    $('club-premio').textContent = c.premio;
+    $('club-n').textContent = String(c.sellos);
+    pintarSellos($('club-muestra-sellos'), Math.min(4, c.sellos - 1), c.sellos);
+    var pie = document.querySelector('.club__carton-pie');
+    if (pie) {
+      pie.firstChild.textContent = Math.min(4, c.sellos - 1) + ' de ' + c.sellos;
+      pie.lastChild.textContent = 'Premio al completarla';
+    }
+    $('club-acciones').hidden = !!socio;
+    $('club-acciones-socio').hidden = !socio;
+    if (socio) {
+      var faltan = socio.necesarios - socio.sellos;
+      $('club-hola').textContent = 'Hola, ' + socio.nombre.split(' ')[0] + '. ' +
+        (faltan <= 0 ? 'Tienes ' + socio.premio + ' esperándote.' : 'Llevas ' + socio.sellos + ' de ' + socio.necesarios + ' sellos.');
+    }
+    document.querySelectorAll('[data-enlace-club]').forEach(function (a) { a.textContent = socio ? 'Mi tarjeta' : 'Club'; });
+  }
+
+  function ponerSocio(s) {
+    socio = s;
+    pintarClub();
+    if (socio && modalTarjeta.open) pintarTarjeta();
+  }
+
+  /* Ventana de acceso: pestañas «Unirme» y «Ya soy socio» */
+  function pestanaClub(cual) {
+    var alta = cual === 'alta';
+    $('club-tab-alta').setAttribute('aria-selected', alta ? 'true' : 'false');
+    $('club-tab-entrar').setAttribute('aria-selected', alta ? 'false' : 'true');
+    $('club-tab-alta').tabIndex = alta ? 0 : -1;
+    $('club-tab-entrar').tabIndex = alta ? -1 : 0;
+    $('form-club-alta').hidden = !alta;
+    $('form-club-entrar').hidden = alta;
+    $('t-club-acceso').textContent = alta ? 'Únete al club' : 'Entra en tu tarjeta';
+  }
+  function abrirAccesoClub(cual) {
+    pestanaClub(cual);
+    $('aviso-club-alta').textContent = '';
+    $('aviso-club-entrar').textContent = '';
+    abrir(modalClub);
+    setTimeout(function () { (cual === 'alta' ? $('club-nombre') : $('club-entrar-email')).focus(); }, 60);
+  }
+  $('club-tab-alta').addEventListener('click', function () { pestanaClub('alta'); });
+  $('club-tab-entrar').addEventListener('click', function () { pestanaClub('entrar'); });
+  document.querySelectorAll('[data-club-alta]').forEach(function (b) { b.addEventListener('click', function () { abrirAccesoClub('alta'); }); });
+  document.querySelectorAll('[data-club-entrar]').forEach(function (b) { b.addEventListener('click', function () { abrirAccesoClub('entrar'); }); });
+
+  /* La tarjeta se actualiza sola mientras está abierta */
+  var relojTarjeta = null;
+  function abrirTarjeta() {
+    if (!socio) { abrirAccesoClub('entrar'); return; }
+    sellosVistos = null;
+    $('form-baja').hidden = true;
+    pintarTarjeta();
+    abrir(modalTarjeta);
+    clearInterval(relojTarjeta);
+    relojTarjeta = setInterval(function () {
+      if (document.hidden || !modalTarjeta.open) return;
+      api('GET', '/api/club/yo').then(function (r) {
+        if (!r.socio) { ponerSocio(null); cerrar(modalTarjeta); abrirAccesoClub('entrar'); return; }
+        var cambio = !socio || r.socio.sellos !== socio.sellos || r.socio.historial.length !== socio.historial.length ||
+          (r.socio.historial[0] && socio.historial[0] && r.socio.historial[0].t !== socio.historial[0].t);
+        socio = r.socio;
+        if (cambio) { pintarTarjeta(); pintarClub(); }
+      }).catch(function () {});
+    }, 5000);
+  }
+  modalTarjeta.addEventListener('close', function () { clearInterval(relojTarjeta); relojTarjeta = null; });
+  document.querySelectorAll('[data-abrir-tarjeta]').forEach(function (b) { b.addEventListener('click', abrirTarjeta); });
+  document.querySelectorAll('[data-enlace-club]').forEach(function (a) {
+    a.addEventListener('click', function (e) { if (socio) { e.preventDefault(); abrirTarjeta(); } });
+  });
+
+  function enviarClub(form, ruta, datos, aviso) {
+    var boton = form.querySelector('button[type="submit"]');
+    boton.disabled = true;
+    aviso.textContent = '';
+    return api('POST', ruta, datos).then(function (r) {
+      form.reset();
+      ponerSocio(r.socio);
+      cerrar(modalClub);
+      abrirTarjeta();
+    }).catch(function (err) {
+      aviso.textContent = err.message;
+    }).then(function () { boton.disabled = false; });
+  }
+  $('form-club-alta').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = e.target;
+    var aviso = $('aviso-club-alta');
+    if (f.nombre.value.trim().length < 2) { aviso.textContent = 'Escribe tu nombre para la tarjeta.'; f.nombre.focus(); return; }
+    if (f.email.value.trim().indexOf('@') < 1) { aviso.textContent = 'Revisa el email: parece que le falta algo.'; f.email.focus(); return; }
+    if (f.clave.value.length < 8) { aviso.textContent = 'La contraseña necesita al menos 8 caracteres.'; f.clave.focus(); return; }
+    if (!f.acepto.checked) { aviso.textContent = 'Para unirte tienes que aceptar que guardemos tus datos del club.'; return; }
+    enviarClub(f, '/api/club/alta', {
+      nombre: f.nombre.value, email: f.email.value, telefono: f.telefono.value,
+      clave: f.clave.value, acepto: true, web: f.web.value
+    }, aviso);
+  });
+  $('form-club-entrar').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = e.target;
+    var aviso = $('aviso-club-entrar');
+    if (!f.email.value.trim() || !f.clave.value) { aviso.textContent = 'Escribe tu email y tu contraseña.'; return; }
+    enviarClub(f, '/api/club/entrar', { email: f.email.value, clave: f.clave.value }, aviso);
+  });
+
+  $('club-salir').addEventListener('click', function () {
+    api('POST', '/api/club/salir').catch(function () {}).then(function () {
+      ponerSocio(null);
+      cerrar(modalTarjeta);
+    });
+  });
+  $('club-baja').addEventListener('click', function () {
+    $('form-baja').hidden = false;
+    $('aviso-baja').textContent = '';
+    $('baja-clave').focus();
+  });
+  $('baja-cancelar').addEventListener('click', function () { $('form-baja').reset(); $('form-baja').hidden = true; });
+  $('form-baja').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = e.target;
+    if (!f.clave.value) { $('aviso-baja').textContent = 'Escribe tu contraseña para confirmarlo.'; return; }
+    api('POST', '/api/club/baja', { clave: f.clave.value }).then(function () {
+      f.reset();
+      ponerSocio(null);
+      cerrar(modalTarjeta);
+    }).catch(function (err) { $('aviso-baja').textContent = err.message; });
+  });
+
   /* ---------- Acceso al panel ---------- */
   function abrirLogin(mensaje) {
     $('form-login').reset();
@@ -1008,6 +1250,7 @@
     if (k === 'datos' && b.paraLlevar === undefined) b.paraLlevar = true;
     if (k === 'datos' && b.domicilio === undefined) b.domicilio = true;
     if (k === 'datos' && !Array.isArray(b.zonas)) b.zonas = clonar(ZONAS_INICIALES);
+    if (k === 'datos' && (!b.club || typeof b.club !== 'object')) b.club = { activo: true, sellos: 10, premio: 'un desayuno gratis' };
     if (k === 'carta') b.productos.forEach(function (p) { if (!Array.isArray(p.alergenos)) p.alergenos = []; });
     return b;
   }
@@ -1048,6 +1291,7 @@
     });
   });
   function cambiarPestana(nombre) {
+    pararEscaner();
     pestana = nombre;
     document.querySelectorAll('.pestana').forEach(function (t) {
       var activa = t.getAttribute('data-pestana') === nombre;
@@ -1085,6 +1329,7 @@
     if (pestana === 'reservas') panelReservas();
     if (pestana === 'pedidos') panelPedidos();
     if (pestana === 'mensajes') panelMensajes();
+    if (pestana === 'club') panelClub();
     cuerpo.scrollTop = mismaPestana ? posicion : 0;
     if (!guardando) mostrarEstado(k && sucio[k] ? 'Hay cambios sin guardar.' : '');
     btnDescartar.disabled = !(k && sucio[k]);
@@ -1451,6 +1696,23 @@
     });
     grupo.appendChild(camposLlevar);
     cuerpo.appendChild(grupo);
+
+    var gc = el('section', 'admin__grupo');
+    gc.appendChild(el('h3', null, 'Club SOÑO'));
+    gc.appendChild(el('p', 'admin__ayuda', 'Tarjeta de sellos para los socios. Cada desayuno es un sello; al completar la tarjeta, el socio tiene el premio. Los sellos se ponen en la pestaña «Club».'));
+    var camposClub = el('div', 'admin__campos');
+    var labClub = el('label', 'casilla');
+    var chClub = el('input'); chClub.type = 'checkbox'; chClub.id = 'adm-club-activo'; chClub.checked = b.club.activo !== false;
+    chClub.addEventListener('change', function () { b.club.activo = chClub.checked; marcar(); });
+    labClub.appendChild(chClub);
+    labClub.appendChild(document.createTextNode('Mostrar el club en la web y admitir socios nuevos'));
+    camposClub.appendChild(labClub);
+    var filaClub = el('div', 'fila-2');
+    filaClub.appendChild(campoTexto('adm-club-premio', 'Premio al completar la tarjeta', b.club.premio, function (v) { b.club.premio = v; }, { maxlength: '60', placeholder: 'un desayuno gratis' }));
+    filaClub.appendChild(campoTexto('adm-club-sellos', 'Sellos de la tarjeta', String(b.club.sellos), function (v) { b.club.sellos = Number(String(v).trim()); }, { inputmode: 'numeric', placeholder: '10' }));
+    camposClub.appendChild(filaClub);
+    gc.appendChild(camposClub);
+    cuerpo.appendChild(gc);
   }
 
   /* Pestaña: reservas recibidas */
@@ -1548,6 +1810,369 @@
     });
   }
 
+  /* Pestaña: Club SOÑO
+     Para sellar: escanear el QR del socio con la cámara, escribir el código que sale
+     debajo del QR o buscarlo en la lista. Lo que se hace queda en el historial del socio,
+     con el nombre de quien atiende. */
+  var club = { socios: [], ajustes: null, elegido: null, filtro: '', clave: '' };
+  var escaner = { stream: null, activo: false, temporizador: null };
+
+  function quienAtiende() { try { return localStorage.getItem('sono2-quien') || ''; } catch (e) { return ''; } }
+  function guardarQuien(v) { try { localStorage.setItem('sono2-quien', v); } catch (e) { /* sin almacenamiento: no pasa nada */ } }
+  function sinAcentos(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+  function avisoClub(t, esError) {
+    var a = $('club-aviso');
+    if (!a) return;
+    a.textContent = t || '';
+    a.classList.toggle('es-error', !!esError);
+  }
+
+  function panelClub() {
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'Para poner un sello, escanea el QR de la tarjeta del socio o escribe el código que sale debajo. También puedes buscarlo en la lista.'));
+
+    var lector = el('section', 'admin__grupo club-admin__lector');
+    var filaLector = el('div', 'club-admin__fila');
+    var botonEscanear = el('button', 'boton boton--lleno', 'Escanear QR');
+    botonEscanear.type = 'button';
+    botonEscanear.id = 'club-escanear';
+    botonEscanear.addEventListener('click', escanear);
+    filaLector.appendChild(botonEscanear);
+    var formCodigo = el('form', 'club-admin__codigo');
+    formCodigo.noValidate = true;
+    var lCodigo = el('label', 'solo-lector', 'Código de la tarjeta'); lCodigo.htmlFor = 'club-codigo';
+    var iCodigo = el('input'); iCodigo.id = 'club-codigo'; iCodigo.type = 'text'; iCodigo.placeholder = 'Código: ABCD-2345';
+    iCodigo.setAttribute('autocomplete', 'off'); iCodigo.setAttribute('autocapitalize', 'characters'); iCodigo.spellcheck = false;
+    var bCodigo = el('button', 'boton boton--borde', 'Buscar'); bCodigo.type = 'submit';
+    formCodigo.appendChild(lCodigo); formCodigo.appendChild(iCodigo); formCodigo.appendChild(bCodigo);
+    formCodigo.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!iCodigo.value.trim()) { avisoClub('Escribe el código que sale debajo del QR.', true); iCodigo.focus(); return; }
+      buscarCodigo(iCodigo.value);
+    });
+    filaLector.appendChild(formCodigo);
+    lector.appendChild(filaLector);
+
+    var camara = el('div', 'club-admin__camara');
+    camara.id = 'club-camara';
+    camara.hidden = true;
+    var video = el('video');
+    video.id = 'club-video';
+    video.setAttribute('playsinline', '');
+    video.muted = true;
+    camara.appendChild(video);
+    camara.appendChild(el('span', 'club-admin__marco'));
+    var bCancelar = el('button', 'boton boton--borde boton--mini club-admin__cancelar', 'Cancelar');
+    bCancelar.type = 'button';
+    bCancelar.addEventListener('click', function () { pararEscaner(); avisoClub(''); });
+    camara.appendChild(bCancelar);
+    lector.appendChild(camara);
+
+    var pAviso = el('p', 'admin__estado club-admin__aviso');
+    pAviso.id = 'club-aviso';
+    pAviso.setAttribute('aria-live', 'polite');
+    lector.appendChild(pAviso);
+
+    lector.appendChild(campoTextoSimple('club-quien', 'Quién atiende (sale en la tarjeta del socio)', quienAtiende(), guardarQuien, 'Marta'));
+    cuerpo.appendChild(lector);
+
+    var ficha = el('section', 'club-admin__ficha');
+    ficha.id = 'club-ficha';
+    ficha.hidden = true;
+    cuerpo.appendChild(ficha);
+
+    var gLista = el('section', 'admin__grupo');
+    var cab = el('div', 'club-admin__cabeza-lista');
+    var h = el('h3', null, 'Socios');
+    h.id = 'club-titulo-lista';
+    cab.appendChild(h);
+    var lBuscar = el('label', 'solo-lector', 'Buscar socio'); lBuscar.htmlFor = 'club-buscar';
+    var iBuscar = el('input', 'club-admin__buscar'); iBuscar.id = 'club-buscar'; iBuscar.type = 'search';
+    iBuscar.placeholder = 'Buscar por nombre, email, teléfono o código';
+    iBuscar.value = club.filtro;
+    iBuscar.addEventListener('input', function () { club.filtro = iBuscar.value; pintarListaSocios(); });
+    cab.appendChild(lBuscar); cab.appendChild(iBuscar);
+    gLista.appendChild(cab);
+    var lista = el('div', 'registros');
+    lista.id = 'club-lista';
+    lista.appendChild(el('p', 'estado-vacio', 'Cargando socios…'));
+    gLista.appendChild(lista);
+    cuerpo.appendChild(gLista);
+
+    if (club.elegido) pintarFicha();
+    cargarSocios();
+  }
+
+  /* Campo de texto que no marca «cambios sin guardar» (se guarda en este dispositivo) */
+  function campoTextoSimple(id, etiqueta, valor, alCambiar, ejemplo) {
+    var c = el('div', 'campo club-admin__quien');
+    var l = el('label', null, etiqueta); l.htmlFor = id;
+    var i = el('input'); i.id = id; i.type = 'text'; i.value = valor || ''; i.maxLength = 30; i.placeholder = ejemplo || '';
+    i.setAttribute('autocomplete', 'off');
+    i.addEventListener('input', function () { alCambiar(i.value.trim()); });
+    c.appendChild(l); c.appendChild(i);
+    return c;
+  }
+
+  function cargarSocios() {
+    api('GET', '/api/club/socios').then(function (r) {
+      club.socios = r.socios;
+      club.ajustes = r.club;
+      if (pestana === 'club') pintarListaSocios();
+    }).catch(function (err) {
+      if (sesionCaducada(err)) return;
+      var lista = $('club-lista');
+      if (lista) { lista.innerHTML = ''; lista.appendChild(el('p', 'estado-vacio', err.message)); }
+    });
+  }
+
+  function pintarListaSocios() {
+    var lista = $('club-lista');
+    if (!lista) return;
+    var necesarios = (club.ajustes && club.ajustes.sellos) || 10;
+    var q = sinAcentos(club.filtro).replace(/[\s-]/g, '');
+    var visibles = club.socios.filter(function (s) {
+      if (!q) return true;
+      return [s.nombre, s.email, s.telefono, s.codigo].some(function (v) { return sinAcentos(v).replace(/[\s-]/g, '').indexOf(q) !== -1; });
+    });
+    $('club-titulo-lista').textContent = 'Socios (' + club.socios.length + ')';
+    lista.innerHTML = '';
+    if (!club.socios.length) { lista.appendChild(el('p', 'estado-vacio', 'Todavía no hay socios. Se apuntan desde la web, en la sección «Club».')); return; }
+    if (!visibles.length) { lista.appendChild(el('p', 'estado-vacio', 'Ningún socio coincide con la búsqueda.')); return; }
+    visibles.slice(0, 200).forEach(function (s) {
+      var b = el('button', 'socio-fila' + (club.elegido && club.elegido.id === s.id ? ' es-elegido' : ''));
+      b.type = 'button';
+      var izq = el('span', 'socio-fila__datos');
+      izq.appendChild(el('span', 'socio-fila__nombre', s.nombre));
+      izq.appendChild(el('span', 'socio-fila__meta', [s.email, s.telefono, codigoBonito(s.codigo)].filter(Boolean).join(' · ')));
+      b.appendChild(izq);
+      var der = el('span', 'socio-fila__sellos' + (s.sellos >= necesarios ? ' es-premio' : ''), s.sellos >= necesarios ? 'Premio' : s.sellos + '/' + necesarios);
+      b.appendChild(der);
+      b.addEventListener('click', function () {
+        api('GET', '/api/club/socios/' + s.id).then(function (r) { elegir(r.socio, r.club); })
+          .catch(function (err) { if (!sesionCaducada(err)) avisoClub(err.message, true); });
+      });
+      lista.appendChild(b);
+    });
+    if (visibles.length > 200) lista.appendChild(el('p', 'estado-vacio', 'Se muestran 200. Busca para encontrar al resto.'));
+  }
+
+  function elegir(s, ajustes, desdeSellos) {
+    club.elegido = s;
+    if (ajustes) club.ajustes = ajustes;
+    club.clave = '';
+    // Actualiza también la fila de la lista
+    var i = club.socios.findIndex(function (x) { return x.id === s.id; });
+    var resumen = Object.assign({}, s); delete resumen.historial;
+    if (i === -1) club.socios.unshift(resumen); else club.socios[i] = resumen;
+    pintarFicha(desdeSellos);
+    pintarListaSocios();
+    // Solo se baja hasta la ficha si no se ve (al elegir un socio de la lista);
+    // así, tras escanear, el lector sigue a la vista para el siguiente cliente
+    var ficha = $('club-ficha');
+    if (ficha && desdeSellos === undefined) {
+      var caja = cuerpo.getBoundingClientRect();
+      var r = ficha.getBoundingClientRect();
+      if (r.top < caja.top || r.top > caja.bottom - 120) {
+        cuerpo.scrollTop = Math.max(0, r.top - caja.top + cuerpo.scrollTop - 16);
+      }
+    }
+  }
+
+  function pintarFicha(desdeSellos) {
+    var ficha = $('club-ficha');
+    var s = club.elegido;
+    if (!ficha || !s) return;
+    var necesarios = (club.ajustes && club.ajustes.sellos) || 10;
+    var premio = (club.ajustes && club.ajustes.premio) || 'un desayuno gratis';
+    var tienePremio = s.sellos >= necesarios;
+    ficha.hidden = false;
+    ficha.innerHTML = '';
+    var cab = el('div', 'club-admin__ficha-cabeza');
+    var nombre = el('div');
+    nombre.appendChild(el('h3', 'club-admin__nombre', s.nombre));
+    nombre.appendChild(el('p', 'socio-fila__meta', [s.email, s.telefono, 'Tarjeta ' + codigoBonito(s.codigo)].filter(Boolean).join(' · ')));
+    cab.appendChild(nombre);
+    var cerrarFicha = el('button', 'boton boton--borde boton--mini', 'Cerrar');
+    cerrarFicha.type = 'button';
+    cerrarFicha.addEventListener('click', function () { club.elegido = null; ficha.hidden = true; pintarListaSocios(); });
+    cab.appendChild(cerrarFicha);
+    ficha.appendChild(cab);
+
+    var sellos = el('div', 'tarjeta-sellos tarjeta-sellos--panel');
+    pintarSellos(sellos, Math.min(s.sellos, necesarios), necesarios, desdeSellos);
+    ficha.appendChild(sellos);
+    var resumen = s.sellos + ' de ' + necesarios + ' sellos · ' + (s.total === 1 ? '1 desayuno' : s.total + ' desayunos') + ' en total' +
+      (s.canjes ? ' · ' + (s.canjes === 1 ? '1 premio canjeado' : s.canjes + ' premios canjeados') : '');
+    ficha.appendChild(el('p', 'club-admin__resumen', resumen));
+    if (tienePremio) ficha.appendChild(el('p', 'premio-aviso', 'Tiene ' + premio + ' para canjear.'));
+
+    var acc = el('div', 'club-admin__acciones');
+    var mas = el('button', 'boton boton--lleno club-admin__mas', '+1 sello');
+    mas.type = 'button';
+    mas.addEventListener('click', function () { accionSocio('sellos', { cantidad: 1 }, 'Sello añadido a ' + s.nombre + '.'); });
+    acc.appendChild(mas);
+    var menos = el('button', 'boton boton--borde', '−1');
+    menos.type = 'button';
+    menos.setAttribute('aria-label', 'Quitar un sello');
+    menos.disabled = s.sellos === 0;
+    menos.addEventListener('click', function () { accionSocio('sellos', { cantidad: -1 }, 'Sello quitado.'); });
+    acc.appendChild(menos);
+    var canjear = el('button', 'boton ' + (tienePremio ? 'boton--lleno' : 'boton--borde'), 'Canjear premio');
+    canjear.type = 'button';
+    canjear.disabled = !tienePremio;
+    canjear.addEventListener('click', function () { accionSocio('canjear', {}, 'Premio canjeado. La tarjeta vuelve a empezar.'); });
+    acc.appendChild(canjear);
+    ficha.appendChild(acc);
+
+    var hist = el('div', 'club-admin__historial');
+    hist.appendChild(el('p', 'meta', 'Últimos movimientos'));
+    var ul = el('ul', 'movimientos');
+    pintarMovimientos(ul, s.historial, 'Sin movimientos todavía.');
+    hist.appendChild(ul);
+    ficha.appendChild(hist);
+
+    var extra = el('div', 'acciones-mini club-admin__extra');
+    extra.appendChild(botonMini('Nueva contraseña', function () {
+      api('POST', '/api/club/socios/' + s.id + '/clave', {}).then(function (r) {
+        club.clave = r.clave;
+        pintarFicha();
+      }).catch(function (err) { if (!sesionCaducada(err)) avisoClub(err.message, true); });
+    }));
+    extra.appendChild(botonBorrar('Borrar socio', function () {
+      api('DELETE', '/api/club/socios/' + s.id).then(function () {
+        club.socios = club.socios.filter(function (x) { return x.id !== s.id; });
+        club.elegido = null;
+        ficha.hidden = true;
+        pintarListaSocios();
+        avisoClub('Socio borrado.');
+      }).catch(function (err) { if (!sesionCaducada(err)) avisoClub(err.message, true); });
+    }));
+    ficha.appendChild(extra);
+    if (club.clave) {
+      var caja = el('p', 'club-admin__clave');
+      caja.appendChild(document.createTextNode('Contraseña provisional: '));
+      caja.appendChild(el('strong', null, club.clave));
+      caja.appendChild(document.createTextNode(' Dísela al socio: entrará con ella y su email. Solo se enseña ahora.'));
+      ficha.appendChild(caja);
+    }
+  }
+
+  function accionSocio(accion, datos, hecho) {
+    var s = club.elegido;
+    if (!s) return;
+    var antes = s.sellos;
+    datos.por = quienAtiende();
+    document.querySelectorAll('.club-admin__acciones .boton').forEach(function (b) { b.disabled = true; });
+    api('POST', '/api/club/socios/' + s.id + '/' + accion, datos).then(function (r) {
+      var necesarios = (r.club && r.club.sellos) || 10;
+      elegir(r.socio, r.club, r.socio.sellos > antes ? Math.min(antes, necesarios) : undefined);
+      avisoClub(hecho);
+      if (navigator.vibrate) navigator.vibrate(40);
+    }).catch(function (err) {
+      if (!sesionCaducada(err)) avisoClub(err.message, true);
+      pintarFicha();
+    });
+  }
+
+  function buscarCodigo(texto) {
+    avisoClub('Buscando la tarjeta…');
+    api('POST', '/api/club/buscar', { codigo: texto }).then(function (r) {
+      var i = $('club-codigo'); if (i) i.value = '';
+      elegir(r.socio, r.club);
+      avisoClub('Tarjeta de ' + r.socio.nombre + '.');
+      if (navigator.vibrate) navigator.vibrate(60);
+    }).catch(function (err) { if (!sesionCaducada(err)) avisoClub(err.message, true); });
+  }
+
+  /* Lector de QR: usa el del navegador si lo trae; si no, carga jsQR (solo al escanear) */
+  function cargarJsQR() {
+    return new Promise(function (ok, mal) {
+      if (window.jsQR) { ok(); return; }
+      var s = document.createElement('script');
+      s.src = '/vendor/jsQR.js';
+      s.onload = function () { ok(); };
+      s.onerror = function () { mal(new Error('No se ha podido cargar el lector de QR. Escribe el código de la tarjeta.')); };
+      document.head.appendChild(s);
+    });
+  }
+  function lectorJsQR() {
+    return cargarJsQR().then(function () {
+      var lienzo = document.createElement('canvas');
+      var ctx = lienzo.getContext('2d', { willReadFrequently: true });
+      return function (video) {
+        var w = video.videoWidth, h = video.videoHeight;
+        if (!w || !h) return Promise.resolve(null);
+        var escala = Math.min(1, 720 / Math.max(w, h));
+        lienzo.width = Math.round(w * escala);
+        lienzo.height = Math.round(h * escala);
+        ctx.drawImage(video, 0, 0, lienzo.width, lienzo.height);
+        var img = ctx.getImageData(0, 0, lienzo.width, lienzo.height);
+        var res = window.jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        return Promise.resolve(res ? res.data : null);
+      };
+    });
+  }
+  function crearLector() {
+    if ('BarcodeDetector' in window && window.BarcodeDetector.getSupportedFormats) {
+      return window.BarcodeDetector.getSupportedFormats().then(function (formatos) {
+        if (formatos.indexOf('qr_code') === -1) return lectorJsQR();
+        var detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        return function (video) {
+          return detector.detect(video).then(function (c) { return c.length ? c[0].rawValue : null; });
+        };
+      }).catch(function () { return lectorJsQR(); });
+    }
+    return lectorJsQR();
+  }
+  function pararEscaner() {
+    escaner.activo = false;
+    clearTimeout(escaner.temporizador);
+    if (escaner.stream) { escaner.stream.getTracks().forEach(function (pista) { pista.stop(); }); escaner.stream = null; }
+    var caja = $('club-camara');
+    if (caja) caja.hidden = true;
+    var video = $('club-video');
+    if (video) video.srcObject = null;
+  }
+  function escanear() {
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      avisoClub('La cámara solo funciona cuando la web va por https (con su dominio). Mientras, escribe el código que sale debajo del QR.', true);
+      return;
+    }
+    pararEscaner();
+    var caja = $('club-camara');
+    var video = $('club-video');
+    caja.hidden = false;
+    avisoClub('Apunta la cámara al QR de la tarjeta.');
+    escaner.activo = true;
+    Promise.all([
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }),
+      crearLector()
+    ]).then(function (res) {
+      if (!escaner.activo) { res[0].getTracks().forEach(function (p) { p.stop(); }); return; }
+      escaner.stream = res[0];
+      var leer = res[1];
+      video.srcObject = escaner.stream;
+      var reproducir = video.play();
+      if (reproducir && reproducir.catch) reproducir.catch(function () {});
+      var avisoOtro = false;
+      (function vuelta() {
+        if (!escaner.activo) return;
+        leer(video).then(function (leido) {
+          if (!escaner.activo) return;
+          if (leido && /^SONO:/i.test(leido)) { pararEscaner(); buscarCodigo(leido); return; }
+          if (leido && !avisoOtro) { avisoOtro = true; avisoClub('Ese QR no es de una tarjeta de SOÑO.', true); }
+          escaner.temporizador = setTimeout(vuelta, 220);
+        }).catch(function () { escaner.temporizador = setTimeout(vuelta, 400); });
+      })();
+    }).catch(function (err) {
+      pararEscaner();
+      avisoClub(err && err.name === 'NotAllowedError'
+        ? 'Sin permiso para usar la cámara. Permítelo en el navegador o escribe el código de la tarjeta.'
+        : (err && err.message) || 'No se ha podido abrir la cámara. Escribe el código de la tarjeta.', true);
+    });
+  }
+  modalAdmin.addEventListener('close', pararEscaner);
+
   /* Pestaña: pedidos para llevar */
   var fHora = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   function panelPedidos() {
@@ -1634,6 +2259,8 @@
       }
     }
     if (k === 'datos') {
+      var nSellos = Number(b.club.sellos);
+      if (!(nSellos >= 3 && nSellos <= 20 && Math.floor(nSellos) === nSellos)) return 'Los sellos de la tarjeta del club van de 3 a 20.';
       for (var z = 0; z < b.zonas.length; z++) {
         if (!texto(b.zonas[z].nombre)) return 'Hay una zona sin nombre (la ' + (z + 1) + 'ª). Escríbelo o quita la zona.';
       }
@@ -1972,4 +2599,15 @@
     pintarTodo();
   });
   if (location.hash === '#reservar') abrir(modalReserva);
+
+  /* Sesión del socio del club. Con «#tarjeta» en la dirección se abre la tarjeta directamente */
+  api('GET', '/api/club/yo').then(function (r) {
+    ponerSocio(r.socio || null);
+  }).catch(function () {
+    ponerSocio(null);
+  }).then(function () {
+    if (location.hash === '#tarjeta') {
+      if (socio) abrirTarjeta(); else abrirAccesoClub('entrar');
+    }
+  });
 })();

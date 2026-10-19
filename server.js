@@ -3,7 +3,7 @@
 /*
  * SOÑO · servidor web
  * Sin dependencias externas: solo Node.js 20 o superior.
- * Sirve la web, guarda la carta, fotos, horarios, reservas y mensajes
+ * Sirve la web, guarda la carta, fotos, horarios, reservas, mensajes y los socios del club
  * en la carpeta de datos, y protege el panel con usuario y contraseña.
  */
 
@@ -40,6 +40,13 @@ const ZONAS_INICIALES = [
   { id: 'lectura', nombre: 'Zona de lectura', tipo: 'lectura', activa: true },
   { id: 'terraza', nombre: 'Terraza', tipo: 'terraza', activa: true }
 ];
+/* Club SOÑO: tarjeta de sellos de los socios */
+const CLUB_INICIAL = { activo: true, sellos: 10, premio: 'un desayuno gratis' };
+const MAX_SOCIOS = 5000;
+const MAX_HISTORIAL = 30;
+const DIAS_SESION_SOCIO = 120;
+const ALFABETO_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // sin 0/O ni 1/I, para dictarlo sin dudas
+const RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ICONOS = ['taza', 'vaso', 'vaso-alto', 'coldbrew', 'cruasan', 'tostada', 'bol', 'bizcocho', 'filtro', 'prensa', 'chemex', 'llevar'];
 const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const ALERGENOS = ['gluten', 'crustaceos', 'huevos', 'pescado', 'cacahuetes', 'soja', 'lacteos', 'frutos', 'apio', 'mostaza', 'sesamo', 'sulfitos', 'altramuces', 'moluscos'];
@@ -86,6 +93,9 @@ let pedidos = [];
 const sesiones = new Map();        // token -> caducidad (ms)
 const intentosLogin = new Map();   // ip -> { fallos, bloqueadoHasta }
 const envios = new Map();          // 'tipo:ip' -> [marcas de tiempo]
+let socios = [];                   // socios del club
+let secretoClub = null;            // firma las sesiones de los socios (se guarda en la carpeta de datos)
+const intentosSocio = new Map();   // ip -> { fallos, bloqueadoHasta }
 
 /* ---------- Utilidades ---------- */
 function normalizarUsuario(u) {
@@ -201,6 +211,14 @@ async function iniciarDatos() {
   reservas = await leerArchivo('reservas.json', []);
   mensajes = await leerArchivo('mensajes.json', []);
   pedidos = await leerArchivo('pedidos.json', []);
+  socios = await leerArchivo('socios.json', []);
+  const secreto = await leerArchivo('secreto.json', null);
+  if (secreto && /^[a-f0-9]{64}$/.test(secreto.clave || '')) {
+    secretoClub = Buffer.from(secreto.clave, 'hex');
+  } else {
+    secretoClub = crypto.randomBytes(32);
+    await guardarArchivo('secreto.json', { clave: secretoClub.toString('hex') });
+  }
   const limitePedidos = new Date(Date.now() - 30 * 86400000).toISOString();
   const antesPedidos = pedidos.length;
   pedidos = pedidos.filter((p) => p.creado >= limitePedidos);
@@ -233,6 +251,7 @@ async function completarContenido() {
   if (contenido.datos.paraLlevar === undefined) { contenido.datos.paraLlevar = true; cambiado = true; }
   if (!Array.isArray(contenido.datos.zonas)) { contenido.datos.zonas = ZONAS_INICIALES.map((z) => Object.assign({}, z)); cambiado = true; }
   if (contenido.datos.domicilio === undefined) { contenido.datos.domicilio = true; cambiado = true; }
+  if (!contenido.datos.club) { contenido.datos.club = Object.assign({}, CLUB_INICIAL); cambiado = true; }
   if (cambiado) await guardarArchivo('contenido.json', contenido);
 }
 
@@ -358,8 +377,16 @@ function validarDatos(d) {
     abrimosPronto: d.abrimosPronto !== false,
     paraLlevar: d.paraLlevar !== false,
     domicilio: d.domicilio !== false,
-    zonas
+    zonas,
+    club: validarClub(d.club)
   };
+}
+
+function validarClub(c) {
+  const v = c && typeof c === 'object' ? c : CLUB_INICIAL;
+  const sellos = Number(v.sellos);
+  if (!Number.isInteger(sellos) || sellos < 3 || sellos > 20) throw errorCliente('Los sellos para conseguir el premio van de 3 a 20.');
+  return { activo: v.activo !== false, sellos, premio: texto(v.premio, 60) || CLUB_INICIAL.premio };
 }
 
 const VALIDADORES = { carta: validarCarta, galeria: validarGaleria, horario: validarHorario, datos: validarDatos };
@@ -369,7 +396,7 @@ function cabecerasSeguridad(res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), interest-cohort=()');   // la cámara, para leer el QR de los socios en el panel
   res.setHeader('Content-Security-Policy', CSP);
 }
 
@@ -504,10 +531,264 @@ async function servirPublico(req, res, pathname) {
   return servirArchivo(req, res, ruta, cache);
 }
 
+/* ---------- Club SOÑO ---------- */
+function scrypt(clave, sal) {
+  return new Promise((ok, mal) => crypto.scrypt(String(clave), sal, 64, (e, k) => (e ? mal(e) : ok(k))));
+}
+async function cifrarClave(clave) {
+  const sal = crypto.randomBytes(16);
+  return sal.toString('hex') + ':' + (await scrypt(clave, sal)).toString('hex');
+}
+async function claveCorrecta(clave, guardada) {
+  const partes = String(guardada || '').split(':');
+  const sal = Buffer.from(partes[0] || '00', 'hex');
+  const ref = Buffer.from(partes[1] || '', 'hex');
+  const k = await scrypt(clave, sal);   // se calcula siempre, también si el socio no existe
+  return ref.length === k.length && crypto.timingSafeEqual(ref, k);
+}
+
+function nuevoCodigo() {
+  let codigo;
+  do {
+    codigo = Array.from(crypto.randomBytes(8), (b) => ALFABETO_CODIGO[b % 32]).join('');
+  } while (socios.some((s) => s.codigo === codigo));
+  return codigo;
+}
+/* Acepta lo que lee el escáner («SONO:ABCD2345») o lo que se escribe a mano («abcd-2345») */
+function limpiarCodigo(v) {
+  let s = String(v || '').toUpperCase();
+  if (s.indexOf(':') !== -1) s = s.slice(s.lastIndexOf(':') + 1);
+  return s.replace(/[^A-Z0-9]/g, '').slice(0, 16);
+}
+
+function ajustesClub() { return contenido.datos.club || CLUB_INICIAL; }
+
+function anotar(socio, tipo, n, por) {
+  socio.historial.unshift({ t: new Date().toISOString(), tipo, n, por: por || '' });
+  if (socio.historial.length > MAX_HISTORIAL) socio.historial.length = MAX_HISTORIAL;
+}
+
+/* Lo que ve el socio en su tarjeta */
+function tarjeta(s) {
+  const club = ajustesClub();
+  return {
+    nombre: s.nombre,
+    codigo: s.codigo,
+    sellos: s.sellos,
+    necesarios: club.sellos,
+    premio: club.premio,
+    total: s.total,
+    canjes: s.canjes,
+    desde: s.creado,
+    historial: s.historial.slice(0, 8)
+  };
+}
+/* Lo que ve el personal en el panel */
+function fichaSocio(s, conHistorial) {
+  const ficha = {
+    id: s.id,
+    codigo: s.codigo,
+    nombre: s.nombre,
+    email: s.email,
+    telefono: s.telefono,
+    sellos: s.sellos,
+    total: s.total,
+    canjes: s.canjes,
+    creado: s.creado,
+    ultimo: (s.historial[0] && s.historial[0].t) || s.creado
+  };
+  if (conHistorial) ficha.historial = s.historial.slice(0, 15);
+  return ficha;
+}
+
+/* Sesión del socio: cookie firmada (sobrevive a los reinicios del servidor) */
+function firmar(txt) { return crypto.createHmac('sha256', secretoClub).update(txt).digest('base64url'); }
+function cookieSocio(req, valor, maxAgeSeg) {
+  const segura = COOKIE_SEGURA === 'true' || (COOKIE_SEGURA === 'auto' && esHttps(req));
+  return 'sono2_socio=' + valor + '; Path=/; HttpOnly; SameSite=Strict; Max-Age=' + maxAgeSeg + (segura ? '; Secure' : '');
+}
+function abrirSesionSocio(req, res, socio) {
+  const cuerpo = socio.id + '.' + socio.version + '.' + (Date.now() + DIAS_SESION_SOCIO * 86400000);
+  res.setHeader('Set-Cookie', cookieSocio(req, cuerpo + '.' + firmar(cuerpo), DIAS_SESION_SOCIO * 86400));
+}
+function socioDeSesion(req) {
+  const valor = leerCookies(req).sono2_socio;
+  if (!valor) return null;
+  const partes = valor.split('.');
+  if (partes.length !== 4) return null;
+  const cuerpo = partes.slice(0, 3).join('.');
+  const firma = Buffer.from(partes[3]);
+  const buena = Buffer.from(firmar(cuerpo));
+  if (firma.length !== buena.length || !crypto.timingSafeEqual(firma, buena)) return null;
+  if (Number(partes[2]) < Date.now()) return null;
+  const socio = socios.find((s) => s.id === partes[0]);
+  return socio && String(socio.version) === partes[1] ? socio : null;
+}
+
+function bloqueoSocio(ip) {
+  const estado = intentosSocio.get(ip) || { fallos: 0, bloqueadoHasta: 0 };
+  if (estado.bloqueadoHasta > Date.now()) {
+    const minutos = Math.ceil((estado.bloqueadoHasta - Date.now()) / 60000);
+    throw errorCliente('Demasiados intentos. Prueba otra vez dentro de ' + minutos + ' min.', 429);
+  }
+  return estado;
+}
+function falloSocio(ip, estado) {
+  estado.fallos += 1;
+  if (estado.fallos >= 6) { estado.bloqueadoHasta = Date.now() + 15 * 60000; estado.fallos = 0; }
+  intentosSocio.set(ip, estado);
+}
+
+async function apiClub(req, res, pathname, metodo, ip) {
+  /* --- Socios --- */
+  if (pathname === '/api/club/yo' && metodo === 'GET') {
+    const socio = socioDeSesion(req);
+    return enviarJSON(res, 200, { socio: socio ? tarjeta(socio) : null });
+  }
+
+  if (pathname === '/api/club/alta' && metodo === 'POST') {
+    if (!mismoOrigen(req)) throw errorCliente('Petición no permitida.', 403);
+    if (!ajustesClub().activo) throw errorCliente('El club no admite socios nuevos ahora mismo.', 409);
+    const datos = await leerJSON(req);
+    if (texto(datos.web, 200)) return enviarJSON(res, 201, { ok: true });   // trampa para bots
+    const nombre = texto(datos.nombre, 60);
+    if (nombre.length < 2) throw errorCliente('Escribe tu nombre para la tarjeta.');
+    const email = texto(datos.email, 120).toLowerCase();
+    if (!RE_EMAIL.test(email)) throw errorCliente('Revisa el email: parece que le falta algo.');
+    const telefono = texto(datos.telefono, 25);
+    if (telefono && telefono.replace(/[^\d]/g, '').length < 9) throw errorCliente('Revisa el teléfono: necesita al menos 9 cifras (o déjalo vacío).');
+    const clave = typeof datos.clave === 'string' ? datos.clave : '';
+    if (clave.length < 8) throw errorCliente('La contraseña necesita al menos 8 caracteres.');
+    if (clave.length > 200) throw errorCliente('La contraseña es demasiado larga.');
+    if (datos.acepto !== true) throw errorCliente('Para unirte tienes que aceptar que guardemos tus datos del club.');
+    if (socios.some((s) => s.email === email)) throw errorCliente('Ya hay una tarjeta con ese email. Entra con tu contraseña.', 409);
+    if (!permitirEnvio('alta', ip, 5, 3600000)) throw errorCliente('Has creado muchas tarjetas seguidas. Prueba más tarde.', 429);
+    if (socios.length >= MAX_SOCIOS) throw errorCliente('El club está completo ahora mismo. Pregúntanos en la barra.', 503);
+    const socio = {
+      id: crypto.randomBytes(8).toString('hex'),
+      codigo: nuevoCodigo(),
+      nombre,
+      email,
+      telefono,
+      clave: await cifrarClave(clave),
+      version: 1,
+      creado: new Date().toISOString(),
+      sellos: 0,
+      total: 0,
+      canjes: 0,
+      historial: []
+    };
+    anotar(socio, 'alta', 0, '');
+    socios.push(socio);
+    await guardarArchivo('socios.json', socios);
+    abrirSesionSocio(req, res, socio);
+    console.log('[soño] Nuevo socio del club');
+    return enviarJSON(res, 201, { socio: tarjeta(socio) });
+  }
+
+  if (pathname === '/api/club/entrar' && metodo === 'POST') {
+    if (!mismoOrigen(req)) throw errorCliente('Petición no permitida.', 403);
+    const estado = bloqueoSocio(ip);
+    const datos = await leerJSON(req);
+    const email = texto(datos.email, 120).toLowerCase();
+    const socio = socios.find((s) => s.email === email);
+    const ok = await claveCorrecta(typeof datos.clave === 'string' ? datos.clave : '', socio ? socio.clave : '');
+    if (!socio || !ok) {
+      falloSocio(ip, estado);
+      throw errorCliente('El email o la contraseña no son correctos.', 401);
+    }
+    intentosSocio.delete(ip);
+    abrirSesionSocio(req, res, socio);
+    return enviarJSON(res, 200, { socio: tarjeta(socio) });
+  }
+
+  if (pathname === '/api/club/salir' && metodo === 'POST') {
+    res.setHeader('Set-Cookie', cookieSocio(req, '', 0));
+    return enviarJSON(res, 200, { ok: true });
+  }
+
+  if (pathname === '/api/club/baja' && metodo === 'POST') {
+    if (!mismoOrigen(req)) throw errorCliente('Petición no permitida.', 403);
+    const socio = socioDeSesion(req);
+    if (!socio) throw errorCliente('Tu sesión ha caducado. Vuelve a entrar.', 401);
+    const estado = bloqueoSocio(ip);
+    const datos = await leerJSON(req);
+    if (!(await claveCorrecta(typeof datos.clave === 'string' ? datos.clave : '', socio.clave))) {
+      falloSocio(ip, estado);
+      throw errorCliente('La contraseña no es correcta.', 401);
+    }
+    socios = socios.filter((s) => s !== socio);
+    await guardarArchivo('socios.json', socios);
+    res.setHeader('Set-Cookie', cookieSocio(req, '', 0));
+    return enviarJSON(res, 200, { ok: true });
+  }
+
+  /* --- Personal (panel) --- */
+  if (pathname === '/api/club/socios' && metodo === 'GET') {
+    exigirAdmin(req);
+    const lista = socios.map((s) => fichaSocio(s, false)).sort((a, b) => b.ultimo.localeCompare(a.ultimo));
+    return enviarJSON(res, 200, { socios: lista, club: ajustesClub() });
+  }
+
+  if (pathname === '/api/club/buscar' && metodo === 'POST') {
+    exigirAdmin(req);
+    const datos = await leerJSON(req);
+    const codigo = limpiarCodigo(datos.codigo);
+    const socio = codigo ? socios.find((s) => s.codigo === codigo) : null;
+    if (!socio) throw errorCliente('No hay ninguna tarjeta con ese código.', 404);
+    return enviarJSON(res, 200, { socio: fichaSocio(socio, true), club: ajustesClub() });
+  }
+
+  const m = pathname.match(/^\/api\/club\/socios\/([a-f0-9]{16})(?:\/(sellos|canjear|clave))?$/);
+  if (m) {
+    exigirAdmin(req);
+    const socio = socios.find((s) => s.id === m[1]);
+    if (!socio) throw errorCliente('Ese socio ya no existe.', 404);
+    const accion = m[2];
+    if (!accion && metodo === 'GET') return enviarJSON(res, 200, { socio: fichaSocio(socio, true), club: ajustesClub() });
+    if (!accion && metodo === 'DELETE') {
+      socios = socios.filter((s) => s !== socio);
+      await guardarArchivo('socios.json', socios);
+      return enviarJSON(res, 200, { ok: true });
+    }
+    if (metodo !== 'POST') throw errorCliente('Método no permitido.', 405);
+    const datos = await leerJSON(req);
+    const por = texto(datos.por, 30);
+    if (accion === 'sellos') {
+      const cantidad = Number(datos.cantidad);
+      if (!Number.isInteger(cantidad) || cantidad === 0 || cantidad < -5 || cantidad > 5) throw errorCliente('Se pueden sumar o quitar de 1 a 5 sellos cada vez.');
+      if (cantidad < 0 && socio.sellos === 0) throw errorCliente('Este socio no tiene sellos que quitar.', 409);
+      const real = cantidad < 0 ? -Math.min(socio.sellos, -cantidad) : cantidad;
+      socio.sellos += real;
+      socio.total = Math.max(0, socio.total + real);
+      anotar(socio, real > 0 ? 'sello' : 'quitar', Math.abs(real), por);
+    } else if (accion === 'canjear') {
+      const necesarios = ajustesClub().sellos;
+      if (socio.sellos < necesarios) throw errorCliente('Aún le faltan ' + (necesarios - socio.sellos) + ' sellos para el premio.', 409);
+      socio.sellos -= necesarios;
+      socio.canjes += 1;
+      anotar(socio, 'canje', 1, por);
+    } else if (accion === 'clave') {
+      // Contraseña provisional para quien la ha olvidado: se enseña una sola vez y cierra sus sesiones
+      const provisional = Array.from(crypto.randomBytes(10), (b) => ALFABETO_CODIGO[b % 32]).join('').toLowerCase();
+      socio.clave = await cifrarClave(provisional);
+      socio.version += 1;
+      await guardarArchivo('socios.json', socios);
+      return enviarJSON(res, 200, { clave: provisional });
+    }
+    await guardarArchivo('socios.json', socios);
+    return enviarJSON(res, 200, { socio: fichaSocio(socio, true), club: ajustesClub() });
+  }
+
+  return enviarJSON(res, 404, { error: 'No encontrado.' });
+}
+
 /* ---------- Rutas de la API ---------- */
 async function api(req, res, pathname) {
   const metodo = req.method;
   const ip = ipCliente(req);
+
+  if (pathname.startsWith('/api/club/')) return apiClub(req, res, pathname, metodo, ip);
 
   if (pathname === '/api/contenido' && metodo === 'GET') {
     return enviarJSON(res, 200, contenido);
@@ -785,6 +1066,7 @@ setInterval(() => {
   for (const [t, caduca] of sesiones) if (caduca < ahora) sesiones.delete(t);
   for (const [ip, e] of intentosLogin) if (e.bloqueadoHasta < ahora && e.fallos === 0) intentosLogin.delete(ip);
   for (const [k, lista] of envios) if (!lista.some((t) => ahora - t < 3600000)) envios.delete(k);
+  for (const [ip, e] of intentosSocio) if (e.bloqueadoHasta < ahora && e.fallos === 0) intentosSocio.delete(ip);
 }, 10 * 60000).unref();
 
 iniciarDatos().then(() => {
