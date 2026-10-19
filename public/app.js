@@ -1719,96 +1719,147 @@
     });
   }
 
-  /* ---------- Escena de la portada: el vaso se llena al bajar ----------
-     El dibujo se queda fijo en el centro mientras se recorre «.escena__recorrido».
-     p va de 0 (vaso vacío) a 1 (café listo):
-       0,00–0,33  la jarrita sirve un espresso doble (hasta 60 ml)
-       0,33–0,66  la jarra añade la leche (hasta 240 ml)
-       0,66–0,90  una capa de espuma (hasta 276 ml)
-       0,90–1,00  sale el vapor
-     Sin JavaScript, o con «reducir movimiento», se ve el vaso ya lleno. */
+  /* ---------- Escena: la taza se llena al bajar ----------
+     Va justo después de la portada. El dibujo se queda fijo en el centro mientras
+     se recorre «.escena__recorrido». p va de 0 (taza vacía) a 1 (café listo):
+       0,00–0,33  la cafetera sirve el café (60 ml)
+       0,33–0,66  la jarra añade la leche (hasta 220 ml)
+       0,66–0,90  la jarra pone la espuma (hasta 250 ml)
+       0,90–1,00  sale el vapor y aparece el corazón en la espuma
+     La cafetera y la jarra tienen siempre el mismo tamaño.
+     Sin JavaScript, o con «reducir movimiento», se ve la taza ya llena. */
   (function () {
     var escena = $('escena');
     var fijo = $('escena-fijo');
-    var svg = $('escena-svg');
-    if (!escena || !fijo || !svg) return;
+    if (!escena || !fijo) return;
     var recorrido = escena.querySelector('.escena__recorrido');
     var raizHtml = document.documentElement;
     var cabecera = $('cabecera');
-    var capas = { espresso: $('capa-espresso'), leche: $('capa-leche'), espuma: $('capa-espuma') };
-    var chorros = { espresso: $('chorro-espresso'), leche: $('chorro-leche'), espuma: $('chorro-espuma') };
-    var jarraPeque = $('jarra-espresso');
-    var jarraGrande = $('jarra-leche');
+    var capas = { cafe: $('capa-cafe'), leche: $('capa-leche'), espuma: $('capa-espuma') };
+    var superficie = $('superficie');
+    var ondas = $('ondas');
+    var onda1 = $('onda-1');
+    var onda2 = $('onda-2');
+    var corazon = $('corazon');
+    var chorros = { cafe: $('chorro-cafe'), leche: $('chorro-leche'), espuma: $('chorro-espuma') };
+    var cafetera = $('cafetera');
+    var jarra = $('jarra');
     var vapor = $('escena-vapor');
     var pasos = [$('paso-1'), $('paso-2'), $('paso-3')];
-    var barras = pasos.map(function (p) { return p.querySelector('.escena__barra > span'); });
+    var barras = pasos.map(function (li) { return li.querySelector('.escena__barra > span'); });
     var textoEl = $('escena-texto');
     var mlEl = $('escena-ml');
-    var ML_LLENO = 300;          // capacidad del vaso: las marcas van de 60 en 60 ml
-    var PICO_Y = 70;             // altura del pico de las jarras
+    var PICO = { x: 300, y: 74 };     // pico de la cafetera y de la jarra (en el dibujo)
+    var ESCALA = 1.15;                // tamaño de la cafetera y la jarra: el mismo para las dos
     var reducido = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
-    var movil = window.matchMedia ? window.matchMedia('(max-width: 760px)') : { matches: false };
 
     function entre(v, a, b) { return Math.min(b, Math.max(a, v)); }
     function tramo(p, a, b) { return entre((p - a) / (b - a), 0, 1); }
-    function suave(t) { return t * t * (3 - 2 * t); }
-    function nivelY(f) { return 368 - f * 215; }     // f = fracción del vaso (0 vacío, 1 lleno)
+    function suave(x) { return x * x * (3 - 2 * x); }
+
+    // Ancho del cuenco de la taza a cada altura (curva del dibujo, en coordenadas de la taza)
+    function bez(s, a, b, c, d) { var u = 1 - s; return u * u * u * a + 3 * u * u * s * b + 3 * u * s * s * c + s * s * s * d; }
+    var perfil = [];
+    for (var i = 0; i <= 80; i++) {
+      var s = i / 80;
+      perfil.push({ y: bez(s, 262, 334, 366, 366), m: 210 - bez(s, 118, 118, 160, 210) });
+    }
+    function mitadAncho(y) {
+      for (var j = 1; j < perfil.length; j++) {
+        if (perfil[j].y >= y) {
+          var a = perfil[j - 1], b = perfil[j];
+          var k = (y - a.y) / ((b.y - a.y) || 1);
+          return Math.max(0, a.m + (b.m - a.m) * k - 2);
+        }
+      }
+      return 0;
+    }
+    function nivelY(f) { return 363 - f * 95; }             // f: 0 fondo de la taza, 1 borde
+    function enDibujoY(y) { return 1.4 * y - 136.8; }       // de la taza al dibujo completo
+    // Zona del líquido por debajo del borde delantero de su superficie
+    function capa(y) {
+      var m = mitadAncho(y);
+      if (m < 0.5) return '';
+      var r = (m * 0.196).toFixed(2);
+      return 'M' + (210 - m).toFixed(2) + ' ' + y.toFixed(2) + ' A' + m.toFixed(2) + ' ' + r + ' 0 0 0 ' +
+        (210 + m).toFixed(2) + ' ' + y.toFixed(2) + ' L' + (210 + m).toFixed(2) + ' 380 L' + (210 - m).toFixed(2) + ' 380 Z';
+    }
+    function elipse(el, y, factor) {
+      var m = mitadAncho(y) * (factor || 1);
+      el.setAttribute('cy', y.toFixed(2));
+      el.setAttribute('rx', m.toFixed(2));
+      el.setAttribute('ry', (m * 0.196).toFixed(2));
+    }
 
     var ultimoTexto = '';
     var ultimoMl = -1;
+    var ultimoTipo = '';
     function pintar(p) {
-      var esp = 0.2 * tramo(p, 0.06, 0.29);
-      var leche = esp + 0.6 * tramo(p, 0.41, 0.65);
-      var espuma = leche + 0.12 * tramo(p, 0.67, 0.85);
-      capas.espresso.setAttribute('transform', 'translate(0 ' + nivelY(esp).toFixed(2) + ')');
-      capas.leche.setAttribute('transform', 'translate(0 ' + nivelY(leche).toFixed(2) + ')');
-      capas.espuma.setAttribute('transform', 'translate(0 ' + nivelY(espuma).toFixed(2) + ')');
+      var tCafe = tramo(p, 0.06, 0.29);
+      var tLeche = tramo(p, 0.41, 0.65);
+      var tEspuma = tramo(p, 0.67, 0.85);
+      var fCafe = 0.3 * tCafe;
+      var fLeche = fCafe + 0.55 * tLeche;
+      var fEspuma = fLeche + 0.1 * tEspuma;
+      var yCafe = nivelY(fCafe), yLeche = nivelY(fLeche), yEspuma = nivelY(fEspuma);
+      capas.cafe.setAttribute('d', capa(yCafe));
+      capas.leche.setAttribute('d', capa(yLeche));
+      capas.espuma.setAttribute('d', capa(yEspuma));
 
-      // Jarras: se inclinan para servir y vuelven a su sitio
-      var giroPeque = -18 - 40 * (suave(tramo(p, 0, 0.05)) - suave(tramo(p, 0.28, 0.33)));
-      var giroGrande = -18 - 40 * (suave(tramo(p, 0.36, 0.4)) - suave(tramo(p, 0.86, 0.91)));
-      jarraPeque.setAttribute('transform', 'translate(500 ' + PICO_Y + ') rotate(' + giroPeque.toFixed(2) + ') scale(0.62)');
-      jarraGrande.setAttribute('transform', 'translate(500 ' + PICO_Y + ') rotate(' + giroGrande.toFixed(2) + ')');
-      jarraPeque.setAttribute('opacity', (1 - tramo(p, 0.31, 0.35)).toFixed(3));
-      jarraGrande.setAttribute('opacity', (tramo(p, 0.33, 0.37) * (1 - tramo(p, 0.91, 0.95))).toFixed(3));
+      // Superficie que se ve desde arriba, del color de la capa de encima
+      var tipo = tEspuma > 0 ? 'espuma' : tLeche > 0 ? 'leche' : 'cafe';
+      if (tipo !== ultimoTipo) { superficie.setAttribute('class', 'superficie es-' + tipo); ultimoTipo = tipo; }
+      elipse(superficie, yEspuma);
+      superficie.style.opacity = fEspuma > 0.004 ? '1' : '0';
+
+      // Cafetera y jarra: se inclinan para servir y vuelven; mismo tamaño las dos
+      var giroCafetera = -18 - 40 * (suave(tramo(p, 0, 0.05)) - suave(tramo(p, 0.28, 0.33)));
+      var giroJarra = -18 - 40 * (suave(tramo(p, 0.36, 0.4)) - suave(tramo(p, 0.86, 0.91)));
+      cafetera.setAttribute('transform', 'translate(' + PICO.x + ' ' + PICO.y + ') rotate(' + giroCafetera.toFixed(2) + ') scale(' + ESCALA + ')');
+      jarra.setAttribute('transform', 'translate(' + PICO.x + ' ' + PICO.y + ') rotate(' + giroJarra.toFixed(2) + ') scale(' + ESCALA + ')');
+      cafetera.setAttribute('opacity', (1 - tramo(p, 0.31, 0.35)).toFixed(3));
+      jarra.setAttribute('opacity', (tramo(p, 0.33, 0.37) * (1 - tramo(p, 0.91, 0.95))).toFixed(3));
 
       // Chorros: del pico a la superficie, solo mientras se sirve
-      var superficie = nivelY(espuma) + 2;
+      var fondo = enDibujoY(yEspuma) + 1;
+      var sirviendo = false;
       function chorro(el, desde, hasta) {
         var visible = p > desde && p < hasta;
-        var largo = visible ? (superficie - PICO_Y) * tramo(p, desde, desde + 0.025) : 0;
+        if (visible) sirviendo = true;
+        var largo = visible ? (fondo - PICO.y) * tramo(p, desde, desde + 0.025) : 0;
         el.setAttribute('height', Math.max(0, largo).toFixed(2));
       }
-      chorro(chorros.espresso, 0.04, 0.29);
+      chorro(chorros.cafe, 0.04, 0.29);
       chorro(chorros.leche, 0.39, 0.655);
       chorro(chorros.espuma, 0.66, 0.855);
+      ondas.classList.toggle('sirviendo', sirviendo && fEspuma > 0.02);
+      elipse(onda1, yEspuma, 0.8);
+      elipse(onda2, yEspuma, 0.8);
 
+      // Al final: corazón en la espuma y vapor
+      corazon.setAttribute('transform', 'translate(0 ' + (yEspuma - 264).toFixed(2) + ') ' +
+        'translate(210 264) scale(' + (0.75 + 0.25 * tramo(p, 0.88, 0.96)).toFixed(3) + ') translate(-210 -264)');
+      corazon.style.opacity = tramo(p, 0.88, 0.95).toFixed(3);
       vapor.style.opacity = tramo(p, 0.9, 0.97).toFixed(3);
 
       // Pasos y texto de abajo
-      var avance = [tramo(p, 0.06, 0.29), tramo(p, 0.41, 0.65), tramo(p, 0.67, 0.85)];
+      var avance = [tCafe, tLeche, tEspuma];
       var actual = p < 0.33 ? 0 : p < 0.66 ? 1 : p < 0.9 ? 2 : 3;
-      barras.forEach(function (b, i) { b.style.setProperty('--t', avance[i].toFixed(3)); });
-      pasos.forEach(function (li, i) {
-        li.classList.toggle('activo', i === actual && p > 0.02);
-        li.classList.toggle('hecho', avance[i] >= 1);
+      barras.forEach(function (b, n) { b.style.setProperty('--t', avance[n].toFixed(3)); });
+      pasos.forEach(function (li, n) {
+        li.classList.toggle('activo', n === actual && p > 0.02);
+        li.classList.toggle('hecho', avance[n] >= 1);
       });
       var texto = p < 0.03 ? 'Baja para servirte un café ↓'
-        : actual === 0 ? 'Primero, un espresso doble'
+        : actual === 0 ? 'Primero, el café recién hecho'
         : actual === 1 ? 'Después, leche cremosa'
         : actual === 2 ? 'Y una capa fina de espuma'
         : 'Tu café con leche, listo';
       if (texto !== ultimoTexto) { textoEl.textContent = texto; ultimoTexto = texto; }
-      var ml = Math.round(espuma * ML_LLENO);
+      var ml = Math.round(60 * tCafe + 160 * tLeche + 30 * tEspuma);
       if (ml !== ultimoMl) { mlEl.textContent = ml + ' ml'; ultimoMl = ml; }
     }
 
-    // En el móvil se encuadra solo el vaso para que se vea grande
-    function encuadre() {
-      var estrecho = movil.matches;
-      svg.setAttribute('viewBox', estrecho ? '400 0 290 400' : '0 0 900 400');
-      fijo.style.setProperty('--aspecto', estrecho ? '0.725' : '2.25');
-    }
     // El dibujo queda centrado en el hueco que deja la cabecera
     function colocar() {
       var alto = cabecera ? cabecera.offsetHeight : 0;
@@ -1830,7 +1881,6 @@
       requestAnimationFrame(function () { pendiente = false; pintar(progreso()); });
     }
     function iniciar() {
-      encuadre();
       if (activa()) {
         raizHtml.classList.add('escena-activa');
         colocar();
@@ -1851,10 +1901,8 @@
       ultimoAlto = window.innerHeight;
       iniciar();
     });
-    [reducido, movil].forEach(function (m) {
-      if (m.addEventListener) m.addEventListener('change', iniciar);
-      else if (m.addListener) m.addListener(iniciar);
-    });
+    if (reducido.addEventListener) reducido.addEventListener('change', iniciar);
+    else if (reducido.addListener) reducido.addListener(iniciar);
     iniciar();
   })();
 
