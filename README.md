@@ -40,7 +40,7 @@ Los datos del club están en `socios.json` y la clave que firma las sesiones en 
 
 ## Reseñas
 
-Sección «Lo que nos contáis», después de la galería. Arriba sale la nota media (por ejemplo, 4,6 con 12 reseñas) y debajo las reseñas en tarjetas, de 6 en 6 con «Ver más reseñas». Cualquiera puede escribir una desde «Escribir una reseña»: estrellas del 1 al 5, nombre (como quiera que salga), comentario y la casilla para aceptar que se publique. Si quien escribe tiene abierta su tarjeta del club, la reseña sale con la etiqueta «Socio del club».
+Sección «Lo que nos contáis», después de la galería. Arriba sale la nota media (por ejemplo, 4,6 con 12 reseñas) y debajo las reseñas en un **slider**: 3 tarjetas a la vez en el ordenador, 2 en la tableta y 1 en el móvil (asomando la siguiente). Se pasa con el dedo, con las flechas o arrastrando con el ratón, y una barra fina indica por dónde vas; si caben todas, no salen ni flechas ni barra. Las reseñas largas se cortan a unas líneas con «Leer entera». Cualquiera puede escribir una desde «Escribir una reseña»: estrellas del 1 al 5, nombre (como quiera que salga), comentario y la casilla para aceptar que se publique. Si quien escribe tiene abierta su tarjeta del club, la reseña sale con la etiqueta «Socio del club».
 
 Las reseñas **no salen en la web hasta que se publican** desde el panel, pestaña **Reseñas**:
 - **Reseñas activas en la web**: interruptor arriba de la pestaña, como el del club. Se guarda al momento. Desactivado, la sección y el enlace del menú desaparecen y nadie puede escribir; las reseñas se guardan para cuando se vuelva a activar.

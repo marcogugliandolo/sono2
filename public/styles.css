@@ -1399,38 +1399,81 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 .estrellas svg.es-llena { --relleno: currentColor; }
 .estrellas--peque svg { width: 16px; height: 16px; }
 
-.resenas { list-style: none; margin: 0; padding: 0; columns: 3 280px; column-gap: 20px; }
-.resenas--pocas { columns: auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 400px)); gap: 20px; }
+/* Slider: 3 tarjetas a la vez en el ordenador, 2 en la tableta y 1 (asomando la siguiente) en el móvil */
+.resenas {
+  list-style: none;
+  margin: 0;
+  padding: 2px 0 4px;
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.resenas::-webkit-scrollbar { display: none; }
+@media (prefers-reduced-motion: no-preference) { .resenas { scroll-behavior: smooth; } }
+.resenas:focus-visible { outline-offset: 4px; }
+@media (hover: hover) and (pointer: fine) { .resenas.desliza { cursor: grab; } }
+.resenas.arrastrando { cursor: grabbing; scroll-snap-type: none; scroll-behavior: auto; user-select: none; }
 .resena {
-  break-inside: avoid;
-  display: grid;
+  flex: 0 0 calc((100% - 40px) / 3);
+  min-width: 0;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
-  margin: 0 0 20px;
   padding: clamp(22px, 2.6vw, 30px);
   border: 1px solid var(--linea);
   border-radius: var(--r-tarjeta);
   background: var(--superficie);
 }
-.resenas--pocas .resena { margin: 0; }
-.resena:focus-visible { outline-offset: 2px; }
+.resenas .estado-vacio { flex: 1 1 100%; }
 .resena__cabeza { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .resena__fecha { font-family: var(--f-mono); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cafe-suave); }
-.resena__texto { margin: 0; font-family: var(--f-titulo); font-size: clamp(1.25rem, 1.7vw, 1.4rem); line-height: 1.32; white-space: pre-line; overflow-wrap: anywhere; }
+.resena__texto { margin: 0; display: grid; justify-items: start; gap: 6px; font-family: var(--f-titulo); font-size: clamp(1.25rem, 1.7vw, 1.4rem); line-height: 1.32; white-space: pre-line; overflow-wrap: anywhere; }
+/* Las largas se cortan (5 líneas de reseña y 3 de respuesta) para que las tarjetas no crezcan de más */
+.resena__texto p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden; }
+.resena__respuesta p:last-child { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.resena.es-entera .resena__texto p, .resena.es-entera .resena__respuesta p:last-child { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.resena__mas { padding: 4px 0; border: 0; background: none; color: var(--cafe); font: 500 0.875rem/1.4 var(--f-cuerpo); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: pointer; }
 .resena__texto p::before { content: "\201C"; }
 .resena__texto p::after { content: "\201D"; }
-.resena__autor { display: flex; align-items: center; gap: 12px; padding-top: 14px; border-top: 1px solid var(--linea); }
+.resena__autor { display: flex; align-items: center; gap: 12px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--linea); }
 .resena__inicial { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--beige); font-family: var(--f-titulo); font-size: 1.25rem; line-height: 1; }
-.resena__quien { display: grid; gap: 3px; min-width: 0; }
+.resena__quien { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
 .resena__nombre { font-weight: 600; font-size: 0.9375rem; overflow-wrap: anywhere; }
-.resena__socio { justify-self: start; font-family: var(--f-mono); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--beige-suave); }
+.resena__socio { font-family: var(--f-mono); font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: var(--beige-suave); }
 .resena__respuesta { display: grid; gap: 6px; padding: 12px 14px; border-radius: 10px; background: var(--beige-suave); font-size: 0.9375rem; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
 .resena__respuesta .meta { color: var(--cafe); }
-.resenas__pie { display: grid; justify-items: center; gap: 16px; margin-top: clamp(20px, 3vw, 36px); text-align: center; }
+.resenas__pie { display: grid; justify-items: center; gap: 18px; margin-top: clamp(20px, 3vw, 32px); text-align: center; }
+.resenas__controles { justify-self: stretch; display: flex; align-items: center; gap: 24px; }
+.resenas__progreso { position: relative; flex: 1; height: 2px; border-radius: 2px; background: var(--linea); overflow: hidden; }
+.resenas__progreso span { position: absolute; top: 0; bottom: 0; left: 0; width: 0; border-radius: 2px; background: var(--cafe); transition: left 0.12s linear; }
+.resenas__flechas { display: flex; gap: 8px; }
+.flecha {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--linea-fuerte);
+  border-radius: 50%;
+  background: var(--superficie);
+  color: var(--cafe);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.flecha svg { width: 20px; height: 20px; --grosor: 1.8; overflow: visible; }
+@media (hover: hover) { .flecha:hover:not(:disabled) { background: var(--cafe); border-color: var(--cafe); color: var(--lienzo); } }
+.flecha:active:not(:disabled) { transform: scale(0.94); }
+.flecha:disabled { opacity: 0.35; cursor: default; }
 .resenas__aviso { font-size: 0.875rem; color: var(--cafe-suave); max-width: 60ch; text-wrap: balance; }
 .resenas__aviso a { white-space: nowrap; }
 .resenas__vacio {
-  break-inside: avoid;
-  column-span: all;
+  flex: 1 1 100%;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -1442,9 +1485,6 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 .resenas__vacio svg { width: 64px; height: 64px; --grosor: 1.8; overflow: visible; }
 .resenas__vacio-texto { display: grid; gap: 4px; }
 .resenas__vacio-titulo { font-family: var(--f-titulo); font-size: clamp(1.7rem, 2.6vw, 2.1rem); line-height: 1.1; }
-@media (prefers-reduced-motion: no-preference) {
-  .resena--nueva { animation: subir 0.5s var(--suave) both; animation-delay: calc(var(--i, 0) * 60ms); }
-}
 
 /* Enlaces subrayados dentro de textos pequeños */
 .resenas__aviso a, .nota-legal a, .casilla--texto a, .enlace, .aviso-cookies__enlace {
@@ -1620,9 +1660,19 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 .resena-admin .registro__titulo .resena__socio { margin-left: 10px; vertical-align: 2px; }
 .resena-admin__respuesta { display: grid; gap: 10px; }
 .resena-admin__respuesta:empty { display: none; }
+@media (max-width: 900px) {
+  .resena { flex-basis: calc((100% - 20px) / 2); }
+}
 @media (max-width: 640px) {
   .resenas__vacio { grid-template-columns: minmax(0, 1fr); justify-items: start; }
   .resenas__lado { width: 100%; justify-content: space-between; }
+  /* En el móvil el slider llega hasta los bordes de la pantalla y asoma la siguiente tarjeta */
+  .resenas { gap: 12px; margin-inline: -20px; padding-inline: 20px; scroll-padding-inline: 20px; }
+  .resena { flex-basis: 86%; gap: 14px; padding: 22px; }
+  .resena__texto { font-size: 1.2rem; }
+  .resena__texto p { -webkit-line-clamp: 4; }
+  .resena__respuesta p:last-child { -webkit-line-clamp: 2; }
+  .resenas__controles { gap: 16px; }
 }
 @media (max-width: 520px) {
   .fila-2--legal { grid-template-columns: minmax(0, 1fr); }
