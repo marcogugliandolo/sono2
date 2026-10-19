@@ -1471,33 +1471,72 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 .elegir-estrellas__texto { font-size: 0.9375rem; color: var(--cafe-suave); min-height: 1.5em; }
 .campo__contador { justify-self: end; font-family: var(--f-mono); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 
-/* ---------- Aviso de cookies ---------- */
+/* ---------- Aviso de cookies: una galleta con su mordisco ----------
+   Tarjeta beige, como la del club y la del pie, con una galleta dibujada a línea.
+   Al pulsar «Entendido», la galleta se lleva otro mordisco y el aviso baja y se va. */
 .aviso-cookies {
   position: fixed;
   z-index: 18;
   left: max(16px, env(safe-area-inset-left, 0px));
   bottom: max(16px, env(safe-area-inset-bottom, 0px));
-  width: min(400px, calc(100% - 32px));
+  width: min(420px, calc(100% - 32px));
   display: grid;
-  gap: 14px;
-  padding: 18px 20px;
-  border: 1px solid var(--linea);
-  border-radius: var(--r-tarjeta);
-  background: var(--superficie);
+  grid-template-columns: 72px minmax(0, 1fr);
+  column-gap: 16px;
+  align-items: start;
+  padding: 20px 22px 18px 16px;
+  border-radius: 14px;
+  background: var(--beige);
   color: var(--cafe);
-  box-shadow: 0 12px 40px rgba(40, 18, 6, 0.14);
-  font-size: 0.875rem;
-  line-height: 1.5;
-  transition: opacity 0.22s ease, transform 0.22s var(--salida);
+  box-shadow: 0 1px 2px rgba(63, 29, 12, 0.14), 0 18px 48px rgba(63, 29, 12, 0.22);
+  transition: opacity 0.28s ease, transform 0.34s var(--salida);
 }
-.aviso-cookies.se-va { opacity: 0; transform: translateY(8px); }
-.aviso-cookies__acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
-.aviso-cookies__enlace { font-weight: 500; padding-block: 6px; }
+.aviso-cookies__dibujo { width: 72px; height: 72px; overflow: visible; --grosor: 1.8; margin-top: 2px; }
+.aviso-cookies__cuerpo { display: grid; gap: 6px; min-width: 0; }
+.aviso-cookies__titulo { font-family: var(--f-titulo); font-size: 1.625rem; line-height: 1.05; letter-spacing: -0.01em; }
+.aviso-cookies__texto { font-size: 0.875rem; line-height: 1.5; }
+.aviso-cookies__acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; margin-top: 8px; }
+.aviso-cookies__enlace { font-size: 0.875rem; font-weight: 500; padding-block: 8px; }
+.aviso-cookies .boton:focus-visible, .aviso-cookies__enlace:focus-visible { outline-color: var(--cafe-oscuro); }
+
+/* La galleta */
+.galleta__masa { --relleno: var(--superficie); }
+.galleta__pepita { fill: var(--cafe); stroke: var(--cafe); stroke-width: 0.9; stroke-linejoin: round; }
+.galleta__miga { fill: var(--cafe); }
+.galleta__miga--fija { opacity: 0.5; }
+.galleta__miga--cae { opacity: 0; }
+.galleta__mordisco-nuevo { transform: scale(0); transform-box: fill-box; transform-origin: center; }
+.aviso-cookies.mordiendo .galleta__mordisco-nuevo { transform: scale(1); transition: transform 0.22s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.aviso-cookies.se-va { opacity: 0; transform: translateY(16px); }
+.aviso-cookies .boton:disabled { opacity: 1; cursor: default; }
+
 @media (prefers-reduced-motion: no-preference) {
-  .aviso-cookies:not(.se-va) { animation: subir 0.5s var(--suave) 0.5s both; }
+  .aviso-cookies { animation: aviso-entra 0.65s var(--suave) 0.8s both; }
+  .aviso-cookies.se-va { animation: none; }
+  .aviso-cookies__dibujo { animation: galleta-rueda 0.8s var(--suave) 0.85s both; }
+  .aviso-cookies.mordiendo .galleta__miga--cae { animation: miga-cae 0.5s ease-in both; animation-delay: calc(0.14s + var(--d, 0s)); }
+  .aviso-cookies.mordiendo .aviso-cookies__dibujo { animation: galleta-mordisco 0.3s ease-out 0.05s both; }
 }
+@keyframes aviso-entra { from { opacity: 0; transform: translateY(18px); } }
+@keyframes galleta-rueda { from { transform: translateX(-10px) rotate(-60deg); } }
+@keyframes galleta-mordisco { 40% { transform: rotate(-6deg) scale(0.97); } }
+@keyframes miga-cae {
+  0% { opacity: 0.9; transform: none; }
+  100% { opacity: 0; transform: translate(var(--x, 0), 20px); }
+}
+
 @media (max-width: 520px) {
-  .aviso-cookies { left: 12px; right: 12px; width: auto; bottom: max(12px, env(safe-area-inset-bottom, 0px)); padding: 16px; }
+  .aviso-cookies {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    grid-template-columns: 56px minmax(0, 1fr);
+    column-gap: 14px;
+    padding: 16px 16px 14px 14px;
+  }
+  .aviso-cookies__dibujo { width: 56px; height: 56px; }
+  .aviso-cookies__titulo { font-size: 1.45rem; }
 }
 
 /* ---------- Página de textos legales ---------- */
