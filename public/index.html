@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="/styles.css">
 <script src="/vendor/qrcode.js" defer></script>
 <script src="/app.js" defer></script>
+<script src="/cookies.js" defer></script>
 </head>
 <body>
 <!-- Dibujos reutilizables -->
@@ -114,6 +115,9 @@
       <path class="trazo" d="M44 54 L26 84 C24 88 27 91 31 91 H69 C73 91 76 88 74 84 L56 54"/>
       <path class="trazo" d="M33 74 H67"/>
     </symbol>
+    <symbol id="i-estrella" viewBox="0 0 24 24">
+      <path class="trazo" d="M12 2.9 L14.7 8.5 L20.8 9.3 L16.3 13.5 L17.5 19.6 L12 16.6 L6.5 19.6 L7.7 13.5 L3.2 9.3 L9.3 8.5 Z"/>
+    </symbol>
     <symbol id="i-camara" viewBox="0 0 100 100">
       <path class="trazo" d="M18 34 H34 L40 26 H60 L66 34 H82 C85 34 88 37 88 40 V72 C88 75 85 78 82 78 H18 C15 78 12 75 12 72 V40 C12 37 15 34 18 34 Z"/>
       <circle class="trazo" cx="50" cy="56" r="13"/>
@@ -167,6 +171,7 @@
         <li data-llevar><a href="#llevar">Para llevar</a></li>
         <li data-club><a href="#club" data-enlace-club>Club</a></li>
         <li data-galeria hidden><a href="#galeria">Galería</a></li>
+        <li data-resenas><a href="#resenas">Reseñas</a></li>
         <li><a href="#contacto">Visítanos</a></li>
       </ul>
     </nav>
@@ -189,6 +194,7 @@
       <li data-llevar><a href="#llevar">Para llevar</a></li>
       <li data-club><a href="#club" data-enlace-club>Club</a></li>
       <li data-galeria hidden><a href="#galeria">Galería</a></li>
+      <li data-resenas><a href="#resenas">Reseñas</a></li>
       <li><a href="#contacto">Visítanos</a></li>
     </ul>
   </nav>
@@ -425,6 +431,7 @@
           <strong id="pedido-total">Elige al menos un producto</strong>
         </div>
         <button class="boton boton--lleno boton--ancho" type="submit">Enviar pedido</button>
+        <p class="nota-legal">Usamos tus datos solo para preparar y entregar el pedido, y se borran a los 30 días. <a href="/privacidad" target="_blank" rel="noopener">Política de privacidad</a></p>
         <p class="aviso" id="aviso-pedido" aria-live="polite"></p>
       </form>
 
@@ -484,6 +491,32 @@
         <p class="cabeza-centro__nota">¿Tienes una foto en SOÑO? Compártela y etiquétanos. <span class="dato-instagram"><span class="pendiente">Instagram por confirmar</span></span></p>
       </div>
       <ul class="galeria" id="galeria-lista"></ul>
+    </div>
+  </section>
+
+  <section class="seccion seccion--linea" id="resenas" aria-labelledby="t-resenas" data-resenas>
+    <div class="wrap">
+      <div class="cabeza-seccion resenas__cabeza" data-aparece>
+        <div>
+          <p class="meta">Reseñas</p>
+          <h2 class="titulo" id="t-resenas">Lo que nos contáis</h2>
+        </div>
+        <div class="resenas__lado">
+          <div class="resenas__media" id="resenas-media" hidden>
+            <span class="resenas__nota" id="resenas-nota"></span>
+            <div class="resenas__media-texto">
+              <span class="estrellas" id="resenas-estrellas"></span>
+              <span class="resenas__total" id="resenas-total"></span>
+            </div>
+          </div>
+          <button class="boton boton--lleno" type="button" data-escribir-resena>Escribir una reseña</button>
+        </div>
+      </div>
+      <ul class="resenas" id="resenas-lista" aria-live="polite"></ul>
+      <div class="resenas__pie">
+        <button class="boton boton--borde" type="button" id="resenas-mas" hidden>Ver más reseñas</button>
+        <p class="resenas__aviso">Las leemos todas antes de publicarlas, sean buenas o no. <a href="/aviso-legal#resenas">Cómo lo hacemos</a></p>
+      </div>
     </div>
   </section>
 
@@ -549,6 +582,7 @@
             <textarea id="mensaje" name="mensaje" required style="min-height:130px"></textarea>
           </div>
           <button class="boton boton--lleno" type="submit">Enviar mensaje</button>
+          <p class="nota-legal">Usamos tu nombre y tu email solo para responderte. <a href="/privacidad" target="_blank" rel="noopener">Política de privacidad</a></p>
           <p class="aviso" id="aviso" aria-live="polite"></p>
         </form>
       </div>
@@ -572,6 +606,7 @@
             <li data-llevar><a href="#llevar">Para llevar</a></li>
             <li data-club><a href="#club" data-enlace-club>Club</a></li>
             <li data-galeria hidden><a href="#galeria">Galería</a></li>
+            <li data-resenas><a href="#resenas">Reseñas</a></li>
             <li><a href="#contacto">Visítanos</a></li>
           </ul>
         </div>
@@ -581,7 +616,14 @@
         </div>
       </div>
     </div>
-    <p class="pie__legal">© 2026 SOÑO</p>
+    <div class="pie__legal">
+      <p>© 2026 SOÑO</p>
+      <ul class="pie__legales">
+        <li><a href="/aviso-legal">Aviso legal</a></li>
+        <li><a href="/privacidad">Privacidad</a></li>
+        <li><a href="/cookies">Cookies</a></li>
+      </ul>
+    </div>
   </div>
 </footer>
 
@@ -652,6 +694,7 @@
           <p id="resumen">Mesa para 2</p>
           <button class="boton boton--lleno" type="submit">Reservar mesa</button>
         </div>
+        <p class="nota-legal">Usamos tu nombre y tu teléfono solo para gestionar la reserva. <a href="/privacidad" target="_blank" rel="noopener">Política de privacidad</a></p>
         <p class="aviso" id="aviso-reserva" aria-live="polite"></p>
       </div>
     </form>
@@ -738,7 +781,7 @@
         <input id="club-clave" name="clave" type="password" autocomplete="new-password" minlength="8" required>
         <p class="campo__ayuda">Al menos 8 caracteres.</p>
       </div>
-      <label class="casilla casilla--texto"><input type="checkbox" id="club-acepto" name="acepto"> <span>Acepto que SOÑO guarde mi nombre, email y teléfono para gestionar mi tarjeta del club. Puedo darme de baja cuando quiera desde la tarjeta.</span></label>
+      <label class="casilla casilla--texto"><input type="checkbox" id="club-acepto" name="acepto"> <span>Acepto que SOÑO guarde mi nombre, email y teléfono para gestionar mi tarjeta del club. Puedo darme de baja cuando quiera desde la tarjeta. <a href="/privacidad" target="_blank" rel="noopener">Política de privacidad</a></span></label>
       <button class="boton boton--lleno boton--ancho" type="submit">Crear mi tarjeta</button>
       <p class="aviso" id="aviso-club-alta" aria-live="polite"></p>
     </form>
@@ -811,6 +854,53 @@
   </div>
 </dialog>
 
+<!-- Ventana: escribir una reseña -->
+<dialog class="modal modal--resena" id="modal-resena" aria-labelledby="t-resena">
+  <div class="ventana">
+    <button class="modal__cerrar" type="button" data-cerrar aria-label="Cerrar"><svg viewBox="0 0 20 20" aria-hidden="true"><use href="#i-cerrar"/></svg></button>
+    <div class="ventana__cabeza">
+      <p class="meta">Reseñas</p>
+      <h2 class="modal__titulo" id="t-resena">¿Qué tal en SOÑO?</h2>
+    </div>
+
+    <form class="formulario" id="form-resena" novalidate>
+      <div class="trampa" aria-hidden="true"><label for="resena-web">No rellenar</label><input id="resena-web" name="web" type="text" tabindex="-1" autocomplete="off"></div>
+      <fieldset class="elegir-estrellas" id="elegir-estrellas">
+        <legend>Tu valoración</legend>
+        <div class="elegir-estrellas__fila">
+          <label><input class="oculto" type="radio" name="estrellas" value="1"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-estrella"/></svg><span class="solo-lector">1 estrella: mal</span></label>
+          <label><input class="oculto" type="radio" name="estrellas" value="2"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-estrella"/></svg><span class="solo-lector">2 estrellas: regular</span></label>
+          <label><input class="oculto" type="radio" name="estrellas" value="3"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-estrella"/></svg><span class="solo-lector">3 estrellas: bien</span></label>
+          <label><input class="oculto" type="radio" name="estrellas" value="4"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-estrella"/></svg><span class="solo-lector">4 estrellas: muy bien</span></label>
+          <label><input class="oculto" type="radio" name="estrellas" value="5"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-estrella"/></svg><span class="solo-lector">5 estrellas: genial</span></label>
+        </div>
+        <p class="elegir-estrellas__texto" id="resena-valoracion" aria-hidden="true">Toca las estrellas para valorar</p>
+      </fieldset>
+      <div class="campo">
+        <label for="resena-nombre">Tu nombre</label>
+        <input id="resena-nombre" name="nombre" type="text" autocomplete="given-name" maxlength="40" required>
+        <p class="campo__ayuda">Así saldrá en la reseña: tu nombre, o tu nombre y una inicial.</p>
+      </div>
+      <div class="campo">
+        <label for="resena-texto">Tu reseña</label>
+        <textarea id="resena-texto" name="texto" maxlength="600" required placeholder="¿Qué tomaste? ¿Qué tal el café, el sitio, la atención?"></textarea>
+        <p class="campo__ayuda campo__contador" id="resena-contador" aria-hidden="true">0 / 600</p>
+      </div>
+      <label class="casilla casilla--texto"><input type="checkbox" id="resena-acepto" name="acepto"> <span>Acepto que SOÑO publique mi reseña con este nombre. Puedo pedir que la quiten cuando quiera. <a href="/privacidad" target="_blank" rel="noopener">Política de privacidad</a></span></label>
+      <button class="boton boton--lleno boton--ancho" type="submit">Enviar reseña</button>
+      <p class="campo__ayuda">La leemos antes de publicarla, así que tardará un poco en salir.</p>
+      <p class="aviso" id="aviso-resena" aria-live="polite"></p>
+    </form>
+
+    <div class="confirmacion" id="resena-gracias" hidden>
+      <svg viewBox="0 0 100 100" aria-hidden="true"><use href="#i-taza"/></svg>
+      <h3>¡Gracias por contárnoslo!</h3>
+      <p class="demo">La publicaremos en cuanto la leamos.</p>
+      <button class="boton boton--lleno" type="button" data-cerrar>Cerrar</button>
+    </div>
+  </div>
+</dialog>
+
 <!-- Ventana: acceso al panel -->
 <dialog class="modal modal--login" id="modal-login" aria-labelledby="t-login">
   <div class="login">
@@ -856,6 +946,7 @@
       <button class="pestana" type="button" role="tab" id="tab-reservas" data-pestana="reservas" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Reservas</button>
       <button class="pestana" type="button" role="tab" id="tab-pedidos" data-pestana="pedidos" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Pedidos</button>
       <button class="pestana" type="button" role="tab" id="tab-club" data-pestana="club" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Club</button>
+      <button class="pestana" type="button" role="tab" id="tab-resenas" data-pestana="resenas" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Reseñas</button>
       <button class="pestana" type="button" role="tab" id="tab-mensajes" data-pestana="mensajes" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Mensajes</button>
       <button class="pestana" type="button" role="tab" id="tab-historial" data-pestana="historial" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Historial</button>
     </div>

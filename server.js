@@ -3,8 +3,8 @@
 /*
  * SOÑO · servidor web
  * Sin dependencias externas: solo Node.js 20 o superior.
- * Sirve la web, guarda la carta, fotos, horarios, reservas, mensajes y los socios del club
- * en la carpeta de datos, y protege el panel con usuario y contraseña.
+ * Sirve la web, guarda la carta, fotos, horarios, reservas, mensajes, los socios del club
+ * y las reseñas en la carpeta de datos, y protege el panel con usuario y contraseña.
  */
 
 const http = require('node:http');
@@ -47,6 +47,15 @@ const MAX_SOCIOS = 5000;
 const MAX_HISTORIAL = 30;
 const DIAS_SESION_SOCIO = 120;
 const ALFABETO_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // sin 0/O ni 1/I, para dictarlo sin dudas
+/* Reseñas: las escriben los clientes y salen en la web cuando el personal las publica */
+const RESENAS_INICIAL = { activo: true };
+const MAX_RESENAS = 2000;
+const MAX_RESENAS_PENDIENTES = 200;
+/* Datos del titular para el aviso legal y la política de privacidad */
+const LEGAL_VACIO = { titular: '', nif: '', domicilio: '', email: '', registro: '', actualizado: '' };
+const RE_NIF = /^([0-9]{8}[A-Z]|[XYZ][0-9]{7}[A-Z]|[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J])$/;
+/* La página de textos legales: una sola página con tres pestañas */
+const PAGINAS_LEGALES = ['/legal', '/aviso-legal', '/privacidad', '/cookies'];
 const RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ICONOS = ['taza', 'vaso', 'vaso-alto', 'coldbrew', 'cruasan', 'tostada', 'bol', 'bizcocho', 'filtro', 'prensa', 'chemex', 'llevar'];
 const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -98,6 +107,7 @@ let socios = [];                   // socios del club
 let secretoClub = null;            // firma las sesiones de los socios (se guarda en la carpeta de datos)
 const intentosSocio = new Map();   // ip -> { fallos, bloqueadoHasta }
 let versiones = [];                // historial de lo que se guarda desde el panel
+let resenas = [];                  // reseñas de los clientes
 
 /* ---------- Utilidades ---------- */
 function normalizarUsuario(u) {
@@ -214,6 +224,7 @@ async function iniciarDatos() {
   mensajes = await leerArchivo('mensajes.json', []);
   pedidos = await leerArchivo('pedidos.json', []);
   socios = await leerArchivo('socios.json', []);
+  resenas = await leerArchivo('resenas.json', []);
   versiones = await leerArchivo('versiones.json', []);
   if (!versiones.length) {
     // Punto de partida: cómo estaba la web cuando se activó el historial
@@ -227,14 +238,25 @@ async function iniciarDatos() {
     secretoClub = crypto.randomBytes(32);
     await guardarArchivo('secreto.json', { clave: secretoClub.toString('hex') });
   }
+  await limpiarAntiguos();
+}
+
+/* Borra lo que ya no hace falta, tal y como dice la política de privacidad:
+   pedidos de hace más de 30 días, reservas de hace más de 90 y mensajes de hace más de un año.
+   Se hace al arrancar y cada 6 horas. */
+async function limpiarAntiguos() {
   const limitePedidos = new Date(Date.now() - 30 * 86400000).toISOString();
-  const antesPedidos = pedidos.length;
+  const nPedidos = pedidos.length;
   pedidos = pedidos.filter((p) => p.creado >= limitePedidos);
-  if (pedidos.length !== antesPedidos) await guardarArchivo('pedidos.json', pedidos);
-  const limite = hoyISO(-90);
-  const antes = reservas.length;
-  reservas = reservas.filter((r) => r.fecha >= limite);
-  if (reservas.length !== antes) await guardarArchivo('reservas.json', reservas);
+  if (pedidos.length !== nPedidos) await guardarArchivo('pedidos.json', pedidos);
+  const limiteReservas = hoyISO(-90);
+  const nReservas = reservas.length;
+  reservas = reservas.filter((r) => r.fecha >= limiteReservas);
+  if (reservas.length !== nReservas) await guardarArchivo('reservas.json', reservas);
+  const limiteMensajes = new Date(Date.now() - 365 * 86400000).toISOString();
+  const nMensajes = mensajes.length;
+  mensajes = mensajes.filter((m) => m.creado >= limiteMensajes);
+  if (mensajes.length !== nMensajes) await guardarArchivo('mensajes.json', mensajes);
 }
 
 /* Completa contenido guardado con versiones anteriores de la web:
@@ -260,6 +282,9 @@ async function completarContenido() {
   if (!Array.isArray(contenido.datos.zonas)) { contenido.datos.zonas = ZONAS_INICIALES.map((z) => Object.assign({}, z)); cambiado = true; }
   if (contenido.datos.domicilio === undefined) { contenido.datos.domicilio = true; cambiado = true; }
   if (!contenido.datos.club) { contenido.datos.club = Object.assign({}, CLUB_INICIAL); cambiado = true; }
+  if (!contenido.datos.resenas) { contenido.datos.resenas = Object.assign({}, RESENAS_INICIAL); cambiado = true; }
+  if (!contenido.datos.legal) { contenido.datos.legal = Object.assign({}, LEGAL_VACIO); cambiado = true; }
+  if (!contenido.datos.legal.actualizado) { contenido.datos.legal.actualizado = hoyISO(0); cambiado = true; }
   if (cambiado) await guardarArchivo('contenido.json', contenido);
 }
 
@@ -386,8 +411,36 @@ function validarDatos(d) {
     paraLlevar: d.paraLlevar !== false,
     domicilio: d.domicilio !== false,
     zonas,
-    club: validarClub(d.club)
+    club: validarClub(d.club),
+    resenas: { activo: !(d.resenas && d.resenas.activo === false) },
+    legal: validarLegal(d.legal)
   };
+}
+
+function validarLegal(l) {
+  const v = l && typeof l === 'object' ? l : {};
+  const nif = texto(v.nif, 20).toUpperCase().replace(/[\s.-]/g, '');
+  if (nif && !RE_NIF.test(nif)) throw errorCliente('Revisa el NIF o CIF: por ejemplo 12345678Z o B12345678.');
+  const email = texto(v.email, 120);
+  if (email && !RE_EMAIL.test(email)) throw errorCliente('Revisa el email para temas de privacidad.');
+  return {
+    titular: texto(v.titular, 120),
+    nif,
+    domicilio: texto(v.domicilio, 200),
+    email,
+    registro: texto(v.registro, 200),
+    actualizado: RE_FECHA.test(String(v.actualizado || '')) ? v.actualizado : ''
+  };
+}
+
+/* Al guardar Ajustes o volver a una versión: el club y las reseñas no se encienden ni se apagan
+   (eso se hace en sus pestañas) y la fecha de los textos legales se pone sola si cambian sus datos */
+function prepararDatos(limpio, antes) {
+  limpio.club.activo = ajustesClub().activo !== false;
+  limpio.resenas.activo = ajustesResenas().activo !== false;
+  const sinFecha = (l) => JSON.stringify(Object.assign({}, LEGAL_VACIO, l || {}, { actualizado: '' }));
+  const previo = (antes && antes.legal) || {};
+  limpio.legal.actualizado = sinFecha(previo) !== sinFecha(limpio.legal) ? hoyISO(0) : (previo.actualizado || hoyISO(0));
 }
 
 function validarClub(c) {
@@ -802,6 +855,111 @@ async function apiClub(req, res, pathname, metodo, ip) {
   return enviarJSON(res, 404, { error: 'No encontrado.' });
 }
 
+/* ---------- Reseñas ----------
+   Los clientes las escriben desde la web y quedan «por revisar». Solo salen en la web
+   cuando el personal las publica desde el panel, que también puede ocultarlas, responderlas
+   o borrarlas. Si quien escribe tiene abierta su tarjeta del club, sale como «Socio del club». */
+function ajustesResenas() { return contenido.datos.resenas || RESENAS_INICIAL; }
+
+function resenaPublica(r) {
+  return { id: r.id, nombre: r.nombre, estrellas: r.estrellas, texto: r.texto, fecha: r.creada, respuesta: r.respuesta || '', socio: !!r.socio };
+}
+
+function cuentaResenas() {
+  const publicadas = resenas.filter((r) => r.estado === 'publicada');
+  const suma = publicadas.reduce((s, r) => s + r.estrellas, 0);
+  return {
+    total: publicadas.length,
+    media: publicadas.length ? Math.round((suma / publicadas.length) * 10) / 10 : 0,
+    pendientes: resenas.filter((r) => r.estado === 'pendiente').length
+  };
+}
+
+async function apiResenas(req, res, pathname, metodo, ip) {
+  /* --- Web --- */
+  if (pathname === '/api/resenas' && metodo === 'GET') {
+    if (!ajustesResenas().activo) return enviarJSON(res, 200, { activo: false, resenas: [], total: 0, media: 0 });
+    const c = cuentaResenas();
+    const lista = resenas.filter((r) => r.estado === 'publicada')
+      .sort((a, b) => b.creada.localeCompare(a.creada))
+      .slice(0, 120)
+      .map(resenaPublica);
+    return enviarJSON(res, 200, { activo: true, resenas: lista, total: c.total, media: c.media });
+  }
+
+  if (pathname === '/api/resenas' && metodo === 'POST') {
+    if (!mismoOrigen(req)) throw errorCliente('Petición no permitida.', 403);
+    if (!ajustesResenas().activo) throw errorCliente('Ahora mismo no se pueden dejar reseñas.', 409);
+    const datos = await leerJSON(req);
+    if (texto(datos.web, 200)) return enviarJSON(res, 201, { ok: true });   // trampa para bots
+    const estrellas = Number(datos.estrellas);
+    if (!Number.isInteger(estrellas) || estrellas < 1 || estrellas > 5) throw errorCliente('Elige de 1 a 5 estrellas.');
+    const nombre = texto(datos.nombre, 40);
+    if (nombre.length < 2) throw errorCliente('Escribe tu nombre: así saldrá en la reseña.');
+    const comentario = textoLargo(datos.texto, 600).replace(/\n{3,}/g, '\n\n');
+    if (comentario.length < 10) throw errorCliente('Cuéntanos un poco más: al menos 10 caracteres.');
+    if (datos.acepto !== true) throw errorCliente('Para publicarla necesitamos que aceptes que salga con tu nombre.');
+    if (!permitirEnvio('resena', ip, 3, 3600000)) throw errorCliente('Has enviado varias reseñas seguidas. Prueba más tarde.', 429);
+    if (cuentaResenas().pendientes >= MAX_RESENAS_PENDIENTES || resenas.length >= MAX_RESENAS) {
+      throw errorCliente('Ahora mismo no podemos recibir más reseñas. Prueba otro día.', 503);
+    }
+    const socio = ajustesClub().activo ? socioDeSesion(req) : null;
+    resenas.unshift({
+      id: crypto.randomBytes(8).toString('hex'),
+      creada: new Date().toISOString(),
+      nombre,
+      estrellas,
+      texto: comentario,
+      estado: 'pendiente',
+      respuesta: '',
+      socio: !!socio
+    });
+    await guardarArchivo('resenas.json', resenas);
+    console.log('[soño] Nueva reseña por revisar (' + estrellas + ' estrellas)');
+    return enviarJSON(res, 201, { ok: true });
+  }
+
+  /* --- Personal (panel) --- */
+  if (pathname === '/api/resenas/activo' && metodo === 'POST') {
+    exigirAdmin(req);
+    const datos = await leerJSON(req);
+    if (typeof datos.activo !== 'boolean') throw errorCliente('Indica si las reseñas quedan activas o no.');
+    contenido.datos = Object.assign({}, contenido.datos, { resenas: Object.assign({}, ajustesResenas(), { activo: datos.activo }) });
+    await guardarArchivo('contenido.json', contenido);
+    console.log('[soño] Reseñas ' + (datos.activo ? 'activadas' : 'desactivadas'));
+    return enviarJSON(res, 200, { resenas: ajustesResenas() });
+  }
+
+  if (pathname === '/api/resenas/todas' && metodo === 'GET') {
+    exigirAdmin(req);
+    return enviarJSON(res, 200, Object.assign({ resenas, activo: ajustesResenas().activo }, cuentaResenas()));
+  }
+
+  const m = pathname.match(/^\/api\/resenas\/([a-f0-9]{16})$/);
+  if (m) {
+    exigirAdmin(req);
+    const resena = resenas.find((x) => x.id === m[1]);
+    if (!resena) throw errorCliente('Esa reseña ya no existe.', 404);
+    if (metodo === 'DELETE') {
+      resenas = resenas.filter((x) => x !== resena);
+      await guardarArchivo('resenas.json', resenas);
+      return enviarJSON(res, 200, Object.assign({ ok: true }, cuentaResenas()));
+    }
+    if (metodo !== 'POST') throw errorCliente('Método no permitido.', 405);
+    const datos = await leerJSON(req);
+    if (datos.estado !== undefined) {
+      if (datos.estado !== 'publicada' && datos.estado !== 'oculta') throw errorCliente('Ese estado no es válido.');
+      resena.estado = datos.estado;
+      if (resena.estado === 'publicada' && !resena.publicada) resena.publicada = new Date().toISOString();
+    }
+    if (datos.respuesta !== undefined) resena.respuesta = textoLargo(datos.respuesta, 600).replace(/\n{3,}/g, '\n\n');
+    await guardarArchivo('resenas.json', resenas);
+    return enviarJSON(res, 200, Object.assign({ resena }, cuentaResenas()));
+  }
+
+  return enviarJSON(res, 404, { error: 'No encontrado.' });
+}
+
 /* ---------- Historial de versiones ----------
    Cada vez que se guarda una parte de la web desde el panel (carta, fotos, horarios
    o ajustes) queda una copia con un resumen de lo que cambió. Volver a una versión
@@ -884,6 +1042,10 @@ function resumenCambios(seccion, a, b) {
     const ca = a.club || {}, cb = b.club || {};
     if (ca.sellos !== cb.sellos) lineas.push('Sellos de la tarjeta del club: ' + vacio(ca.sellos) + ' → ' + cb.sellos);
     if (ca.premio !== cb.premio) lineas.push('Premio del club: ' + cb.premio);
+    const la = a.legal || {}, lb = b.legal || {};
+    [['titular', 'Titular'], ['nif', 'NIF/CIF'], ['domicilio', 'Domicilio legal'], ['email', 'Email para privacidad'], ['registro', 'Datos del registro']].forEach((c) => {
+      if ((la[c[0]] || '') !== (lb[c[0]] || '')) lineas.push(c[1] + ': ' + vacio(la[c[0]]) + ' → ' + vacio(lb[c[0]]));
+    });
   }
   if (!lineas.length) return ['Cambios guardados'];
   return lineas.length > 8 ? lineas.slice(0, 7).concat(['y ' + (lineas.length - 7) + ' cambios más']) : lineas;
@@ -909,8 +1071,11 @@ function apiVersiones(req, res, pathname, metodo) {
       const ultima = versiones.find((x) => x.seccion === v.seccion);
       if (ultima === v) throw errorCliente('Esa ya es la versión que se ve en la web.', 409);
       const limpio = VALIDADORES[v.seccion](JSON.parse(JSON.stringify(v.datos)));
-      if (v.seccion === 'datos') limpio.club.activo = ajustesClub().activo !== false;   // volver a una versión no enciende ni apaga el club
       const antes = contenido[v.seccion];
+      if (v.seccion === 'datos') {
+        if (!v.datos.legal) limpio.legal = Object.assign({}, antes.legal);   // versiones de antes de los datos legales: se conservan los de ahora
+        prepararDatos(limpio, antes);
+      }
       contenido = Object.assign({}, contenido, { [v.seccion]: limpio });
       await guardarArchivo('contenido.json', contenido);
       const cambios = resumenCambios(v.seccion, antes, limpio).filter((l) => l !== 'Cambios guardados');
@@ -930,6 +1095,7 @@ async function api(req, res, pathname) {
 
   if (pathname.startsWith('/api/club/')) return apiClub(req, res, pathname, metodo, ip);
   if (pathname === '/api/versiones' || pathname.startsWith('/api/versiones/')) return apiVersiones(req, res, pathname, metodo);
+  if (pathname === '/api/resenas' || pathname.startsWith('/api/resenas/')) return apiResenas(req, res, pathname, metodo, ip);
 
   if (pathname === '/api/contenido' && metodo === 'GET') {
     return enviarJSON(res, 200, contenido);
@@ -976,8 +1142,8 @@ async function api(req, res, pathname) {
     exigirAdmin(req);
     const clave = mContenido[1];
     const limpio = VALIDADORES[clave](await leerJSON(req));
-    if (clave === 'datos') limpio.club.activo = ajustesClub().activo !== false;   // el club se activa solo desde la pestaña «Club»
     const antes = contenido[clave];
+    if (clave === 'datos') prepararDatos(limpio, antes);
     contenido = Object.assign({}, contenido, { [clave]: limpio });
     await guardarArchivo('contenido.json', contenido);
     if (JSON.stringify(antes) !== JSON.stringify(limpio)) {
@@ -1190,6 +1356,10 @@ async function atender(req, res) {
     return;
   }
 
+  if (PAGINAS_LEGALES.includes(pathname)) {
+    if (await servirArchivo(req, res, path.join(DIR_PUBLICO, 'legal.html'), 'no-cache')) return;
+  }
+
   if (await servirPublico(req, res, pathname)) return;
 
   /* Cualquier otra ruta muestra la portada, sin cambiar de URL */
@@ -1215,6 +1385,11 @@ setInterval(() => {
   for (const [k, lista] of envios) if (!lista.some((t) => ahora - t < 3600000)) envios.delete(k);
   for (const [ip, e] of intentosSocio) if (e.bloqueadoHasta < ahora && e.fallos === 0) intentosSocio.delete(ip);
 }, 10 * 60000).unref();
+
+/* Borrado de lo antiguo (reservas, pedidos y mensajes) cada 6 horas */
+setInterval(() => {
+  limpiarAntiguos().catch((e) => console.error('[soño] Error al borrar datos antiguos:', e));
+}, 6 * 3600000).unref();
 
 iniciarDatos().then(() => {
   servidor.listen(PUERTO, () => {

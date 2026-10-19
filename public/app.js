@@ -40,6 +40,7 @@
   var CLAVE_DE = { carta: 'carta', fotos: 'galeria', horarios: 'horario', datos: 'datos' };
   var RE_PRECIO = /^\d{1,3}([.,]\d{1,2})?$/;
   var RE_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+  var RE_NIF = /^([0-9]{8}[A-Z]|[XYZ][0-9]{7}[A-Z]|[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J])$/;
   var ALERGENOS = [
     { id: 'gluten', nombre: 'Gluten' },
     { id: 'crustaceos', nombre: 'Crustáceos' },
@@ -468,6 +469,7 @@
   function pintarDatos() {
     var d = estado.datos || {};
     pintarClub();
+    pintarResenas();
     pintarZonas();
     actualizarResumen();
     ponerDato('dato-direccion', d.direccion);
@@ -1179,6 +1181,195 @@
     }).catch(function (err) { $('aviso-baja').textContent = err.message; });
   });
 
+  /* ---------- Reseñas ----------
+     Las publicadas salen en tarjetas, de 6 en 6, con la nota media arriba.
+     Las nuevas llegan al panel «por revisar» y no salen hasta que el personal las publica. */
+  var modalResena = $('modal-resena');
+  var formResena = $('form-resena');
+  var listaResenas = $('resenas-lista');
+  var botonMasResenas = $('resenas-mas');
+  var POR_TANDA = 6;
+  var opiniones = { lista: [], total: 0, media: 0, cargadas: false, error: false, mostradas: POR_TANDA };
+  var NOTAS_ESTRELLAS = ['Toca las estrellas para valorar', 'Mal', 'Regular', 'Bien', 'Muy bien', '¡Genial!'];
+  var valorResena = 0;
+
+  function resenasActivas() {
+    var r = estado.datos && estado.datos.resenas;
+    return !(r && r.activo === false);
+  }
+  function numeroBonito(n) { return (Math.round(n * 10) / 10).toFixed(1).replace('.', ','); }
+  function svgEstrella() {
+    var ns = 'http://www.w3.org/2000/svg';
+    var s = document.createElementNS(ns, 'svg');
+    s.setAttribute('viewBox', '0 0 24 24');
+    s.setAttribute('aria-hidden', 'true');
+    var u = document.createElementNS(ns, 'use');
+    u.setAttribute('href', '#i-estrella');
+    s.appendChild(u);
+    return s;
+  }
+  function dibujarEstrellas(cont, n) {
+    cont.innerHTML = '';
+    var llenas = Math.round(n);
+    for (var i = 1; i <= 5; i++) {
+      var s = svgEstrella();
+      if (i <= llenas) s.setAttribute('class', 'es-llena');
+      cont.appendChild(s);
+    }
+    cont.setAttribute('role', 'img');
+    cont.setAttribute('aria-label', (n % 1 ? numeroBonito(n) : String(n)) + ' de 5 estrellas');
+  }
+
+  function tarjetaResena(r, i, nueva) {
+    var li = el('li', 'resena' + (nueva ? ' resena--nueva' : ''));
+    li.style.setProperty('--i', i % POR_TANDA);
+    var cab = el('div', 'resena__cabeza');
+    var est = el('span', 'estrellas estrellas--peque');
+    dibujarEstrellas(est, r.estrellas);
+    cab.appendChild(est);
+    var fecha = el('time', 'resena__fecha', fMesAnio.format(new Date(r.fecha)));
+    fecha.dateTime = String(r.fecha).slice(0, 10);
+    cab.appendChild(fecha);
+    li.appendChild(cab);
+    var cita = el('blockquote', 'resena__texto');
+    cita.appendChild(el('p', null, r.texto));
+    li.appendChild(cita);
+    var autor = el('div', 'resena__autor');
+    var inicial = el('span', 'resena__inicial', (Array.from(r.nombre)[0] || '').toUpperCase());
+    inicial.setAttribute('aria-hidden', 'true');
+    autor.appendChild(inicial);
+    var quien = el('div', 'resena__quien');
+    quien.appendChild(el('span', 'resena__nombre', r.nombre));
+    if (r.socio) quien.appendChild(el('span', 'resena__socio', 'Socio del club'));
+    autor.appendChild(quien);
+    li.appendChild(autor);
+    if (r.respuesta) {
+      var resp = el('div', 'resena__respuesta');
+      resp.appendChild(el('p', 'meta', 'Respuesta de SOÑO'));
+      resp.appendChild(el('p', null, r.respuesta));
+      li.appendChild(resp);
+    }
+    return li;
+  }
+
+  function pintarResenas(desde) {
+    var activas = resenasActivas();
+    document.querySelectorAll('[data-resenas]').forEach(function (n) { n.hidden = !activas; });
+    if (!activas) {
+      if (modalResena.open) cerrar(modalResena);
+      return;
+    }
+    $('resenas-media').hidden = !opiniones.total;
+    if (opiniones.total) {
+      $('resenas-nota').textContent = numeroBonito(opiniones.media);
+      dibujarEstrellas($('resenas-estrellas'), opiniones.media);
+      $('resenas-total').textContent = opiniones.total === 1 ? '1 reseña' : opiniones.total + ' reseñas';
+    }
+    listaResenas.innerHTML = '';
+    var visibles = opiniones.lista.slice(0, opiniones.mostradas);
+    listaResenas.classList.toggle('resenas--pocas', visibles.length > 0 && visibles.length < 3);
+    if (opiniones.error) {
+      listaResenas.appendChild(el('li', 'estado-vacio', 'Ahora mismo no se pueden cargar las reseñas.'));
+    } else if (opiniones.cargadas && !opiniones.lista.length) {
+      var vacio = el('li', 'resenas__vacio');
+      vacio.appendChild(svgUso('taza'));
+      var txt = el('div', 'resenas__vacio-texto');
+      txt.appendChild(el('p', 'resenas__vacio-titulo', 'Aún no hay reseñas'));
+      txt.appendChild(el('p', null, '¿Ya nos conoces? Cuéntanos qué tal: la tuya puede ser la primera.'));
+      vacio.appendChild(txt);
+      var b = el('button', 'boton boton--borde', 'Escribir la primera');
+      b.type = 'button';
+      b.addEventListener('click', abrirResena);
+      vacio.appendChild(b);
+      listaResenas.appendChild(vacio);
+    } else {
+      visibles.forEach(function (r, i) { listaResenas.appendChild(tarjetaResena(r, i, desde !== undefined && i >= desde)); });
+    }
+    botonMasResenas.hidden = !opiniones.cargadas || opiniones.mostradas >= opiniones.lista.length;
+  }
+
+  function cargarResenas() {
+    if (!resenasActivas()) { pintarResenas(); return; }
+    api('GET', '/api/resenas').then(function (r) {
+      opiniones.lista = r.resenas || [];
+      opiniones.total = r.total || 0;
+      opiniones.media = r.media || 0;
+      opiniones.cargadas = true;
+      opiniones.error = false;
+      pintarResenas();
+    }).catch(function () {
+      opiniones.error = !opiniones.cargadas;
+      pintarResenas();
+    });
+  }
+
+  botonMasResenas.addEventListener('click', function () {
+    var antes = opiniones.mostradas;
+    opiniones.mostradas += POR_TANDA;
+    pintarResenas(antes);
+    var primera = listaResenas.children[antes];
+    if (primera) { primera.tabIndex = -1; primera.focus({ preventScroll: true }); }
+  });
+
+  /* Ventana para escribir una reseña: estrellas, nombre y comentario */
+  function pintarEstrellasElegidas(n) {
+    document.querySelectorAll('#elegir-estrellas label').forEach(function (l, i) { l.classList.toggle('es-llena', i < n); });
+    $('resena-valoracion').textContent = NOTAS_ESTRELLAS[n] || NOTAS_ESTRELLAS[0];
+  }
+  document.querySelectorAll('#elegir-estrellas input').forEach(function (input) {
+    input.addEventListener('change', function () {
+      valorResena = Number(input.value);
+      pintarEstrellasElegidas(valorResena);
+    });
+  });
+  document.querySelectorAll('#elegir-estrellas label').forEach(function (l, i) {
+    l.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') pintarEstrellasElegidas(i + 1); });
+  });
+  document.querySelector('#elegir-estrellas .elegir-estrellas__fila').addEventListener('pointerleave', function () {
+    pintarEstrellasElegidas(valorResena);
+  });
+  $('resena-texto').addEventListener('input', function () {
+    $('resena-contador').textContent = $('resena-texto').value.length + ' / 600';
+  });
+  formResena.addEventListener('input', function () { $('aviso-resena').textContent = ''; });
+  formResena.addEventListener('change', function () { $('aviso-resena').textContent = ''; });
+
+  function abrirResena() {
+    if (!resenasActivas()) return;
+    formResena.hidden = false;
+    $('resena-gracias').hidden = true;
+    $('aviso-resena').textContent = '';
+    if (socio && !formResena.nombre.value) formResena.nombre.value = socio.nombre.split(' ')[0];
+    abrir(modalResena);
+  }
+  document.querySelectorAll('[data-escribir-resena]').forEach(function (b) { b.addEventListener('click', abrirResena); });
+
+  formResena.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = formResena;
+    var aviso = $('aviso-resena');
+    if (!valorResena) { aviso.textContent = 'Elige de 1 a 5 estrellas.'; f.querySelector('input[name="estrellas"]').focus(); return; }
+    if (f.nombre.value.trim().length < 2) { aviso.textContent = 'Escribe tu nombre: así saldrá en la reseña.'; f.nombre.focus(); return; }
+    if (f.texto.value.trim().length < 10) { aviso.textContent = 'Cuéntanos un poco más: al menos 10 caracteres.'; f.texto.focus(); return; }
+    if (!f.acepto.checked) { aviso.textContent = 'Para publicarla necesitamos que aceptes que salga con tu nombre.'; f.acepto.focus(); return; }
+    var boton = f.querySelector('button[type="submit"]');
+    boton.disabled = true;
+    aviso.textContent = '';
+    api('POST', '/api/resenas', {
+      estrellas: valorResena, nombre: f.nombre.value, texto: f.texto.value, acepto: true, web: f.web.value
+    }).then(function () {
+      f.reset();
+      valorResena = 0;
+      pintarEstrellasElegidas(0);
+      $('resena-contador').textContent = '0 / 600';
+      f.hidden = true;
+      $('resena-gracias').hidden = false;
+      $('resena-gracias').querySelector('button').focus();
+    }).catch(function (err) {
+      aviso.textContent = err.message;
+    }).then(function () { boton.disabled = false; });
+  });
+
   /* ---------- Acceso al panel ---------- */
   function abrirLogin(mensaje) {
     $('form-login').reset();
@@ -1255,6 +1446,8 @@
     if (k === 'datos' && b.domicilio === undefined) b.domicilio = true;
     if (k === 'datos' && !Array.isArray(b.zonas)) b.zonas = clonar(ZONAS_INICIALES);
     if (k === 'datos' && (!b.club || typeof b.club !== 'object')) b.club = { activo: true, sellos: 10, premio: 'un desayuno gratis' };
+    if (k === 'datos' && (!b.resenas || typeof b.resenas !== 'object')) b.resenas = { activo: true };
+    if (k === 'datos' && (!b.legal || typeof b.legal !== 'object')) b.legal = { titular: '', nif: '', domicilio: '', email: '', registro: '' };
     if (k === 'carta') b.productos.forEach(function (p) { if (!Array.isArray(p.alergenos)) p.alergenos = []; });
     return b;
   }
@@ -1334,6 +1527,7 @@
     if (pestana === 'pedidos') panelPedidos();
     if (pestana === 'mensajes') panelMensajes();
     if (pestana === 'club') panelClub();
+    if (pestana === 'resenas') panelResenas();
     if (pestana === 'historial') panelHistorial();
     cuerpo.scrollTop = mismaPestana ? posicion : 0;
     if (!guardando) mostrarEstado(k && sucio[k] ? 'Hay cambios sin guardar.' : '');
@@ -1712,6 +1906,30 @@
     camposClub.appendChild(filaClub);
     gc.appendChild(camposClub);
     cuerpo.appendChild(gc);
+
+    var gl = el('section', 'admin__grupo');
+    gl.appendChild(el('h3', null, 'Datos legales'));
+    var ayudaLegal = el('p', 'admin__ayuda');
+    ayudaLegal.appendChild(document.createTextNode('Salen en el aviso legal y en la política de privacidad, que se abren desde el pie de la web. Si el domicilio o el email son los de arriba, déjalos vacíos. '));
+    var verLegal = el('a', 'enlace', 'Ver los textos legales');
+    verLegal.href = '/aviso-legal';
+    verLegal.target = '_blank';
+    verLegal.rel = 'noopener';
+    ayudaLegal.appendChild(verLegal);
+    gl.appendChild(ayudaLegal);
+    if (!texto(b.legal.titular) || !texto(b.legal.nif)) {
+      gl.appendChild(el('p', 'admin__alerta', 'Falta el titular o el NIF/CIF: la ley pide que salgan en el aviso legal de la web.'));
+    }
+    var camposLegal = el('div', 'admin__campos');
+    var filaLegal = el('div', 'fila-2 fila-2--legal');
+    filaLegal.appendChild(campoTexto('adm-legal-titular', 'Titular: nombre y apellidos o razón social', b.legal.titular, function (v) { b.legal.titular = v; }, { maxlength: '120', autocomplete: 'off' }));
+    filaLegal.appendChild(campoTexto('adm-legal-nif', 'NIF o CIF', b.legal.nif, function (v) { b.legal.nif = v; }, { maxlength: '20', placeholder: 'Ej.: 12345678Z', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false' }));
+    camposLegal.appendChild(filaLegal);
+    camposLegal.appendChild(campoTexto('adm-legal-domicilio', 'Domicilio del titular', b.legal.domicilio, function (v) { b.legal.domicilio = v; }, { maxlength: '200', placeholder: 'Si es distinto de la dirección del local', autocomplete: 'off' }));
+    camposLegal.appendChild(campoTexto('adm-legal-email', 'Email para temas de privacidad', b.legal.email, function (v) { b.legal.email = v; }, { maxlength: '120', placeholder: 'Si es distinto del email de contacto', inputmode: 'email', autocomplete: 'off' }));
+    camposLegal.appendChild(campoTexto('adm-legal-registro', 'Datos del Registro Mercantil (solo si es una sociedad)', b.legal.registro, function (v) { b.legal.registro = v; }, { maxlength: '200', placeholder: 'Registro Mercantil de …, tomo …, folio …, hoja …', autocomplete: 'off' }));
+    gl.appendChild(camposLegal);
+    cuerpo.appendChild(gl);
   }
 
   /* Pestaña: reservas recibidas */
@@ -1775,7 +1993,7 @@
 
   /* Pestaña: mensajes del formulario de contacto */
   function panelMensajes() {
-    cuerpo.appendChild(el('p', 'admin__ayuda', 'Mensajes que llegan desde el formulario «Escríbenos» de la web.'));
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'Mensajes que llegan desde el formulario «Escríbenos» de la web. Bórralos cuando estén atendidos. Los de hace más de un año se borran solos.'));
     var cont = el('div', 'registros');
     cont.appendChild(el('p', 'estado-vacio', 'Cargando mensajes…'));
     cuerpo.appendChild(cont);
@@ -1807,6 +2025,209 @@
       cont.innerHTML = '';
       cont.appendChild(el('p', 'estado-vacio', err.message));
     });
+  }
+
+  /* Pestaña: Reseñas
+     Las nuevas llegan «por revisar» y no salen en la web hasta que se publican.
+     Arriba, el interruptor para enseñar u ocultar la sección en la web. */
+  var panelOpiniones = { filtro: 'pendiente', datos: null };
+  var NOMBRE_ESTADO = { pendiente: 'Por revisar', publicada: 'Publicada', oculta: 'Oculta' };
+
+  function avisoResenas(t, esError, esOk) {
+    var a = $('resenas-aviso');
+    if (!a) return;
+    a.textContent = t || '';
+    a.classList.toggle('es-error', !!esError);
+    a.classList.toggle('es-ok', !!esOk && !esError);
+  }
+
+  function panelResenas() {
+    var activo = resenasActivas();
+    var bloque = el('section', 'club-admin__estado' + (activo ? ' es-activo' : ''));
+    var interruptor = el('label', 'interruptor');
+    var ch = el('input');
+    ch.type = 'checkbox';
+    ch.id = 'resenas-activo';
+    ch.setAttribute('role', 'switch');
+    ch.checked = activo;
+    interruptor.appendChild(ch);
+    interruptor.appendChild(el('span', 'interruptor__pista'));
+    interruptor.appendChild(el('span', 'interruptor__texto', 'Reseñas activas en la web'));
+    bloque.appendChild(interruptor);
+    var explica = el('p', 'club-admin__estado-texto');
+    bloque.appendChild(explica);
+    function textoEstado(si) {
+      explica.textContent = si
+        ? 'La web muestra las reseñas publicadas y deja escribir nuevas.'
+        : 'La sección de reseñas no sale en la web y nadie puede escribir una. Las que ya hay se guardan.';
+      bloque.classList.toggle('es-activo', si);
+    }
+    textoEstado(activo);
+    ch.addEventListener('change', function () {
+      var quiere = ch.checked;
+      ch.disabled = true;
+      api('POST', '/api/resenas/activo', { activo: quiere }).then(function (r) {
+        estado.datos.resenas = r.resenas;
+        if (borradores.datos) borradores.datos.resenas = Object.assign({}, borradores.datos.resenas, { activo: r.resenas.activo });
+        textoEstado(r.resenas.activo);
+        cargarResenas();
+        avisoResenas(r.resenas.activo ? 'Reseñas activadas: ya se ven en la web.' : 'Reseñas desactivadas: ya no salen en la web.', false, true);
+      }).catch(function (err) {
+        ch.checked = !quiere;
+        if (!sesionCaducada(err)) avisoResenas(err.message, true);
+      }).then(function () { ch.disabled = false; });
+    });
+    cuerpo.appendChild(bloque);
+
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'Las reseñas que escriben los clientes llegan aquí «por revisar» y no salen en la web hasta que pulsas «Publicar». Publica también las negativas si son respetuosas: es lo que da confianza, y así lo explica el aviso legal. Borra las que tengan insultos, datos de otras personas o publicidad. Puedes responder a cualquiera: la respuesta sale debajo.'));
+    var pAviso = el('p', 'resenas-admin__aviso');
+    pAviso.id = 'resenas-aviso';
+    pAviso.setAttribute('aria-live', 'polite');
+    cuerpo.appendChild(pAviso);
+    var resumenEl = el('p', 'resenas-admin__resumen');
+    resumenEl.id = 'resenas-resumen';
+    cuerpo.appendChild(resumenEl);
+    var filtros = el('div', 'historial__filtros');
+    filtros.id = 'resenas-filtros';
+    filtros.setAttribute('role', 'group');
+    filtros.setAttribute('aria-label', 'Ver reseñas');
+    cuerpo.appendChild(filtros);
+    var lista = el('div', 'registros');
+    lista.id = 'resenas-admin-lista';
+    lista.appendChild(el('p', 'estado-vacio', 'Cargando reseñas…'));
+    cuerpo.appendChild(lista);
+    if (panelOpiniones.datos) pintarListaResenasAdmin();
+    cargarResenasAdmin();
+  }
+
+  function cargarResenasAdmin() {
+    return api('GET', '/api/resenas/todas').then(function (r) {
+      panelOpiniones.datos = r;
+      ponerContador('resenas', r.pendientes);
+      if (pestana === 'resenas') pintarListaResenasAdmin();
+    }).catch(function (err) {
+      if (sesionCaducada(err)) return;
+      var lista = $('resenas-admin-lista');
+      if (lista && pestana === 'resenas') { lista.innerHTML = ''; lista.appendChild(el('p', 'estado-vacio', err.message)); }
+    });
+  }
+
+  function pintarListaResenasAdmin() {
+    var d = panelOpiniones.datos;
+    var lista = $('resenas-admin-lista');
+    if (!d || !lista) return;
+    var cuenta = { pendiente: 0, publicada: 0, oculta: 0 };
+    d.resenas.forEach(function (r) { cuenta[r.estado] = (cuenta[r.estado] || 0) + 1; });
+    $('resenas-resumen').textContent = d.total
+      ? 'Nota media en la web: ' + numeroBonito(d.media) + ' de 5, con ' + (d.total === 1 ? '1 reseña publicada.' : d.total + ' reseñas publicadas.')
+      : 'Aún no hay ninguna reseña publicada en la web.';
+    var filtros = $('resenas-filtros');
+    filtros.innerHTML = '';
+    [['pendiente', 'Por revisar'], ['publicada', 'Publicadas'], ['oculta', 'Ocultas'], ['', 'Todas']].forEach(function (f) {
+      var n = f[0] ? cuenta[f[0]] : d.resenas.length;
+      var b = el('button', 'historial__filtro', f[1] + ' (' + n + ')');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', panelOpiniones.filtro === f[0] ? 'true' : 'false');
+      b.addEventListener('click', function () { panelOpiniones.filtro = f[0]; pintarListaResenasAdmin(); });
+      filtros.appendChild(b);
+    });
+    lista.innerHTML = '';
+    var visibles = d.resenas.filter(function (r) { return !panelOpiniones.filtro || r.estado === panelOpiniones.filtro; });
+    if (!visibles.length) {
+      lista.appendChild(el('p', 'estado-vacio', panelOpiniones.filtro === 'pendiente' ? 'No hay reseñas por revisar.' : 'No hay reseñas en este apartado.'));
+      return;
+    }
+    visibles.forEach(function (r) { lista.appendChild(tarjetaResenaAdmin(r)); });
+  }
+
+  function accionResena(r, datos, textoOk) {
+    return api('POST', '/api/resenas/' + r.id, datos).then(function () {
+      avisoResenas(textoOk, false, true);
+      cargarResenasAdmin();
+      cargarResenas();
+    }).catch(function (err) {
+      if (!sesionCaducada(err)) avisoResenas(err.message, true);
+      if (pestana === 'resenas') pintarListaResenasAdmin();
+    });
+  }
+
+  function tarjetaResenaAdmin(r) {
+    var t = el('article', 'registro resena-admin resena-admin--' + r.estado);
+    var cab = el('div', 'registro__cabecera');
+    var titulo = el('p', 'registro__titulo');
+    titulo.appendChild(el('span', 'etiqueta-tipo', NOMBRE_ESTADO[r.estado] || r.estado));
+    titulo.appendChild(document.createTextNode(r.nombre));
+    if (r.socio) titulo.appendChild(el('span', 'resena__socio', 'Socio del club'));
+    cab.appendChild(titulo);
+    cab.appendChild(el('p', 'registro__meta', fRecibido.format(new Date(r.creada))));
+    t.appendChild(cab);
+    var est = el('span', 'estrellas estrellas--peque');
+    dibujarEstrellas(est, r.estrellas);
+    t.appendChild(est);
+    t.appendChild(el('p', 'registro__texto', r.texto));
+
+    var zonaRespuesta = el('div', 'resena-admin__respuesta');
+    function verRespuesta() {
+      zonaRespuesta.innerHTML = '';
+      if (!r.respuesta) return;
+      var caja = el('div', 'resena__respuesta');
+      caja.appendChild(el('p', 'meta', 'Vuestra respuesta'));
+      caja.appendChild(el('p', null, r.respuesta));
+      zonaRespuesta.appendChild(caja);
+    }
+    function editarRespuesta() {
+      zonaRespuesta.innerHTML = '';
+      var c = el('div', 'campo');
+      var id = 'respuesta-' + r.id;
+      var l = el('label', null, 'Respuesta de SOÑO (sale debajo de la reseña)');
+      l.htmlFor = id;
+      var area = el('textarea');
+      area.id = id;
+      area.maxLength = 600;
+      area.value = r.respuesta || '';
+      area.style.minHeight = '90px';
+      c.appendChild(l);
+      c.appendChild(area);
+      zonaRespuesta.appendChild(c);
+      var acc = el('div', 'acciones-mini');
+      var g = el('button', 'boton boton--lleno boton--mini', 'Guardar respuesta');
+      g.type = 'button';
+      g.addEventListener('click', function () {
+        g.disabled = true;
+        accionResena(r, { respuesta: area.value }, area.value.trim() ? 'Respuesta guardada.' : 'Respuesta quitada.');
+      });
+      acc.appendChild(g);
+      acc.appendChild(botonMini('Cancelar', verRespuesta));
+      zonaRespuesta.appendChild(acc);
+      area.focus();
+    }
+    verRespuesta();
+    t.appendChild(zonaRespuesta);
+
+    var acciones = el('div', 'acciones-mini');
+    if (r.estado !== 'publicada') {
+      var publicar = el('button', 'boton boton--lleno boton--mini', 'Publicar');
+      publicar.type = 'button';
+      publicar.addEventListener('click', function () {
+        publicar.disabled = true;
+        accionResena(r, { estado: 'publicada' }, 'Reseña de ' + r.nombre + ' publicada: ya se ve en la web.');
+      });
+      acciones.appendChild(publicar);
+    } else {
+      acciones.appendChild(botonMini('Ocultar', function () {
+        accionResena(r, { estado: 'oculta' }, 'Reseña de ' + r.nombre + ' oculta: ya no sale en la web.');
+      }));
+    }
+    acciones.appendChild(botonMini(r.respuesta ? 'Editar respuesta' : 'Responder', editarRespuesta));
+    acciones.appendChild(botonBorrar('Borrar', function () {
+      api('DELETE', '/api/resenas/' + r.id).then(function () {
+        avisoResenas('Reseña borrada.', false, true);
+        cargarResenasAdmin();
+        cargarResenas();
+      }).catch(function (err) { if (!sesionCaducada(err)) avisoResenas(err.message, true); });
+    }));
+    t.appendChild(acciones);
+    return t;
   }
 
   /* Pestaña: Club SOÑO
@@ -2370,7 +2791,7 @@
 
   function ponerContador(pest, n) {
     var tab = $('tab-' + pest);
-    var base = { reservas: 'Reservas', mensajes: 'Mensajes', pedidos: 'Pedidos' }[pest];
+    var base = { reservas: 'Reservas', mensajes: 'Mensajes', pedidos: 'Pedidos', resenas: 'Reseñas' }[pest];
     tab.textContent = n ? base + ' (' + n + ')' : base;
   }
   function actualizarContadores() {
@@ -2379,6 +2800,7 @@
     }).catch(function () {});
     api('GET', '/api/mensajes').then(function (r) { ponerContador('mensajes', r.mensajes.length); }).catch(function () {});
     api('GET', '/api/pedidos').then(function (r) { ponerContador('pedidos', r.pedidos.length); }).catch(function () {});
+    api('GET', '/api/resenas/todas').then(function (r) { ponerContador('resenas', r.pendientes); }).catch(function () {});
   }
 
   /* Validación y guardado */
@@ -2408,6 +2830,11 @@
     }
     if (k === 'datos' && texto(b.email) && texto(b.email).indexOf('@') < 1) {
       return 'Revisa el email: parece que le falta la @.';
+    }
+    if (k === 'datos') {
+      var nif = texto(b.legal.nif).toUpperCase().replace(/[\s.-]/g, '');
+      if (nif && !RE_NIF.test(nif)) return 'Revisa el NIF o CIF de los datos legales: por ejemplo 12345678Z o B12345678.';
+      if (texto(b.legal.email) && texto(b.legal.email).indexOf('@') < 1) return 'Revisa el email para temas de privacidad: parece que le falta la @.';
     }
     return '';
   }
@@ -2734,10 +3161,14 @@
     estado = { carta: c.carta, galeria: c.galeria, horario: c.horario, datos: c.datos };
     cargado = true;
     pintarTodo();
+    cargarResenas();
+    // Con «#escribir-resena» en la dirección (por ejemplo, un QR en las mesas) se abre la ventana
+    if (location.hash === '#escribir-resena') abrirResena();
   }).catch(function () {
     cargado = true;
     sinDatos = true;
     pintarTodo();
+    cargarResenas();
   });
   if (location.hash === '#reservar') abrir(modalReserva);
 
