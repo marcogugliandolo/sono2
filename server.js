@@ -642,13 +642,13 @@ function falloSocio(ip, estado) {
 async function apiClub(req, res, pathname, metodo, ip) {
   /* --- Socios --- */
   if (pathname === '/api/club/yo' && metodo === 'GET') {
-    const socio = socioDeSesion(req);
+    const socio = ajustesClub().activo ? socioDeSesion(req) : null;
     return enviarJSON(res, 200, { socio: socio ? tarjeta(socio) : null });
   }
 
   if (pathname === '/api/club/alta' && metodo === 'POST') {
     if (!mismoOrigen(req)) throw errorCliente('Petición no permitida.', 403);
-    if (!ajustesClub().activo) throw errorCliente('El club no admite socios nuevos ahora mismo.', 409);
+    if (!ajustesClub().activo) throw errorCliente('El club está desactivado ahora mismo.', 409);
     const datos = await leerJSON(req);
     if (texto(datos.web, 200)) return enviarJSON(res, 201, { ok: true });   // trampa para bots
     const nombre = texto(datos.nombre, 60);
@@ -688,6 +688,7 @@ async function apiClub(req, res, pathname, metodo, ip) {
 
   if (pathname === '/api/club/entrar' && metodo === 'POST') {
     if (!mismoOrigen(req)) throw errorCliente('Petición no permitida.', 403);
+    if (!ajustesClub().activo) throw errorCliente('El club está desactivado ahora mismo.', 409);
     const estado = bloqueoSocio(ip);
     const datos = await leerJSON(req);
     const email = texto(datos.email, 120).toLowerCase();
@@ -724,6 +725,16 @@ async function apiClub(req, res, pathname, metodo, ip) {
   }
 
   /* --- Personal (panel) --- */
+  if (pathname === '/api/club/activo' && metodo === 'POST') {
+    exigirAdmin(req);
+    const datos = await leerJSON(req);
+    if (typeof datos.activo !== 'boolean') throw errorCliente('Indica si el club queda activo o no.');
+    contenido.datos = Object.assign({}, contenido.datos, { club: Object.assign({}, ajustesClub(), { activo: datos.activo }) });
+    await guardarArchivo('contenido.json', contenido);
+    console.log('[soño] Club ' + (datos.activo ? 'activado' : 'desactivado'));
+    return enviarJSON(res, 200, { club: ajustesClub() });
+  }
+
   if (pathname === '/api/club/socios' && metodo === 'GET') {
     exigirAdmin(req);
     const lista = socios.map((s) => fichaSocio(s, false)).sort((a, b) => b.ultimo.localeCompare(a.ultimo));

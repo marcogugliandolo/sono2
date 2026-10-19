@@ -1205,6 +1205,26 @@ input:focus-visible + .alergeno-chip { outline: 2px solid var(--cafe); outline-o
 @media (hover: hover) { .boton--peligro-lleno:hover { background: #7E2812; border-color: #7E2812; } }
 
 /* Panel: pestaña Club */
+.club-admin__estado {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: var(--r-tarjeta);
+  border: 1px dashed var(--linea-fuerte);
+  background: var(--superficie);
+}
+.club-admin__estado.es-activo { border-style: solid; border-color: var(--beige); background: var(--beige); }
+.club-admin__estado-texto { font-size: 0.9375rem; color: var(--cafe-suave); }
+.club-admin__estado.es-activo .club-admin__estado-texto { color: var(--cafe); }
+/* Interruptor (sí/no) */
+.interruptor { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; font-weight: 600; justify-self: start; }
+.interruptor input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.interruptor__pista { position: relative; flex: none; width: 48px; height: 28px; border-radius: 999px; background: var(--linea-fuerte); transition: background-color 0.2s ease; }
+.interruptor__pista::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--superficie); box-shadow: 0 1px 2px rgba(40, 18, 6, 0.25); transition: transform 0.2s var(--salida); }
+.interruptor input:checked + .interruptor__pista { background: var(--cafe); }
+.interruptor input:checked + .interruptor__pista::after { transform: translateX(20px); }
+.interruptor input:focus-visible + .interruptor__pista { outline: 2px solid var(--cafe); outline-offset: 2px; }
+.interruptor input:disabled + .interruptor__pista { opacity: 0.6; }
 .club-admin__lector { gap: 12px; }
 .club-admin__fila { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
 .club-admin__codigo { flex: 1 1 300px; display: flex; gap: 8px; min-width: 0; }

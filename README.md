@@ -17,13 +17,14 @@ Justo después de la portada hay una sección, «Así preparamos tu café». Al 
 Los clientes se hacen socios desde la web (sección «Club»): nombre, email, teléfono opcional y una contraseña. Al entrar se abre su tarjeta en una ventana con los sellos (una taza por desayuno), su código QR y los últimos movimientos. Mientras la tarjeta está abierta se actualiza sola, así ven el sello en cuanto se lo ponéis. Con `#tarjeta` al final de la dirección (por ejemplo `https://tu-dominio/#tarjeta`) se abre la tarjeta directamente; pueden guardarlo como acceso en el móvil.
 
 En el panel, pestaña **Club**:
+- **Club activo en la web**: interruptor arriba de la pestaña. Se guarda al momento. Desactivado, el club no sale en la web (ni la sección, ni el menú, ni la tarjeta) y nadie puede apuntarse ni entrar; los socios y sus sellos se conservan para cuando se vuelva a activar.
 - **Escanear QR**: abre la cámara del móvil o la tablet, lee el QR del socio y **le pone el sello directamente**. No lo pone solo si la tarjeta ya está completa (toca canjear el premio) o si a ese socio se le acaba de sellar escaneando hace menos de 2 minutos (para no sumar dos por error); en esos casos se pulsa el botón. La cámara del navegador solo funciona si la web va por **https** (con su dominio); por `http://IP:puerto` no. Mientras tanto, se puede escribir el **código** que sale debajo del QR (por ejemplo `BZ4Z-4BAR`).
 - **+1 sello**, **−1** para corregir y **Canjear premio** cuando la tarjeta está completa (la tarjeta vuelve a empezar y lo que sobre se conserva).
 - **Quién atiende**: el nombre que escribáis sale en la tarjeta del socio («Sello añadido por Marta»). Se recuerda en cada dispositivo.
 - **Nueva contraseña** para quien la haya olvidado: se enseña una vez para dársela al socio y cierra sus sesiones abiertas.
 - **Borrar socio**, y una lista de socios con buscador por nombre, email, teléfono o código.
 
-En **Ajustes → Club SOÑO** se elige cuántos sellos tiene la tarjeta (de 3 a 20; por defecto 10), cuál es el premio y si el club se muestra en la web.
+En **Ajustes → Club SOÑO** se elige cuántos sellos tiene la tarjeta (de 3 a 20; por defecto 10), cuál es el premio y también si el club está activo.
 
 Los socios pueden darse de baja ellos mismos desde su tarjeta (se borran sus datos). Las contraseñas se guardan cifradas (scrypt) y la sesión del socio dura 120 días. Al recoger nombre, email y teléfono, conviene mencionarlo en la política de privacidad de la cafetería.
 
