@@ -15,6 +15,7 @@
 <link rel="preload" href="/fuentes/geist.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fuentes/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/styles.css">
+<script src="/vendor/qrcode.js" defer></script>
 <script src="/app.js" defer></script>
 </head>
 <body>
@@ -164,6 +165,7 @@
         <li><a href="#nosotros">Nosotros</a></li>
         <li><a href="#carta">Carta</a></li>
         <li data-llevar><a href="#llevar">Para llevar</a></li>
+        <li data-club><a href="#club" data-enlace-club>Club</a></li>
         <li data-galeria hidden><a href="#galeria">Galería</a></li>
         <li><a href="#contacto">Visítanos</a></li>
       </ul>
@@ -185,6 +187,7 @@
       <li><a href="#nosotros">Nosotros</a></li>
       <li><a href="#carta">Carta</a></li>
       <li data-llevar><a href="#llevar">Para llevar</a></li>
+      <li data-club><a href="#club" data-enlace-club>Club</a></li>
       <li data-galeria hidden><a href="#galeria">Galería</a></li>
       <li><a href="#contacto">Visítanos</a></li>
     </ul>
@@ -436,6 +439,39 @@
     </div>
   </section>
 
+  <section class="seccion seccion--linea" id="club" aria-labelledby="t-club" data-club>
+    <div class="wrap club">
+      <div class="club__texto" data-aparece>
+        <p class="meta">Club SOÑO</p>
+        <h2 class="titulo" id="t-club">Tu tarjeta de desayunos</h2>
+        <p class="club__intro">Hazte socio gratis. Cada desayuno suma un sello y, al completar la tarjeta, <strong id="club-premio">un desayuno gratis</strong> corre de nuestra cuenta.</p>
+        <ol class="club__pasos">
+          <li><span class="club__num">01</span><div><h3>Hazte socio</h3><p>Con tu email y una contraseña. Es gratis.</p></div></li>
+          <li><span class="club__num">02</span><div><h3>Enseña tu QR</h3><p>Al pedir, abre tu tarjeta en el móvil y te ponemos el sello.</p></div></li>
+          <li><span class="club__num">03</span><div><h3>Completa la tarjeta</h3><p>Con <span id="club-n">10</span> sellos, el premio es tuyo.</p></div></li>
+        </ol>
+        <div class="acciones" id="club-acciones">
+          <button class="boton boton--lleno" type="button" data-club-alta>Unirme al club</button>
+          <button class="boton boton--borde" type="button" data-club-entrar>Ya soy socio</button>
+        </div>
+        <div class="club__socio" id="club-acciones-socio" hidden>
+          <button class="boton boton--lleno" type="button" data-abrir-tarjeta>Ver mi tarjeta</button>
+          <p class="club__hola" id="club-hola"></p>
+        </div>
+      </div>
+      <div class="club__muestra" data-aparece aria-hidden="true">
+        <div class="club__carton">
+          <div class="club__carton-cabeza">
+            <svg class="logo club__carton-logo"><use href="#logo-sono"/></svg>
+            <p class="meta">Tarjeta de desayunos</p>
+          </div>
+          <div class="tarjeta-sellos" id="club-muestra-sellos"></div>
+          <p class="club__carton-pie"><span>4 de 10</span><span>Desayuno gratis al completarla</span></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="seccion seccion--linea" id="galeria" aria-labelledby="t-galeria" data-galeria hidden>
     <div class="wrap">
       <div class="cabeza-centro" data-aparece>
@@ -530,6 +566,7 @@
             <li><a href="#reservar" data-abrir-reserva>Reservar mesa</a></li>
             <li><a href="#carta">Carta</a></li>
             <li data-llevar><a href="#llevar">Para llevar</a></li>
+            <li data-club><a href="#club" data-enlace-club>Club</a></li>
             <li data-galeria hidden><a href="#galeria">Galería</a></li>
             <li><a href="#contacto">Visítanos</a></li>
           </ul>
@@ -665,6 +702,111 @@
   </div>
 </dialog>
 
+<!-- Ventana: unirse al club o entrar -->
+<dialog class="modal modal--club" id="modal-club" aria-labelledby="t-club-acceso">
+  <div class="club-acceso">
+    <button class="modal__cerrar" type="button" data-cerrar aria-label="Cerrar"><svg viewBox="0 0 20 20" aria-hidden="true"><use href="#i-cerrar"/></svg></button>
+    <div class="club-acceso__cabeza">
+      <p class="meta">Club SOÑO</p>
+      <h2 class="modal__titulo" id="t-club-acceso">Únete al club</h2>
+    </div>
+    <div class="club-acceso__pestanas" role="tablist" aria-label="Unirse o entrar">
+      <button class="club-acceso__pestana" type="button" role="tab" id="club-tab-alta" aria-selected="true" aria-controls="form-club-alta">Unirme</button>
+      <button class="club-acceso__pestana" type="button" role="tab" id="club-tab-entrar" aria-selected="false" aria-controls="form-club-entrar" tabindex="-1">Ya soy socio</button>
+    </div>
+
+    <form class="formulario" id="form-club-alta" novalidate>
+      <div class="trampa" aria-hidden="true"><label for="club-web">No rellenar</label><input id="club-web" name="web" type="text" tabindex="-1" autocomplete="off"></div>
+      <div class="campo">
+        <label for="club-nombre">Nombre</label>
+        <input id="club-nombre" name="nombre" type="text" autocomplete="given-name" maxlength="60" required>
+      </div>
+      <div class="campo">
+        <label for="club-email">Email</label>
+        <input id="club-email" name="email" type="email" autocomplete="email" inputmode="email" required>
+      </div>
+      <div class="campo">
+        <label for="club-telefono">Teléfono (opcional)</label>
+        <input id="club-telefono" name="telefono" type="tel" autocomplete="tel" inputmode="tel">
+      </div>
+      <div class="campo">
+        <label for="club-clave">Contraseña</label>
+        <input id="club-clave" name="clave" type="password" autocomplete="new-password" minlength="8" required>
+        <p class="campo__ayuda">Al menos 8 caracteres.</p>
+      </div>
+      <label class="casilla casilla--texto"><input type="checkbox" id="club-acepto" name="acepto"> <span>Acepto que SOÑO guarde mi nombre, email y teléfono para gestionar mi tarjeta del club. Puedo darme de baja cuando quiera desde la tarjeta.</span></label>
+      <button class="boton boton--lleno boton--ancho" type="submit">Crear mi tarjeta</button>
+      <p class="aviso" id="aviso-club-alta" aria-live="polite"></p>
+    </form>
+
+    <form class="formulario" id="form-club-entrar" novalidate hidden>
+      <div class="campo">
+        <label for="club-entrar-email">Email</label>
+        <input id="club-entrar-email" name="email" type="email" autocomplete="username" inputmode="email" required>
+      </div>
+      <div class="campo">
+        <label for="club-entrar-clave">Contraseña</label>
+        <input id="club-entrar-clave" name="clave" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="boton boton--lleno boton--ancho" type="submit">Entrar y ver mi tarjeta</button>
+      <p class="campo__ayuda">¿Has olvidado la contraseña? Pídela en la barra y te damos una nueva.</p>
+      <p class="aviso" id="aviso-club-entrar" aria-live="polite"></p>
+    </form>
+  </div>
+</dialog>
+
+<!-- Ventana: la tarjeta del socio, con sus sellos y su QR -->
+<dialog class="modal modal--tarjeta" id="modal-tarjeta" aria-labelledby="tarjeta-nombre">
+  <div class="tarjeta-club">
+    <div class="tarjeta-club__cabeza">
+      <div>
+        <p class="meta">Club SOÑO · Tu tarjeta</p>
+        <h2 class="modal__titulo" id="tarjeta-nombre">Hola</h2>
+      </div>
+      <button class="modal__cerrar" type="button" data-cerrar aria-label="Cerrar tarjeta"><svg viewBox="0 0 20 20" aria-hidden="true"><use href="#i-cerrar"/></svg></button>
+    </div>
+
+    <div class="tarjeta-club__cuerpo">
+      <div class="tarjeta-club__sellos">
+        <div class="tarjeta-sellos" id="tarjeta-sellos" role="img" aria-label=""></div>
+        <div class="tarjeta-club__barra" aria-hidden="true"><span id="tarjeta-barra"></span></div>
+        <p class="tarjeta-club__estado" id="tarjeta-estado" aria-live="polite"></p>
+      </div>
+      <div class="tarjeta-club__qr-bloque">
+        <div class="tarjeta-club__qr" id="tarjeta-qr" role="img" aria-label="Código QR de tu tarjeta"></div>
+        <p class="tarjeta-club__codigo" id="tarjeta-codigo"></p>
+        <p class="tarjeta-club__ayuda">Enséñalo en la barra al pedir y te ponemos el sello.</p>
+      </div>
+    </div>
+
+    <div class="tarjeta-club__movimientos">
+      <p class="meta">Últimos movimientos</p>
+      <ul class="movimientos" id="tarjeta-historial"></ul>
+    </div>
+
+    <div class="tarjeta-club__pie">
+      <p class="tarjeta-club__total" id="tarjeta-total"></p>
+      <div class="acciones-mini">
+        <button class="boton boton--borde boton--mini" type="button" id="club-salir">Cerrar sesión</button>
+        <button class="boton boton--borde boton--mini boton--peligro" type="button" id="club-baja">Darme de baja</button>
+      </div>
+    </div>
+
+    <form class="formulario tarjeta-club__baja" id="form-baja" novalidate hidden>
+      <p>Se borrarán tu tarjeta, tus sellos y tus datos. Escribe tu contraseña para confirmarlo.</p>
+      <div class="campo">
+        <label for="baja-clave">Contraseña</label>
+        <input id="baja-clave" name="clave" type="password" autocomplete="current-password" required>
+      </div>
+      <div class="acciones-mini">
+        <button class="boton boton--lleno boton--peque boton--peligro-lleno" type="submit">Borrar mi tarjeta</button>
+        <button class="boton boton--borde boton--peque" type="button" id="baja-cancelar">Cancelar</button>
+      </div>
+      <p class="aviso" id="aviso-baja" aria-live="polite"></p>
+    </form>
+  </div>
+</dialog>
+
 <!-- Ventana: acceso al panel -->
 <dialog class="modal modal--login" id="modal-login" aria-labelledby="t-login">
   <div class="login">
@@ -709,6 +851,7 @@
       <button class="pestana" type="button" role="tab" id="tab-datos" data-pestana="datos" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Ajustes</button>
       <button class="pestana" type="button" role="tab" id="tab-reservas" data-pestana="reservas" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Reservas</button>
       <button class="pestana" type="button" role="tab" id="tab-pedidos" data-pestana="pedidos" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Pedidos</button>
+      <button class="pestana" type="button" role="tab" id="tab-club" data-pestana="club" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Club</button>
       <button class="pestana" type="button" role="tab" id="tab-mensajes" data-pestana="mensajes" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Mensajes</button>
     </div>
   </div>

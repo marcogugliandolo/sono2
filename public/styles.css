@@ -1091,6 +1091,176 @@ input:focus-visible + .icono-chip { outline: 2px solid var(--cafe); outline-offs
 input:checked + .alergeno-chip { background: var(--cafe); border-color: var(--cafe); color: var(--lienzo); }
 input:focus-visible + .alergeno-chip { outline: 2px solid var(--cafe); outline-offset: 2px; }
 
+/* ---------- Club SOÑO ---------- */
+.club {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  gap: clamp(32px, 6vw, 96px);
+  align-items: center;
+}
+.club__texto { display: grid; gap: 20px; justify-items: start; min-width: 0; }
+.club__intro { font-size: clamp(1.0625rem, 1.5vw, 1.2rem); line-height: 1.55; max-width: 44ch; }
+.club__intro strong { font-weight: 600; }
+.club__pasos { list-style: none; margin: 0; padding: 0; display: grid; width: 100%; max-width: 520px; }
+.club__pasos li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; padding-block: 14px; border-top: 1px solid var(--linea); }
+.club__pasos li:last-child { border-bottom: 1px solid var(--linea); }
+.club__num { font-family: var(--f-mono); font-size: 0.8125rem; color: var(--cafe-suave); padding-top: 3px; }
+.club__pasos h3 { font-size: 1.0625rem; font-weight: 550; line-height: 1.35; }
+.club__pasos p { color: var(--cafe-suave); font-size: 0.9375rem; }
+.club__socio { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+.club__hola { color: var(--cafe-suave); }
+.club__muestra { display: grid; place-items: center; min-width: 0; }
+.club__carton {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 20px;
+  padding: clamp(22px, 3vw, 32px);
+  border-radius: 16px;
+  background: var(--beige);
+  transform: rotate(-2deg);
+}
+.club__carton-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.club__carton-cabeza .meta { color: var(--cafe); }
+.club__carton-logo { width: 46px; }
+.club__carton .sello:not(.sello--puesto) { background: var(--beige-suave); }
+.club__carton .sello--puesto { background: var(--lienzo); }
+.club__carton-pie { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-family: var(--f-mono); font-size: 0.75rem; letter-spacing: 0.04em; }
+
+/* Sellos: una taza por desayuno */
+.tarjeta-sellos { display: grid; grid-template-columns: repeat(var(--columnas, 5), minmax(0, 1fr)); gap: clamp(6px, 1.4vw, 12px); width: 100%; }
+.sello {
+  aspect-ratio: 1;
+  max-width: 100%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px dashed var(--linea-fuerte);
+  color: var(--cafe);
+}
+.sello svg { width: 58%; height: auto; --grosor: 1.8; overflow: visible; opacity: 0.32; }
+.sello--puesto { border: 1.5px solid var(--cafe); background: var(--beige); transform: rotate(var(--giro, 0deg)); }
+.sello--puesto svg { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .sello--nuevo { animation: estampar 0.55s var(--salida) both; }
+}
+@keyframes estampar {
+  0% { opacity: 0; transform: scale(1.5) rotate(calc(var(--giro, 0deg) - 12deg)); }
+  60% { opacity: 1; transform: scale(0.94) rotate(var(--giro, 0deg)); }
+  100% { opacity: 1; transform: scale(1) rotate(var(--giro, 0deg)); }
+}
+
+/* Ventana de acceso al club */
+.modal--club { width: min(440px, calc(100% - 24px)); }
+.club-acceso { padding: clamp(24px, 4vw, 34px); display: grid; gap: 18px; position: relative; }
+.club-acceso .modal__cerrar { position: absolute; top: 14px; right: 14px; }
+.club-acceso__cabeza { display: grid; gap: 8px; padding-right: 48px; }
+.club-acceso__pestanas { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 10px; background: var(--beige-suave); }
+.club-acceso__pestana {
+  min-height: 40px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--cafe);
+  font: 500 0.9375rem/1 var(--f-cuerpo);
+  cursor: pointer;
+}
+.club-acceso__pestana[aria-selected="true"] { background: var(--superficie); box-shadow: 0 1px 2px rgba(86, 41, 18, 0.12); }
+.club-acceso__pestana:focus-visible { outline: 2px solid var(--cafe); outline-offset: 1px; }
+.campo__ayuda { font-size: 0.8125rem; color: var(--cafe-suave); }
+.casilla--texto { align-items: flex-start; font-weight: 400; font-size: 0.875rem; line-height: 1.45; }
+.casilla--texto input { margin-top: 2px; }
+
+/* Ventana de la tarjeta: sellos y QR a la vista, sin más pasos */
+.modal--tarjeta { width: min(780px, calc(100% - 16px)); max-height: calc(100dvh - 16px); }
+.tarjeta-club { display: grid; gap: 22px; padding: clamp(20px, 3.5vw, 32px); }
+.tarjeta-club__cabeza { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.tarjeta-club__cabeza > div { display: grid; gap: 6px; }
+.tarjeta-club__cuerpo { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(18px, 3vw, 32px); align-items: center; }
+.tarjeta-club__sellos { display: grid; gap: 14px; min-width: 0; }
+.tarjeta-club__barra { height: 6px; border-radius: 6px; background: var(--linea); overflow: hidden; }
+.tarjeta-club__barra span { display: block; height: 100%; background: var(--cafe); transform-origin: left center; transform: scaleX(0); transition: transform 0.6s var(--salida); }
+.tarjeta-club__estado { font-size: 1rem; line-height: 1.45; }
+.tarjeta-club__estado.es-premio, .premio-aviso { padding: 10px 14px; border-radius: 10px; background: var(--beige); font-weight: 500; }
+.tarjeta-club__qr-bloque { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 18px; border-radius: 14px; border: 1px solid var(--linea); background: var(--superficie); }
+.tarjeta-club__qr { width: min(220px, 62vw); aspect-ratio: 1; }
+.tarjeta-club__qr svg { display: block; width: 100%; height: 100%; border-radius: 6px; }
+.qr__fondo { fill: #FFFFFF; }
+.qr__puntos { fill: #2A1408; }
+.tarjeta-club__codigo { font-family: var(--f-mono); font-size: 1.125rem; letter-spacing: 0.14em; }
+.tarjeta-club__ayuda { font-size: 0.8125rem; color: var(--cafe-suave); max-width: 26ch; }
+.tarjeta-club__movimientos { display: grid; gap: 8px; }
+.movimientos { list-style: none; margin: 0; padding: 0; display: grid; }
+.movimiento { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-block: 10px; border-bottom: 1px solid var(--linea); font-size: 0.9375rem; }
+.movimiento:last-child { border-bottom: 0; }
+.movimiento__fecha { color: var(--cafe-suave); font-variant-numeric: tabular-nums; }
+.movimiento__valor { font-family: var(--f-mono); font-size: 0.8125rem; white-space: nowrap; }
+.movimiento--canje .movimiento__valor { padding: 1px 8px; border-radius: 999px; background: var(--beige); }
+.tarjeta-club__pie { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding-top: 16px; border-top: 1px solid var(--linea); }
+.tarjeta-club__total { font-size: 0.875rem; color: var(--cafe-suave); }
+.tarjeta-club__baja { padding: 16px; border-radius: 12px; border: 1px dashed var(--alerta); gap: 12px; }
+.boton--peligro-lleno { background: var(--alerta); border-color: var(--alerta); color: #fff; }
+@media (hover: hover) { .boton--peligro-lleno:hover { background: #7E2812; border-color: #7E2812; } }
+
+/* Panel: pestaña Club */
+.club-admin__lector { gap: 12px; }
+.club-admin__fila { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+.club-admin__codigo { flex: 1 1 300px; display: flex; gap: 8px; min-width: 0; }
+.club-admin__codigo input, .club-admin__buscar {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 48px;
+  font: inherit;
+  font-size: 1rem;
+  border-radius: var(--r-chip);
+  padding: 10px 13px;
+  border: 1px solid var(--linea-fuerte);
+  background: var(--superficie);
+  color: var(--cafe);
+}
+.club-admin__codigo input { font-family: var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; }
+.club-admin__codigo input::placeholder { text-transform: none; letter-spacing: 0; font-family: var(--f-cuerpo); }
+.club-admin__codigo input:focus-visible, .club-admin__buscar:focus-visible { outline: 2px solid var(--cafe); outline-offset: 1px; border-color: var(--cafe); }
+.club-admin__camara { position: relative; width: min(100%, 420px); aspect-ratio: 1; border-radius: 14px; overflow: hidden; background: #1E0E06; }
+.club-admin__camara video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.club-admin__marco { position: absolute; inset: 16%; border: 2px solid rgba(255, 253, 247, 0.9); border-radius: 14px; box-shadow: 0 0 0 999px rgba(30, 14, 6, 0.35); pointer-events: none; }
+.club-admin__cancelar { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: var(--superficie); }
+.club-admin__aviso { min-height: 1.5em; margin: 0; }
+.club-admin__quien { max-width: 360px; }
+.club-admin__ficha { display: grid; gap: 16px; padding: clamp(16px, 2.6vw, 26px); border-radius: var(--r-tarjeta); border: 1.5px solid var(--cafe); background: var(--superficie); }
+.club-admin__ficha-cabeza { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.club-admin__nombre { font-family: var(--f-titulo); font-weight: 400; font-size: clamp(1.8rem, 3vw, 2.3rem); line-height: 1.05; }
+.tarjeta-sellos--panel { max-width: 440px; }
+.club-admin__resumen { font-size: 0.9375rem; }
+.club-admin__acciones { display: flex; flex-wrap: wrap; gap: 10px; }
+.club-admin__mas { min-width: 168px; min-height: 52px; font-size: 1.0625rem; }
+.club-admin__historial { display: grid; gap: 6px; max-width: 560px; }
+.club-admin__clave { padding: 12px 14px; border-radius: 10px; border: 1px dashed var(--cafe); background: var(--beige-suave); font-size: 0.9375rem; }
+.club-admin__clave strong { font-family: var(--f-mono); font-size: 1.05rem; letter-spacing: 0.08em; }
+.club-admin__cabeza-lista { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 16px; }
+.club-admin__buscar { flex: 1 1 260px; max-width: 420px; }
+.socio-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--linea);
+  border-radius: var(--r-tarjeta);
+  background: var(--superficie);
+  color: var(--cafe);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+@media (hover: hover) { .socio-fila:hover { border-color: var(--linea-fuerte); } }
+.socio-fila.es-elegido { border-color: var(--cafe); }
+.socio-fila__datos { display: grid; gap: 2px; min-width: 0; }
+.socio-fila__nombre { font-weight: 600; }
+.socio-fila__meta { font-size: 0.8125rem; color: var(--cafe-suave); overflow-wrap: anywhere; }
+.socio-fila__sellos { flex: none; font-family: var(--f-mono); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.socio-fila__sellos.es-premio { padding: 2px 10px; border-radius: 999px; background: var(--beige); }
+
 /* ---------- Mini plano de zonas en la reserva ---------- */
 .plano { display: grid; gap: 10px; }
 .plano__cualquiera { display: flex; }
@@ -1169,6 +1339,8 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 }
 @media (max-width: 900px) {
   .historia__rejilla, .escribenos, .dos-tarjetas { grid-template-columns: minmax(0, 1fr); }
+  .club { grid-template-columns: minmax(0, 1fr); }
+  .club__carton { transform: rotate(-1deg); }
   .historia__dibujo svg { width: min(100%, 340px); }
   .favoritos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .llevar__dibujo { width: min(100%, 300px); }
@@ -1177,6 +1349,9 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 }
 @media (max-width: 760px) {
   .zona-admin { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .tarjeta-club__cuerpo { grid-template-columns: minmax(0, 1fr); }
+  .tarjeta-club { gap: 18px; }
+  .tarjeta-club__qr { width: min(200px, 60vw); }
   .zona-admin .casilla, .zona-admin .boton { padding-bottom: 0; margin-bottom: 0; justify-self: start; }
   .cabecera__fila { grid-template-columns: auto minmax(0, 1fr); min-height: 64px; gap: 0 12px; }
   .cabecera__acciones { justify-self: end; }
