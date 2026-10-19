@@ -1820,15 +1820,16 @@
   function quienAtiende() { try { return localStorage.getItem('sono2-quien') || ''; } catch (e) { return ''; } }
   function guardarQuien(v) { try { localStorage.setItem('sono2-quien', v); } catch (e) { /* sin almacenamiento: no pasa nada */ } }
   function sinAcentos(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
-  function avisoClub(t, esError) {
+  function avisoClub(t, esError, esOk) {
     var a = $('club-aviso');
     if (!a) return;
     a.textContent = t || '';
     a.classList.toggle('es-error', !!esError);
+    a.classList.toggle('es-ok', !!esOk && !esError);
   }
 
   function panelClub() {
-    cuerpo.appendChild(el('p', 'admin__ayuda', 'Para poner un sello, escanea el QR de la tarjeta del socio o escribe el código que sale debajo. También puedes buscarlo en la lista.'));
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'Al escanear el QR de la tarjeta, el sello se pone solo. También puedes escribir el código que sale debajo del QR o buscar al socio en la lista y pulsar «+1 sello».'));
 
     var lector = el('section', 'admin__grupo club-admin__lector');
     var filaLector = el('div', 'club-admin__fila');
@@ -2066,7 +2067,7 @@
     api('POST', '/api/club/socios/' + s.id + '/' + accion, datos).then(function (r) {
       var necesarios = (r.club && r.club.sellos) || 10;
       elegir(r.socio, r.club, r.socio.sellos > antes ? Math.min(antes, necesarios) : undefined);
-      avisoClub(hecho);
+      avisoClub(typeof hecho === 'function' ? hecho(r.socio, necesarios) : hecho, false, true);
       if (navigator.vibrate) navigator.vibrate(40);
     }).catch(function (err) {
       if (!sesionCaducada(err)) avisoClub(err.message, true);
@@ -2074,13 +2075,36 @@
     });
   }
 
-  function buscarCodigo(texto) {
+  /* Al escanear el QR se pone el sello directamente. No se pone solo si:
+     - la tarjeta ya está completa (toca canjear el premio), o
+     - a ese socio ya se le puso un sello escaneando hace menos de 2 minutos
+       (para no sumar dos por leer el mismo QR dos veces). En ese caso se pulsa «+1 sello». */
+  var ultimoEscaneo = { codigo: '', hora: 0 };
+  function buscarCodigo(texto, escaneado) {
     avisoClub('Buscando la tarjeta…');
     api('POST', '/api/club/buscar', { codigo: texto }).then(function (r) {
       var i = $('club-codigo'); if (i) i.value = '';
       elegir(r.socio, r.club);
-      avisoClub('Tarjeta de ' + r.socio.nombre + '.');
       if (navigator.vibrate) navigator.vibrate(60);
+      var s = r.socio;
+      var necesarios = (r.club && r.club.sellos) || 10;
+      var premio = (r.club && r.club.premio) || 'un desayuno gratis';
+      if (!escaneado) { avisoClub('Tarjeta de ' + s.nombre + '. Pulsa «+1 sello» para sellar.'); return; }
+      if (s.sellos >= necesarios) {
+        avisoClub('Tarjeta de ' + s.nombre + ' completa: tiene ' + premio + '. Pulsa «Canjear premio».', false, true);
+        return;
+      }
+      var segundos = Math.round((Date.now() - ultimoEscaneo.hora) / 1000);
+      if (ultimoEscaneo.codigo === s.codigo && segundos < 120) {
+        avisoClub('A ' + s.nombre + ' ya se le puso un sello hace ' + segundos + ' s. Si es otro desayuno, pulsa «+1 sello».', true);
+        return;
+      }
+      ultimoEscaneo = { codigo: s.codigo, hora: Date.now() };
+      accionSocio('sellos', { cantidad: 1 }, function (socioNuevo, n) {
+        var faltan = n - socioNuevo.sellos;
+        return 'Sello añadido a ' + socioNuevo.nombre + ': ' + Math.min(socioNuevo.sellos, n) + ' de ' + n +
+          (faltan <= 0 ? '. ¡Tarjeta completa! La próxima vez, canjea el premio.' : '.');
+      });
     }).catch(function (err) { if (!sesionCaducada(err)) avisoClub(err.message, true); });
   }
 
@@ -2159,7 +2183,7 @@
         if (!escaner.activo) return;
         leer(video).then(function (leido) {
           if (!escaner.activo) return;
-          if (leido && /^SONO:/i.test(leido)) { pararEscaner(); buscarCodigo(leido); return; }
+          if (leido && /^SONO:/i.test(leido)) { pararEscaner(); buscarCodigo(leido, true); return; }
           if (leido && !avisoOtro) { avisoOtro = true; avisoClub('Ese QR no es de una tarjeta de SOÑO.', true); }
           escaner.temporizador = setTimeout(vuelta, 220);
         }).catch(function () { escaner.temporizador = setTimeout(vuelta, 400); });
