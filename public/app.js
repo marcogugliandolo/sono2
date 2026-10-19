@@ -1044,7 +1044,11 @@
 
   function pintarClub() {
     var c = ajustesClub();
-    document.querySelectorAll('[data-club]').forEach(function (n) { n.hidden = !c.activo && !socio; });
+    document.querySelectorAll('[data-club]').forEach(function (n) { n.hidden = !c.activo; });
+    if (!c.activo) {
+      if (modalTarjeta.open) cerrar(modalTarjeta);
+      if (modalClub.open) cerrar(modalClub);
+    }
     $('club-premio').textContent = c.premio;
     $('club-n').textContent = String(c.sellos);
     pintarSellos($('club-muestra-sellos'), Math.min(4, c.sellos - 1), c.sellos);
@@ -1705,7 +1709,7 @@
     var chClub = el('input'); chClub.type = 'checkbox'; chClub.id = 'adm-club-activo'; chClub.checked = b.club.activo !== false;
     chClub.addEventListener('change', function () { b.club.activo = chClub.checked; marcar(); });
     labClub.appendChild(chClub);
-    labClub.appendChild(document.createTextNode('Mostrar el club en la web y admitir socios nuevos'));
+    labClub.appendChild(document.createTextNode('Club activo en la web (también se cambia desde la pestaña «Club»)'));
     camposClub.appendChild(labClub);
     var filaClub = el('div', 'fila-2');
     filaClub.appendChild(campoTexto('adm-club-premio', 'Premio al completar la tarjeta', b.club.premio, function (v) { b.club.premio = v; }, { maxlength: '60', placeholder: 'un desayuno gratis' }));
@@ -1829,6 +1833,45 @@
   }
 
   function panelClub() {
+    var activo = ajustesClub().activo;
+    var bloque = el('section', 'club-admin__estado' + (activo ? ' es-activo' : ''));
+    bloque.id = 'club-estado';
+    var interruptor = el('label', 'interruptor');
+    var ch = el('input');
+    ch.type = 'checkbox';
+    ch.id = 'club-activo';
+    ch.setAttribute('role', 'switch');
+    ch.checked = activo;
+    interruptor.appendChild(ch);
+    interruptor.appendChild(el('span', 'interruptor__pista'));
+    interruptor.appendChild(el('span', 'interruptor__texto', 'Club activo en la web'));
+    bloque.appendChild(interruptor);
+    var explica = el('p', 'club-admin__estado-texto');
+    explica.id = 'club-estado-texto';
+    bloque.appendChild(explica);
+    function textoEstado(si) {
+      explica.textContent = si
+        ? 'La web muestra el club: los clientes pueden apuntarse y ver su tarjeta.'
+        : 'El club no sale en la web y nadie puede apuntarse ni entrar. Los socios y sus sellos se guardan.';
+      bloque.classList.toggle('es-activo', si);
+    }
+    textoEstado(activo);
+    ch.addEventListener('change', function () {
+      var quiere = ch.checked;
+      ch.disabled = true;
+      api('POST', '/api/club/activo', { activo: quiere }).then(function (r) {
+        estado.datos.club = r.club;
+        if (borradores.datos) borradores.datos.club = Object.assign({}, borradores.datos.club, { activo: r.club.activo });
+        textoEstado(r.club.activo);
+        pintarClub();
+        avisoClub(r.club.activo ? 'Club activado: ya se ve en la web.' : 'Club desactivado: ya no sale en la web.', false, true);
+      }).catch(function (err) {
+        ch.checked = !quiere;
+        if (!sesionCaducada(err)) avisoClub(err.message, true);
+      }).then(function () { ch.disabled = false; });
+    });
+    cuerpo.appendChild(bloque);
+
     cuerpo.appendChild(el('p', 'admin__ayuda', 'Al escanear el QR de la tarjeta, el sello se pone solo. También puedes escribir el código que sale debajo del QR o buscar al socio en la lista y pulsar «+1 sello».'));
 
     var lector = el('section', 'admin__grupo club-admin__lector');
@@ -2630,7 +2673,7 @@
   }).catch(function () {
     ponerSocio(null);
   }).then(function () {
-    if (location.hash === '#tarjeta') {
+    if (location.hash === '#tarjeta' && ajustesClub().activo) {
       if (socio) abrirTarjeta(); else abrirAccesoClub('entrar');
     }
   });
