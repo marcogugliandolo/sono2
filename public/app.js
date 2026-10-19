@@ -1704,14 +1704,8 @@
 
     var gc = el('section', 'admin__grupo');
     gc.appendChild(el('h3', null, 'Club SOÑO'));
-    gc.appendChild(el('p', 'admin__ayuda', 'Tarjeta de sellos para los socios. Cada desayuno es un sello; al completar la tarjeta, el socio tiene el premio. Los sellos se ponen en la pestaña «Club».'));
+    gc.appendChild(el('p', 'admin__ayuda', 'Tarjeta de sellos para los socios. Cada desayuno es un sello; al completar la tarjeta, el socio tiene el premio. Para activar o desactivar el club y poner sellos, ve a la pestaña «Club».'));
     var camposClub = el('div', 'admin__campos');
-    var labClub = el('label', 'casilla');
-    var chClub = el('input'); chClub.type = 'checkbox'; chClub.id = 'adm-club-activo'; chClub.checked = b.club.activo !== false;
-    chClub.addEventListener('change', function () { b.club.activo = chClub.checked; marcar(); });
-    labClub.appendChild(chClub);
-    labClub.appendChild(document.createTextNode('Club activo en la web (también se cambia desde la pestaña «Club»)'));
-    camposClub.appendChild(labClub);
     var filaClub = el('div', 'fila-2');
     filaClub.appendChild(campoTexto('adm-club-premio', 'Premio al completar la tarjeta', b.club.premio, function (v) { b.club.premio = v; }, { maxlength: '60', placeholder: 'un desayuno gratis' }));
     filaClub.appendChild(campoTexto('adm-club-sellos', 'Sellos de la tarjeta', String(b.club.sellos), function (v) { b.club.sellos = Number(String(v).trim()); }, { inputmode: 'numeric', placeholder: '10' }));

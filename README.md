@@ -32,7 +32,7 @@ En el panel, pestaña **Club**:
 - **Nueva contraseña** para quien la haya olvidado: se enseña una vez para dársela al socio y cierra sus sesiones abiertas.
 - **Borrar socio**, y una lista de socios con buscador por nombre, email, teléfono o código.
 
-En **Ajustes → Club SOÑO** se elige cuántos sellos tiene la tarjeta (de 3 a 20; por defecto 10), cuál es el premio y también si el club está activo.
+En **Ajustes → Club SOÑO** se elige cuántos sellos tiene la tarjeta (de 3 a 20; por defecto 10) y cuál es el premio. Activarlo o desactivarlo solo se hace con el interruptor de la pestaña **Club**.
 
 Los socios pueden darse de baja ellos mismos desde su tarjeta (se borran sus datos). Las contraseñas se guardan cifradas (scrypt) y la sesión del socio dura 120 días. Al recoger nombre, email y teléfono, conviene mencionarlo en la política de privacidad de la cafetería.
 

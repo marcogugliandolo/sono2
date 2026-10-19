@@ -737,13 +737,8 @@ async function apiClub(req, res, pathname, metodo, ip) {
     exigirAdmin(req);
     const datos = await leerJSON(req);
     if (typeof datos.activo !== 'boolean') throw errorCliente('Indica si el club queda activo o no.');
-    const antes = contenido.datos;
     contenido.datos = Object.assign({}, contenido.datos, { club: Object.assign({}, ajustesClub(), { activo: datos.activo }) });
     await guardarArchivo('contenido.json', contenido);
-    if (antes.club.activo !== datos.activo) {
-      registrarVersion('datos', contenido.datos, resumenCambios('datos', antes, contenido.datos));
-      await guardarArchivo('versiones.json', versiones);
-    }
     console.log('[soño] Club ' + (datos.activo ? 'activado' : 'desactivado'));
     return enviarJSON(res, 200, { club: ajustesClub() });
   }
@@ -887,7 +882,6 @@ function resumenCambios(seccion, a, b) {
     });
     if (!igual(a.zonas, b.zonas)) lineas.push('Zonas para reservar');
     const ca = a.club || {}, cb = b.club || {};
-    if (ca.activo !== cb.activo) lineas.push('Club: ' + (cb.activo ? 'activado' : 'desactivado'));
     if (ca.sellos !== cb.sellos) lineas.push('Sellos de la tarjeta del club: ' + vacio(ca.sellos) + ' → ' + cb.sellos);
     if (ca.premio !== cb.premio) lineas.push('Premio del club: ' + cb.premio);
   }
@@ -915,6 +909,7 @@ function apiVersiones(req, res, pathname, metodo) {
       const ultima = versiones.find((x) => x.seccion === v.seccion);
       if (ultima === v) throw errorCliente('Esa ya es la versión que se ve en la web.', 409);
       const limpio = VALIDADORES[v.seccion](JSON.parse(JSON.stringify(v.datos)));
+      if (v.seccion === 'datos') limpio.club.activo = ajustesClub().activo !== false;   // volver a una versión no enciende ni apaga el club
       const antes = contenido[v.seccion];
       contenido = Object.assign({}, contenido, { [v.seccion]: limpio });
       await guardarArchivo('contenido.json', contenido);
@@ -981,6 +976,7 @@ async function api(req, res, pathname) {
     exigirAdmin(req);
     const clave = mContenido[1];
     const limpio = VALIDADORES[clave](await leerJSON(req));
+    if (clave === 'datos') limpio.club.activo = ajustesClub().activo !== false;   // el club se activa solo desde la pestaña «Club»
     const antes = contenido[clave];
     contenido = Object.assign({}, contenido, { [clave]: limpio });
     await guardarArchivo('contenido.json', contenido);
