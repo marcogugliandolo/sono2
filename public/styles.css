@@ -45,6 +45,7 @@
   --superficie: #FFFDF7;
   --beige: #F3E0A6;
   --beige-suave: #F8ECCA;
+  --leche: #C9A275;            /* café con leche: mezcla del marrón y el beige */
   --cafe: #562912;
   --cafe-oscuro: #3F1D0C;
   --cafe-suave: #7A5539;
@@ -313,7 +314,7 @@ html.menu-abierto { overflow: hidden; }
 
 /* ---------- Portada ---------- */
 /* Portada centrada, como la plantilla: titular grande, botones y el dibujo debajo */
-.portada { padding-block: clamp(48px, 8vw, 112px) clamp(56px, 8vw, 104px); }
+.portada { padding-block: clamp(36px, 5vw, 72px) clamp(40px, 6vw, 88px); }
 .portada__centro { display: grid; justify-items: center; text-align: center; gap: 26px; }
 .portada__etiquetas { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 16px; }
 .aviso-apertura {
@@ -345,15 +346,54 @@ html.menu-abierto { overflow: hidden; }
 .portada__titulo em { font-style: italic; letter-spacing: -0.025em; }
 .portada__sub { font-size: clamp(1.125rem, 1.5vw, 1.3rem); line-height: 1.5; color: var(--cafe-suave); max-width: 40ch; }
 .portada .acciones { justify-content: center; }
-.portada__dibujo { width: min(100%, 880px); margin-top: clamp(12px, 3vw, 40px); }
+/* ---------- Escena: el vaso se llena al bajar ----------
+   El dibujo se queda fijo en el centro de la pantalla mientras se recorre
+   «.escena__recorrido»; app.js calcula el progreso y mueve las capas de líquido. */
+.escena { margin-top: clamp(20px, 3vw, 44px); }
+.escena__fijo { display: grid; justify-items: center; gap: 18px; }
+html.escena-activa .escena__fijo { position: sticky; top: 76px; }
+.escena__recorrido { display: none; }
+html.escena-activa .escena__recorrido { display: block; height: 130vh; height: 130svh; }
+.portada__dibujo {
+  width: min(100%, 900px, calc((100vh - 230px) * var(--aspecto, 2.25)));
+  width: min(100%, 900px, calc((100svh - 230px) * var(--aspecto, 2.25)));
+}
 .portada__dibujo svg { display: block; width: 100%; height: auto; overflow: visible; --grosor: 2; }
+.vaso__cristal { fill: var(--lienzo); }
+.vaso__brillo { opacity: 0.35; }
+.vaso__ml { font-family: var(--f-mono); font-size: 11px; fill: var(--cafe-suave); }
+.liquido--espresso { fill: var(--cafe); }
+.liquido--leche { fill: var(--leche); }
+.liquido--espuma { fill: var(--beige); }
+.burbuja { fill: none; stroke: var(--leche); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.chorro { stroke: var(--cafe); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.chorro--espresso { fill: var(--cafe); }
+.chorro--leche { fill: var(--superficie); }
+.chorro--espuma { fill: var(--beige-suave); }
+.escena__vapor { transition: opacity 0.4s ease; }
+@media (prefers-reduced-motion: no-preference) {
+  /* La superficie del líquido ondula, como el café de la Ñ del logo */
+  .ola { animation: ola 2.6s linear infinite; }
+  .ola--b { animation-duration: 3.4s; animation-direction: reverse; }
+  .ola--c { animation-duration: 4.2s; }
+}
+@keyframes ola { to { transform: translateX(-40px); } }
+
+.escena__pie { display: grid; justify-items: center; gap: 12px; width: min(100%, 440px); }
+.escena__pasos { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.escena__paso { display: grid; gap: 7px; font-family: var(--f-mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cafe-suave); transition: color 0.25s ease; }
+.escena__paso.activo, .escena__paso.hecho { color: var(--cafe); }
+.escena__barra { display: block; height: 2px; border-radius: 2px; background: var(--linea); overflow: hidden; }
+.escena__barra > span { display: block; height: 100%; background: var(--cafe); transform-origin: left center; transform: scaleX(var(--t, 1)); }
+.escena__texto { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 12px; font-size: 0.9875rem; text-align: center; min-height: 1.6em; }
+.escena__ml { font-family: var(--f-mono); font-size: 0.8125rem; color: var(--cafe-suave); font-variant-numeric: tabular-nums; }
 
 @media (prefers-reduced-motion: no-preference) {
   .portada__centro > * { animation: subir 0.8s var(--suave) both; }
   .portada__centro > :nth-child(2) { animation-delay: 0.07s; }
   .portada__centro > :nth-child(3) { animation-delay: 0.14s; }
   .portada__centro > :nth-child(4) { animation-delay: 0.21s; }
-  .portada__centro > .portada__dibujo { animation: aparecer 1.1s var(--suave) 0.28s both; }
+  .escena__fijo { animation: aparecer 1.1s var(--suave) 0.28s both; }
   .vapor { animation: vapor 3.4s ease-in-out infinite alternate; transform-box: fill-box; }
   .vapor--b { animation-delay: -1.1s; }
   .vapor--c { animation-delay: -2.2s; }

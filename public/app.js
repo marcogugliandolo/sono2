@@ -1719,6 +1719,145 @@
     });
   }
 
+  /* ---------- Escena de la portada: el vaso se llena al bajar ----------
+     El dibujo se queda fijo en el centro mientras se recorre «.escena__recorrido».
+     p va de 0 (vaso vacío) a 1 (café listo):
+       0,00–0,33  la jarrita sirve un espresso doble (hasta 60 ml)
+       0,33–0,66  la jarra añade la leche (hasta 240 ml)
+       0,66–0,90  una capa de espuma (hasta 276 ml)
+       0,90–1,00  sale el vapor
+     Sin JavaScript, o con «reducir movimiento», se ve el vaso ya lleno. */
+  (function () {
+    var escena = $('escena');
+    var fijo = $('escena-fijo');
+    var svg = $('escena-svg');
+    if (!escena || !fijo || !svg) return;
+    var recorrido = escena.querySelector('.escena__recorrido');
+    var raizHtml = document.documentElement;
+    var cabecera = $('cabecera');
+    var capas = { espresso: $('capa-espresso'), leche: $('capa-leche'), espuma: $('capa-espuma') };
+    var chorros = { espresso: $('chorro-espresso'), leche: $('chorro-leche'), espuma: $('chorro-espuma') };
+    var jarraPeque = $('jarra-espresso');
+    var jarraGrande = $('jarra-leche');
+    var vapor = $('escena-vapor');
+    var pasos = [$('paso-1'), $('paso-2'), $('paso-3')];
+    var barras = pasos.map(function (p) { return p.querySelector('.escena__barra > span'); });
+    var textoEl = $('escena-texto');
+    var mlEl = $('escena-ml');
+    var ML_LLENO = 300;          // capacidad del vaso: las marcas van de 60 en 60 ml
+    var PICO_Y = 70;             // altura del pico de las jarras
+    var reducido = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+    var movil = window.matchMedia ? window.matchMedia('(max-width: 760px)') : { matches: false };
+
+    function entre(v, a, b) { return Math.min(b, Math.max(a, v)); }
+    function tramo(p, a, b) { return entre((p - a) / (b - a), 0, 1); }
+    function suave(t) { return t * t * (3 - 2 * t); }
+    function nivelY(f) { return 368 - f * 215; }     // f = fracción del vaso (0 vacío, 1 lleno)
+
+    var ultimoTexto = '';
+    var ultimoMl = -1;
+    function pintar(p) {
+      var esp = 0.2 * tramo(p, 0.06, 0.29);
+      var leche = esp + 0.6 * tramo(p, 0.41, 0.65);
+      var espuma = leche + 0.12 * tramo(p, 0.67, 0.85);
+      capas.espresso.setAttribute('transform', 'translate(0 ' + nivelY(esp).toFixed(2) + ')');
+      capas.leche.setAttribute('transform', 'translate(0 ' + nivelY(leche).toFixed(2) + ')');
+      capas.espuma.setAttribute('transform', 'translate(0 ' + nivelY(espuma).toFixed(2) + ')');
+
+      // Jarras: se inclinan para servir y vuelven a su sitio
+      var giroPeque = -18 - 40 * (suave(tramo(p, 0, 0.05)) - suave(tramo(p, 0.28, 0.33)));
+      var giroGrande = -18 - 40 * (suave(tramo(p, 0.36, 0.4)) - suave(tramo(p, 0.86, 0.91)));
+      jarraPeque.setAttribute('transform', 'translate(500 ' + PICO_Y + ') rotate(' + giroPeque.toFixed(2) + ') scale(0.62)');
+      jarraGrande.setAttribute('transform', 'translate(500 ' + PICO_Y + ') rotate(' + giroGrande.toFixed(2) + ')');
+      jarraPeque.setAttribute('opacity', (1 - tramo(p, 0.31, 0.35)).toFixed(3));
+      jarraGrande.setAttribute('opacity', (tramo(p, 0.33, 0.37) * (1 - tramo(p, 0.91, 0.95))).toFixed(3));
+
+      // Chorros: del pico a la superficie, solo mientras se sirve
+      var superficie = nivelY(espuma) + 2;
+      function chorro(el, desde, hasta) {
+        var visible = p > desde && p < hasta;
+        var largo = visible ? (superficie - PICO_Y) * tramo(p, desde, desde + 0.025) : 0;
+        el.setAttribute('height', Math.max(0, largo).toFixed(2));
+      }
+      chorro(chorros.espresso, 0.04, 0.29);
+      chorro(chorros.leche, 0.39, 0.655);
+      chorro(chorros.espuma, 0.66, 0.855);
+
+      vapor.style.opacity = tramo(p, 0.9, 0.97).toFixed(3);
+
+      // Pasos y texto de abajo
+      var avance = [tramo(p, 0.06, 0.29), tramo(p, 0.41, 0.65), tramo(p, 0.67, 0.85)];
+      var actual = p < 0.33 ? 0 : p < 0.66 ? 1 : p < 0.9 ? 2 : 3;
+      barras.forEach(function (b, i) { b.style.setProperty('--t', avance[i].toFixed(3)); });
+      pasos.forEach(function (li, i) {
+        li.classList.toggle('activo', i === actual && p > 0.02);
+        li.classList.toggle('hecho', avance[i] >= 1);
+      });
+      var texto = p < 0.03 ? 'Baja para servirte un café ↓'
+        : actual === 0 ? 'Primero, un espresso doble'
+        : actual === 1 ? 'Después, leche cremosa'
+        : actual === 2 ? 'Y una capa fina de espuma'
+        : 'Tu café con leche, listo';
+      if (texto !== ultimoTexto) { textoEl.textContent = texto; ultimoTexto = texto; }
+      var ml = Math.round(espuma * ML_LLENO);
+      if (ml !== ultimoMl) { mlEl.textContent = ml + ' ml'; ultimoMl = ml; }
+    }
+
+    // En el móvil se encuadra solo el vaso para que se vea grande
+    function encuadre() {
+      var estrecho = movil.matches;
+      svg.setAttribute('viewBox', estrecho ? '400 0 290 400' : '0 0 900 400');
+      fijo.style.setProperty('--aspecto', estrecho ? '0.725' : '2.25');
+    }
+    // El dibujo queda centrado en el hueco que deja la cabecera
+    function colocar() {
+      var alto = cabecera ? cabecera.offsetHeight : 0;
+      var hueco = window.innerHeight - alto - fijo.offsetHeight;
+      fijo.style.top = Math.round(alto + Math.max(0, hueco / 2)) + 'px';
+    }
+    function progreso() {
+      var arriba = parseFloat(fijo.style.top) || 0;
+      var r = recorrido.getBoundingClientRect();
+      if (!r.height) return 1;
+      return entre((arriba + fijo.offsetHeight - r.top) / r.height, 0, 1);
+    }
+    function activa() { return !reducido.matches && window.innerHeight >= 520; }
+
+    var pendiente = false;
+    function alMover() {
+      if (pendiente || !raizHtml.classList.contains('escena-activa')) return;
+      pendiente = true;
+      requestAnimationFrame(function () { pendiente = false; pintar(progreso()); });
+    }
+    function iniciar() {
+      encuadre();
+      if (activa()) {
+        raizHtml.classList.add('escena-activa');
+        colocar();
+        pintar(progreso());
+      } else {
+        raizHtml.classList.remove('escena-activa');
+        fijo.style.top = '';
+        pintar(1);
+      }
+    }
+    window.addEventListener('scroll', alMover, { passive: true });
+    // En el móvil la barra del navegador cambia el alto al bajar: eso no recoloca el dibujo
+    var ultimoAncho = window.innerWidth;
+    var ultimoAlto = window.innerHeight;
+    window.addEventListener('resize', function () {
+      if (window.innerWidth === ultimoAncho && Math.abs(window.innerHeight - ultimoAlto) < 120) return;
+      ultimoAncho = window.innerWidth;
+      ultimoAlto = window.innerHeight;
+      iniciar();
+    });
+    [reducido, movil].forEach(function (m) {
+      if (m.addEventListener) m.addEventListener('change', iniciar);
+      else if (m.addListener) m.addListener(iniciar);
+    });
+    iniciar();
+  })();
+
   /* ---------- Menú del móvil ---------- */
   (function () {
     var boton = $('menu-boton');
