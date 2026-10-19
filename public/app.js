@@ -1334,6 +1334,7 @@
     if (pestana === 'pedidos') panelPedidos();
     if (pestana === 'mensajes') panelMensajes();
     if (pestana === 'club') panelClub();
+    if (pestana === 'historial') panelHistorial();
     cuerpo.scrollTop = mismaPestana ? posicion : 0;
     if (!guardando) mostrarEstado(k && sucio[k] ? 'Hay cambios sin guardar.' : '');
     btnDescartar.disabled = !(k && sucio[k]);
@@ -2240,6 +2241,85 @@
   }
   modalAdmin.addEventListener('close', pararEscaner);
 
+  /* Pestaña: historial de versiones
+     Cada vez que se guarda la carta, las fotos, los horarios o los ajustes queda una versión.
+     Volver a una versión cambia solo esa parte de la web y también se puede deshacer. */
+  var historial = { filtro: '' };
+  var fHistorial = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+  var CLAVE_DE_SECCION = { carta: 'carta', galeria: 'galeria', horario: 'horario', datos: 'datos' };
+
+  function panelHistorial() {
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'Cada vez que guardas cambios en la carta, las fotos, los horarios o los ajustes queda aquí una versión con lo que cambió. Si algo no te convence, vuelve a una versión anterior: solo cambia esa parte de la web, y la versión de ahora también se guarda, así que puedes deshacerlo.'));
+    var filtros = el('div', 'historial__filtros');
+    filtros.setAttribute('role', 'group');
+    filtros.setAttribute('aria-label', 'Ver versiones de');
+    [['', 'Todo'], ['carta', 'Carta'], ['galeria', 'Fotos'], ['horario', 'Horarios'], ['datos', 'Ajustes']].forEach(function (f) {
+      var b = el('button', 'historial__filtro', f[1]);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', historial.filtro === f[0] ? 'true' : 'false');
+      b.addEventListener('click', function () { historial.filtro = f[0]; pintarPanel(); });
+      filtros.appendChild(b);
+    });
+    cuerpo.appendChild(filtros);
+    var lista = el('div', 'registros');
+    lista.appendChild(el('p', 'estado-vacio', 'Cargando el historial…'));
+    cuerpo.appendChild(lista);
+    api('GET', '/api/versiones').then(function (r) {
+      if (pestana !== 'historial') return;
+      lista.innerHTML = '';
+      var visibles = r.versiones.filter(function (v) { return !historial.filtro || v.seccion === historial.filtro; });
+      if (!visibles.length) { lista.appendChild(el('p', 'estado-vacio', 'Todavía no hay versiones guardadas.')); return; }
+      visibles.forEach(function (v) { lista.appendChild(tarjetaVersion(v)); });
+    }).catch(function (err) {
+      if (sesionCaducada(err)) return;
+      lista.innerHTML = '';
+      lista.appendChild(el('p', 'estado-vacio', err.message));
+    });
+  }
+
+  function tarjetaVersion(v) {
+    var t = el('article', 'registro version' + (v.actual ? ' version--actual' : ''));
+    var cab = el('div', 'registro__cabecera');
+    var titulo = el('p', 'registro__titulo');
+    titulo.appendChild(el('span', 'etiqueta-tipo', v.nombre));
+    var fecha = fHistorial.format(new Date(v.fecha));
+    titulo.appendChild(document.createTextNode(fecha.charAt(0).toUpperCase() + fecha.slice(1)));
+    cab.appendChild(titulo);
+    if (v.actual) cab.appendChild(el('span', 'version__actual', 'Es la que se ve ahora'));
+    t.appendChild(cab);
+    var ul = el('ul', 'version__cambios');
+    v.resumen.forEach(function (linea) { ul.appendChild(el('li', null, linea)); });
+    t.appendChild(ul);
+    if (!v.actual) {
+      var acc = el('div', 'acciones-mini');
+      var texto = 'Volver a esta versión de ' + v.nombre.toLowerCase();
+      var b = botonMini(texto, function () {
+        if (b.getAttribute('data-confirmar') !== '1') {
+          b.setAttribute('data-confirmar', '1');
+          b.textContent = '¿Seguro? Toca otra vez';
+          setTimeout(function () { if (b.isConnected) { b.removeAttribute('data-confirmar'); b.textContent = texto; } }, 4000);
+          return;
+        }
+        b.disabled = true;
+        api('POST', '/api/versiones/' + v.id + '/restaurar').then(function (r) {
+          var k = CLAVE_DE_SECCION[r.seccion];
+          estado[k] = r.valor;
+          borradores[k] = null;
+          sucio[k] = false;
+          pintarTodo();
+          pintarPanel();
+          mostrarEstado(v.nombre + ' vuelve a estar como el ' + fHistorial.format(new Date(v.fecha)) + '. Ya se ve en la web.');
+        }).catch(function (err) {
+          b.disabled = false;
+          if (!sesionCaducada(err)) mostrarEstado(err.message, true);
+        });
+      });
+      acc.appendChild(b);
+      t.appendChild(acc);
+    }
+    return t;
+  }
+
   /* Pestaña: pedidos para llevar */
   var fHora = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   function panelPedidos() {
@@ -2356,7 +2436,7 @@
       pintarPanel();
       cuerpo.scrollTop = arriba;
       pintarTodo();
-      mostrarEstado('Guardado. Ya se ve en la web.');
+      mostrarEstado('Guardado. Ya se ve en la web. Si quieres deshacerlo, está en «Historial».');
       return true;
     }).catch(function (err) {
       guardando = false;
