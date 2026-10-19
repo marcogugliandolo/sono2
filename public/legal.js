@@ -246,7 +246,7 @@
   /* ---------- Política de cookies ---------- */
   function cookies() {
     var f = document.createDocumentFragment();
-    f.appendChild(p('Las cookies son pequeños archivos que una web guarda en tu navegador. Esta web solo usa cookies técnicas, las imprescindibles para que funcione. No usamos cookies de análisis, de publicidad ni de otras empresas.'));
+    f.appendChild(p('Las cookies son pequeños archivos que una web guarda en tu navegador. Ahora mismo esta web solo usa cookies técnicas, las imprescindibles para que funcione. No usamos cookies de análisis, de publicidad ni de otras empresas.'));
 
     f.appendChild(h2('Qué cookies usamos'));
     f.appendChild(tabla([
@@ -260,12 +260,14 @@
     f.appendChild(p('La web también guarda un par de datos en el almacenamiento local de tu navegador, que funciona de forma parecida:'));
     f.appendChild(tabla([
       ['Nombre', 'Para qué sirve', 'Duración'],
-      ['sono2-aviso-cookies', 'Recordar que ya has visto el aviso de cookies, para no enseñártelo cada vez.', 'Hasta que borres los datos del navegador'],
+      ['sono2-cookies', 'Recordar si has aceptado o rechazado las cookies opcionales, para no preguntarte cada vez.', 'Un año; después te volvemos a preguntar'],
       ['sono2-quien', 'Solo en los dispositivos del equipo: recordar quién atiende al poner los sellos del club.', 'Hasta que borres los datos del navegador']
     ]));
 
-    f.appendChild(h2('¿Tengo que aceptarlas?'));
-    f.appendChild(p('No. Son cookies exentas de consentimiento según el artículo 22.2 de la LSSI, porque sin ellas no funcionaría lo que tú mismo pides, como entrar en tu tarjeta del club. Por eso solo te avisamos.'));
+    f.appendChild(h2('Aceptar o rechazar'));
+    f.appendChild(p('Las cookies técnicas no se pueden rechazar: sin ellas no funcionaría lo que tú mismo pides, como entrar en tu tarjeta del club (están exentas de consentimiento según el artículo 22.2 de la LSSI).'));
+    f.appendChild(p('El aviso que sale al entrar te pregunta por las demás, las opcionales. Hoy no usamos ninguna; si algún día añadimos alguna (por ejemplo, de estadísticas), solo se activará si has pulsado «Aceptar». Si pulsas «Rechazar», la web funciona igual.'));
+    f.appendChild(tuEleccion());
 
     f.appendChild(h2('Cómo borrarlas o bloquearlas'));
     f.appendChild(p('Desde los ajustes de tu navegador puedes borrar las cookies y los datos de esta web, o bloquearlas. Si las bloqueas, la web se sigue viendo, pero no podrás mantener abierta tu tarjeta del club.'));
@@ -274,9 +276,32 @@
     f.appendChild(p('Si tocas el enlace de Instagram o de WhatsApp, esas webs pueden usar sus propias cookies, según sus políticas. Las tipografías y todo lo demás se sirve desde nuestro propio servidor: mientras navegas por SOÑO, tu navegador no se conecta con ninguna otra empresa.'));
 
     f.appendChild(h2('Si esto cambia'));
-    f.appendChild(p('Si algún día añadimos otro tipo de cookies (por ejemplo, para estadísticas), te pediremos permiso antes y lo explicaremos aquí. Más sobre tus datos en la ', enlaceDoc('política de privacidad', 'privacidad'), '.'));
+    f.appendChild(p('Si algún día añadimos cookies opcionales, las explicaremos aquí antes de usarlas, y solo funcionarán si las aceptas. Más sobre tus datos en la ', enlaceDoc('política de privacidad', 'privacidad'), '.'));
     return f;
   }
+
+  /* Lo que eligió esta persona en el aviso, con un botón para cambiarlo */
+  function textoEleccion() {
+    var e = window.sonoCookies && window.sonoCookies.eleccion();
+    if (e === 'aceptadas') return 'Has aceptado las cookies opcionales.';
+    if (e === 'rechazadas') return 'Has rechazado las cookies opcionales.';
+    return 'Todavía no has elegido.';
+  }
+  function tuEleccion() {
+    var caja = el('div', 'legal__eleccion');
+    var t = el('p', null, textoEleccion());
+    t.id = 'legal-eleccion';
+    caja.appendChild(t);
+    var b = el('button', 'boton boton--borde boton--peque', 'Cambiar mi elección');
+    b.type = 'button';
+    b.setAttribute('data-configurar-cookies', '');
+    caja.appendChild(b);
+    return caja;
+  }
+  document.addEventListener('sono:cookies', function () {
+    var t = document.getElementById('legal-eleccion');
+    if (t) t.textContent = textoEleccion();
+  });
 
   var CONSTRUIR = { 'aviso-legal': avisoLegal, privacidad: privacidad, cookies: cookies };
 
