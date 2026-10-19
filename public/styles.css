@@ -1449,27 +1449,9 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 .resena__respuesta { display: grid; gap: 6px; padding: 12px 14px; border-radius: 10px; background: var(--beige-suave); font-size: 0.9375rem; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
 .resena__respuesta .meta { color: var(--cafe); }
 .resenas__pie { display: grid; justify-items: center; gap: 18px; margin-top: clamp(20px, 3vw, 32px); text-align: center; }
-.resenas__controles { justify-self: stretch; display: flex; align-items: center; gap: 24px; }
+.resenas__controles { justify-self: stretch; display: flex; align-items: center; }
 .resenas__progreso { position: relative; flex: 1; height: 2px; border-radius: 2px; background: var(--linea); overflow: hidden; }
 .resenas__progreso span { position: absolute; top: 0; bottom: 0; left: 0; width: 0; border-radius: 2px; background: var(--cafe); transition: left 0.12s linear; }
-.resenas__flechas { display: flex; gap: 8px; }
-.flecha {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  border: 1px solid var(--linea-fuerte);
-  border-radius: 50%;
-  background: var(--superficie);
-  color: var(--cafe);
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
-}
-.flecha svg { width: 20px; height: 20px; --grosor: 1.8; overflow: visible; }
-@media (hover: hover) { .flecha:hover:not(:disabled) { background: var(--cafe); border-color: var(--cafe); color: var(--lienzo); } }
-.flecha:active:not(:disabled) { transform: scale(0.94); }
-.flecha:disabled { opacity: 0.35; cursor: default; }
 .resenas__aviso { font-size: 0.875rem; color: var(--cafe-suave); max-width: 60ch; text-wrap: balance; }
 .resenas__aviso a { white-space: nowrap; }
 .resenas__vacio {
@@ -1672,7 +1654,6 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
   .resena__texto { font-size: 1.2rem; }
   .resena__texto p { -webkit-line-clamp: 4; }
   .resena__respuesta p:last-child { -webkit-line-clamp: 2; }
-  .resenas__controles { gap: 16px; }
 }
 @media (max-width: 520px) {
   .fila-2--legal { grid-template-columns: minmax(0, 1fr); }
