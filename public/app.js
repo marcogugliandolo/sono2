@@ -1069,8 +1069,25 @@
     document.querySelectorAll('[data-enlace-club]').forEach(function (a) { a.textContent = socio ? 'Mi tarjeta' : 'Club'; });
   }
 
-  function ponerSocio(s) {
+  /* Botones de Wallet: en el iPhone solo Apple, en Android solo Google y en el ordenador los dos
+     (cada uno sale solo si está configurado en el servidor) */
+  var walletSocio = null;
+  function pintarWallet() {
+    var ua = navigator.userAgent || '';
+    var esIos = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    var esAndroid = /Android/.test(ua);
+    var apple = !!(walletSocio && walletSocio.apple) && !esAndroid;
+    var google = !!(walletSocio && walletSocio.google) && !esIos;
+    $('wallet-apple').hidden = !apple;
+    $('wallet-google').hidden = !google;
+    $('tarjeta-wallet').hidden = !apple && !google;
+  }
+
+  function ponerSocio(s, w) {
     socio = s;
+    if (w !== undefined) walletSocio = w;
+    if (!s) walletSocio = null;
+    pintarWallet();
     pintarClub();
     if (socio && modalTarjeta.open) pintarTarjeta();
   }
@@ -1114,6 +1131,7 @@
         var cambio = !socio || r.socio.sellos !== socio.sellos || r.socio.historial.length !== socio.historial.length ||
           (r.socio.historial[0] && socio.historial[0] && r.socio.historial[0].t !== socio.historial[0].t);
         socio = r.socio;
+        if (r.wallet) { walletSocio = r.wallet; pintarWallet(); }
         if (cambio) { pintarTarjeta(); pintarClub(); }
       }).catch(function () {});
     }, 5000);
@@ -1130,7 +1148,7 @@
     aviso.textContent = '';
     return api('POST', ruta, datos).then(function (r) {
       form.reset();
-      ponerSocio(r.socio);
+      ponerSocio(r.socio, r.wallet);
       cerrar(modalClub);
       abrirTarjeta();
     }).catch(function (err) {
@@ -2362,6 +2380,10 @@
       }).then(function () { ch.disabled = false; });
     });
     cuerpo.appendChild(bloque);
+    var estadoWallet = el('div', 'club-admin__wallet');
+    estadoWallet.id = 'club-wallet';
+    cuerpo.appendChild(estadoWallet);
+    pintarEstadoWallet();
 
     cuerpo.appendChild(el('p', 'admin__ayuda', 'Al escanear el QR de la tarjeta, el sello se pone solo. También puedes escribir el código que sale debajo del QR o buscar al socio en la lista y pulsar «+1 sello».'));
 
@@ -2448,11 +2470,39 @@
     return c;
   }
 
+  /* Si la tarjeta se puede añadir a Apple Wallet y a Google Wallet, o qué falta para que se pueda */
+  function pintarEstadoWallet() {
+    var cont = $('club-wallet');
+    if (!cont) return;
+    cont.innerHTML = '';
+    var w = club.wallet;
+    if (!w) return;
+    cont.appendChild(el('p', 'meta', 'Tarjeta en el móvil (Wallet)'));
+    var lista = el('ul', 'club-admin__wallet-lista');
+    [['Apple Wallet', w.apple], ['Google Wallet', w.google]].forEach(function (x) {
+      var li = el('li', x[1].activo ? 'es-activo' : '');
+      li.appendChild(el('strong', null, x[0] + ': '));
+      var texto = x[1].activo ? 'lista' : 'sin configurar. ' + x[1].motivo;
+      if (x[0] === 'Apple Wallet' && x[1].activo) {
+        texto += ' (' + x[1].passTypeId + ')';
+        if (x[1].registrados) texto += ' · ' + (x[1].registrados === 1 ? '1 iPhone la tiene' : x[1].registrados + ' iPhone la tienen');
+        if (x[1].caduca) texto += ' · el certificado caduca el ' + fCorta.format(new Date(x[1].caduca));
+      }
+      li.appendChild(document.createTextNode(texto));
+      lista.appendChild(li);
+    });
+    cont.appendChild(lista);
+    if ((w.apple.activo || w.google.activo) && !w.https) {
+      cont.appendChild(el('p', 'admin__ayuda', 'Para que las tarjetas se actualicen solas (y para Google Wallet), la web tiene que abrirse por https con su dominio.'));
+    }
+  }
+
   function cargarSocios() {
     api('GET', '/api/club/socios').then(function (r) {
       club.socios = r.socios;
       club.ajustes = r.club;
-      if (pestana === 'club') pintarListaSocios();
+      club.wallet = r.wallet || null;
+      if (pestana === 'club') { pintarListaSocios(); pintarEstadoWallet(); }
     }).catch(function (err) {
       if (sesionCaducada(err)) return;
       var lista = $('club-lista');
@@ -3249,7 +3299,7 @@
 
   /* Sesión del socio del club. Con «#tarjeta» en la dirección se abre la tarjeta directamente */
   api('GET', '/api/club/yo').then(function (r) {
-    ponerSocio(r.socio || null);
+    ponerSocio(r.socio || null, r.wallet || null);
   }).catch(function () {
     ponerSocio(null);
   }).then(function () {

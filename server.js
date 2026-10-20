@@ -12,6 +12,7 @@ const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { crearWallet } = require('./wallet');
 
 /* ---------- Configuración (variables de entorno) ---------- */
 const PUERTO = Number(process.env.PORT || 3000);
@@ -108,6 +109,7 @@ let secretoClub = null;            // firma las sesiones de los socios (se guard
 const intentosSocio = new Map();   // ip -> { fallos, bloqueadoHasta }
 let versiones = [];                // historial de lo que se guarda desde el panel
 let resenas = [];                  // reseñas de los clientes
+let wallet = null;                 // la tarjeta del club en Apple Wallet y Google Wallet (wallet.js)
 
 /* ---------- Utilidades ---------- */
 function normalizarUsuario(u) {
@@ -239,6 +241,16 @@ async function iniciarDatos() {
     await guardarArchivo('secreto.json', { clave: secretoClub.toString('hex') });
   }
   await limpiarAntiguos();
+  wallet = crearWallet({
+    dirDatos: DIR_DATOS,
+    socios: () => socios,
+    guardarSocios: () => guardarArchivo('socios.json', socios),
+    ajustesClub,
+    secreto: secretoClub,
+    urlPublica: process.env.WALLET_URL || '',
+    confiarProxy: CONFIAR_PROXY,
+    esHttps
+  });
 }
 
 /* Borra lo que ya no hace falta, tal y como dice la política de privacidad:
@@ -624,6 +636,17 @@ function limpiarCodigo(v) {
 
 function ajustesClub() { return contenido.datos.club || CLUB_INICIAL; }
 
+/* Botones de Wallet que puede ver el socio (Google necesita que la web vaya por https) */
+function walletDisponible(req) {
+  const d = wallet.disponible();
+  return { apple: d.apple, google: d.google && /^https:\/\//.test(wallet.baseDe(req)) };
+}
+function avisarCambioClub(antes, despues) {
+  const a = (antes && antes.club) || {};
+  const b = despues.club || {};
+  if (a.sellos !== b.sellos || a.premio !== b.premio) wallet.cambioClub();
+}
+
 function anotar(socio, tipo, n, por) {
   socio.historial.unshift({ t: new Date().toISOString(), tipo, n, por: por || '' });
   if (socio.historial.length > MAX_HISTORIAL) socio.historial.length = MAX_HISTORIAL;
@@ -704,7 +727,33 @@ async function apiClub(req, res, pathname, metodo, ip) {
   /* --- Socios --- */
   if (pathname === '/api/club/yo' && metodo === 'GET') {
     const socio = ajustesClub().activo ? socioDeSesion(req) : null;
-    return enviarJSON(res, 200, { socio: socio ? tarjeta(socio) : null });
+    if (socio) wallet.baseDe(req);   // así se sabe la dirección https de la web para avisar a Google
+    return enviarJSON(res, 200, { socio: socio ? tarjeta(socio) : null, wallet: socio ? walletDisponible(req) : null });
+  }
+
+  /* Tarjeta para Apple Wallet (.pkpass) y enlace para guardarla en Google Wallet */
+  const mWallet = pathname.match(/^\/api\/club\/wallet\/(apple|google)$/);
+  if (mWallet && metodo === 'GET') {
+    const socio = ajustesClub().activo ? socioDeSesion(req) : null;
+    if (!socio) {
+      res.writeHead(302, { Location: '/#tarjeta', 'Cache-Control': 'no-store' });
+      return res.end();
+    }
+    if (!permitirEnvio('wallet-descarga', ip, 30, 3600000)) throw errorCliente('Has pedido la tarjeta muchas veces seguidas. Prueba más tarde.', 429);
+    const base = wallet.baseDe(req);
+    if (mWallet[1] === 'apple') {
+      const pass = await wallet.passApple(socio, base);
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.apple.pkpass',
+        'Content-Disposition': 'attachment; filename="SONO-club.pkpass"',
+        'Content-Length': pass.length,
+        'Cache-Control': 'no-store'
+      });
+      return res.end(pass);
+    }
+    const enlace = await wallet.enlaceGoogle(socio, base);
+    res.writeHead(302, { Location: enlace, 'Cache-Control': 'no-store' });
+    return res.end();
   }
 
   if (pathname === '/api/club/alta' && metodo === 'POST') {
@@ -744,7 +793,7 @@ async function apiClub(req, res, pathname, metodo, ip) {
     await guardarArchivo('socios.json', socios);
     abrirSesionSocio(req, res, socio);
     console.log('[soño] Nuevo socio del club');
-    return enviarJSON(res, 201, { socio: tarjeta(socio) });
+    return enviarJSON(res, 201, { socio: tarjeta(socio), wallet: walletDisponible(req) });
   }
 
   if (pathname === '/api/club/entrar' && metodo === 'POST') {
@@ -761,7 +810,7 @@ async function apiClub(req, res, pathname, metodo, ip) {
     }
     intentosSocio.delete(ip);
     abrirSesionSocio(req, res, socio);
-    return enviarJSON(res, 200, { socio: tarjeta(socio) });
+    return enviarJSON(res, 200, { socio: tarjeta(socio), wallet: walletDisponible(req) });
   }
 
   if (pathname === '/api/club/salir' && metodo === 'POST') {
@@ -781,6 +830,7 @@ async function apiClub(req, res, pathname, metodo, ip) {
     }
     socios = socios.filter((s) => s !== socio);
     await guardarArchivo('socios.json', socios);
+    wallet.olvidar(socio.id);
     res.setHeader('Set-Cookie', cookieSocio(req, '', 0));
     return enviarJSON(res, 200, { ok: true });
   }
@@ -799,7 +849,8 @@ async function apiClub(req, res, pathname, metodo, ip) {
   if (pathname === '/api/club/socios' && metodo === 'GET') {
     exigirAdmin(req);
     const lista = socios.map((s) => fichaSocio(s, false)).sort((a, b) => b.ultimo.localeCompare(a.ultimo));
-    return enviarJSON(res, 200, { socios: lista, club: ajustesClub() });
+    wallet.baseDe(req);
+    return enviarJSON(res, 200, { socios: lista, club: ajustesClub(), wallet: wallet.estado() });
   }
 
   if (pathname === '/api/club/buscar' && metodo === 'POST') {
@@ -821,6 +872,7 @@ async function apiClub(req, res, pathname, metodo, ip) {
     if (!accion && metodo === 'DELETE') {
       socios = socios.filter((s) => s !== socio);
       await guardarArchivo('socios.json', socios);
+      wallet.olvidar(socio.id);
       return enviarJSON(res, 200, { ok: true });
     }
     if (metodo !== 'POST') throw errorCliente('Método no permitido.', 405);
@@ -834,12 +886,14 @@ async function apiClub(req, res, pathname, metodo, ip) {
       socio.sellos += real;
       socio.total = Math.max(0, socio.total + real);
       anotar(socio, real > 0 ? 'sello' : 'quitar', Math.abs(real), por);
+      wallet.cambioSocio(socio);
     } else if (accion === 'canjear') {
       const necesarios = ajustesClub().sellos;
       if (socio.sellos < necesarios) throw errorCliente('Aún le faltan ' + (necesarios - socio.sellos) + ' sellos para el premio.', 409);
       socio.sellos -= necesarios;
       socio.canjes += 1;
       anotar(socio, 'canje', 1, por);
+      wallet.cambioSocio(socio);
     } else if (accion === 'clave') {
       // Contraseña provisional para quien la ha olvidado: se enseña una sola vez y cierra sus sesiones
       const provisional = Array.from(crypto.randomBytes(10), (b) => ALFABETO_CODIGO[b % 32]).join('').toLowerCase();
@@ -1078,6 +1132,7 @@ function apiVersiones(req, res, pathname, metodo) {
       }
       contenido = Object.assign({}, contenido, { [v.seccion]: limpio });
       await guardarArchivo('contenido.json', contenido);
+      if (v.seccion === 'datos') avisarCambioClub(antes, limpio);
       const cambios = resumenCambios(v.seccion, antes, limpio).filter((l) => l !== 'Cambios guardados');
       registrarVersion(v.seccion, limpio, ['Vuelta a la versión del ' + fVersion.format(new Date(v.fecha))].concat(cambios).slice(0, 8));
       await guardarArchivo('versiones.json', versiones);
@@ -1146,6 +1201,7 @@ async function api(req, res, pathname) {
     if (clave === 'datos') prepararDatos(limpio, antes);
     contenido = Object.assign({}, contenido, { [clave]: limpio });
     await guardarArchivo('contenido.json', contenido);
+    if (clave === 'datos') avisarCambioClub(antes, limpio);
     if (JSON.stringify(antes) !== JSON.stringify(limpio)) {
       registrarVersion(clave, limpio, resumenCambios(clave, antes, limpio));
       await guardarArchivo('versiones.json', versiones);
@@ -1346,6 +1402,11 @@ async function atender(req, res) {
   if (pathname === '/salud') return enviarTexto(res, 200, 'ok');
 
   if (pathname.startsWith('/api/')) return api(req, res, pathname);
+
+  if (pathname.startsWith('/wallet/') && wallet) {
+    const ip = ipCliente(req);
+    if (await wallet.atender(req, res, pathname, (tipo, maximo) => permitirEnvio(tipo, ip, maximo, 3600000))) return;
+  }
 
   if (req.method !== 'GET' && req.method !== 'HEAD') return enviarTexto(res, 405, 'Método no permitido');
 

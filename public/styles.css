@@ -1206,6 +1206,34 @@ input:focus-visible + .alergeno-chip { outline: 2px solid var(--cafe); outline-o
 .tarjeta-club__codigo { font-family: var(--f-mono); font-size: 1.125rem; letter-spacing: 0.14em; }
 .tarjeta-club__ayuda { font-size: 0.8125rem; color: var(--cafe-suave); max-width: 26ch; }
 .tarjeta-club__movimientos { display: grid; gap: 8px; }
+/* Añadir la tarjeta a la cartera del móvil */
+.tarjeta-club__wallet { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 14px 16px; border-radius: 14px; background: var(--beige); }
+.boton-wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 7px 16px 7px 12px;
+  border-radius: 10px;
+  background: var(--cafe-oscuro);
+  color: var(--lienzo);
+  line-height: 1.1;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+.boton-wallet svg { width: 26px; height: 26px; flex: none; --grosor: 1.6; overflow: visible; }
+.boton-wallet span { display: grid; font-weight: 600; font-size: 0.9375rem; }
+.boton-wallet small { font-weight: 400; font-size: 0.6875rem; opacity: 0.85; }
+@media (hover: hover) { a.boton-wallet:hover { opacity: 1; background: #2A1307; } }
+.boton-wallet:active { transform: scale(0.97); }
+.tarjeta-club__wallet-nota { flex: 1 1 200px; font-size: 0.8125rem; line-height: 1.45; }
+/* Panel: estado de Wallet */
+.club-admin__wallet { display: grid; gap: 6px; }
+.club-admin__wallet:empty { display: none; }
+.club-admin__wallet-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.9375rem; }
+.club-admin__wallet-lista li { padding-left: 18px; position: relative; color: var(--cafe-suave); }
+.club-admin__wallet-lista li::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid currentColor; }
+.club-admin__wallet-lista li.es-activo { color: var(--cafe); }
+.club-admin__wallet-lista li.es-activo::before { background: var(--cafe); border-color: var(--cafe); }
 .movimientos { list-style: none; margin: 0; padding: 0; display: grid; }
 .movimiento { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-block: 10px; border-bottom: 1px solid var(--linea); font-size: 0.9375rem; }
 .movimiento:last-child { border-bottom: 0; }

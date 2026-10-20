@@ -197,6 +197,13 @@
         tiempo: 'Mientras seas socio. Si te das de baja desde tu tarjeta, se borra todo en ese momento.'
       },
       {
+        titulo: 'Tarjeta en Apple Wallet o Google Wallet',
+        datos: 'Si añades la tarjeta del club a la cartera del móvil, lleva tu nombre, el código de la tarjeta y tus sellos. Con Apple Wallet guardamos además un identificador del dispositivo para avisarle cuando cambian los sellos.',
+        para: 'Que tengas la tarjeta en el móvil y se actualice sola.',
+        base: 'Tu decisión de añadirla, como parte del club (artículo 6.1.b del RGPD).',
+        tiempo: 'Mientras la tengas en la cartera. Si la quitas o te das de baja del club, borramos el registro de tu dispositivo.'
+      },
+      {
         titulo: 'Reseñas',
         datos: 'El nombre que elijas, tu valoración, tu comentario, la fecha y, si tienes abierta tu tarjeta del club, que eres socio.',
         para: 'Publicarla en la web después de leerla. Lo que se publica (nombre, valoración, comentario y fecha) lo puede ver cualquiera.',
@@ -229,6 +236,7 @@
 
     f.appendChild(h2('Con quién los compartimos'));
     f.appendChild(p('Con nadie, salvo que una ley nos obligue. No vendemos datos ni los usamos para publicidad. La web está alojada en un servidor; quien lo mantiene solo puede usar los datos para que la web funcione, como encargado del tratamiento.'));
+    f.appendChild(p('Si añades la tarjeta del club a Google Wallet, Google la guarda en tu cuenta de Google; si la añades a Apple Wallet, se guarda en tu dispositivo y los avisos de cambios pasan por el servicio de notificaciones de Apple. En los dos casos se aplican también sus políticas de privacidad, y puede haber transferencias de datos fuera de la UE con las garantías que ofrecen esas empresas.'));
 
     f.appendChild(h2('Tus derechos'));
     f.appendChild(p('Puedes pedirnos ver tus datos, corregirlos, borrarlos, llevártelos a otro sitio, limitar su uso u oponerte a él, y retirar tu consentimiento cuando quieras. Escríbenos a ', correo(), ' con el asunto «Protección de datos» y te responderemos en menos de un mes.'));
