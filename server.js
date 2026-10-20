@@ -846,6 +846,33 @@ async function apiClub(req, res, pathname, metodo, ip) {
     return enviarJSON(res, 200, { club: ajustesClub() });
   }
 
+  /* Configurar la tarjeta en el móvil (Apple Wallet y Google Wallet) desde el panel */
+  if (pathname === '/api/club/wallet/apple/solicitud' && metodo === 'POST') {
+    exigirAdmin(req);
+    return enviarJSON(res, 200, { solicitud: wallet.solicitudApple(), wallet: wallet.estado() });
+  }
+  if (pathname === '/api/club/wallet/apple/certificado' && metodo === 'POST') {
+    exigirAdmin(req);
+    const buf = await leerCuerpo(req, 64 * 1024);
+    wallet.baseDe(req);
+    const estado = await wallet.subirCertificadoApple(buf);
+    console.log('[soño] Wallet: certificado de Apple subido desde el panel');
+    return enviarJSON(res, 200, { wallet: estado });
+  }
+  if (pathname === '/api/club/wallet/google' && metodo === 'POST') {
+    exigirAdmin(req);
+    const datos = await leerJSON(req);
+    wallet.baseDe(req);
+    const r = await wallet.guardarGoogle({ issuerId: datos.issuerId, cuenta: datos.cuenta });
+    console.log('[soño] Wallet: datos de Google guardados desde el panel');
+    return enviarJSON(res, 200, { wallet: r.estado, comprobacion: r.comprobacion });
+  }
+  if (pathname === '/api/club/wallet/google/comprobar' && metodo === 'POST') {
+    exigirAdmin(req);
+    wallet.baseDe(req);
+    return enviarJSON(res, 200, { wallet: wallet.estado(), comprobacion: await wallet.comprobarGoogle() });
+  }
+
   if (pathname === '/api/club/socios' && metodo === 'GET') {
     exigirAdmin(req);
     const lista = socios.map((s) => fichaSocio(s, false)).sort((a, b) => b.ultimo.localeCompare(a.ultimo));

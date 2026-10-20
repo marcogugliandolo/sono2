@@ -2470,7 +2470,83 @@
     return c;
   }
 
-  /* Si la tarjeta se puede añadir a Apple Wallet y a Google Wallet, o qué falta para que se pueda */
+  /* Tarjeta en el móvil: estado de Apple Wallet y Google Wallet, y los pasos para configurarlas desde aquí */
+  var walletUi = { abierto: {}, aviso: {}, issuer: '', cuenta: null, cuentaNombre: '', ocupado: false };
+
+  function enlaceFuera(texto, url) {
+    var a = el('a', 'boton boton--borde boton--mini', texto + ' ↗');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    return a;
+  }
+  function avisoWallet(cual, t, esError, esOk) {
+    walletUi.aviso[cual] = t ? { t: t, error: !!esError, ok: !!esOk } : null;
+    var p = $('wallet-aviso-' + cual);
+    if (!p) return;
+    p.textContent = t || '';
+    p.classList.toggle('es-error', !!esError);
+    p.classList.toggle('es-ok', !!esOk && !esError);
+  }
+  function walletOcupado(si) {
+    walletUi.ocupado = si;
+    document.querySelectorAll('#club-wallet button, #club-wallet input').forEach(function (b) { b.disabled = si; });
+  }
+  function ponerWallet(r) {
+    if (r && r.wallet) club.wallet = r.wallet;
+    pintarEstadoWallet();
+  }
+
+  function pasoWallet(lista, texto, extra) {
+    var li = el('li');
+    var p = el('p');
+    texto.forEach(function (trozo) {
+      if (typeof trozo === 'string') p.appendChild(document.createTextNode(trozo));
+      else p.appendChild(el('strong', null, trozo[0]));
+    });
+    li.appendChild(p);
+    if (extra) {
+      var acciones = el('div', 'wallet-config__acciones');
+      extra.forEach(function (x) { acciones.appendChild(x); });
+      li.appendChild(acciones);
+    }
+    lista.appendChild(li);
+    return li;
+  }
+
+  function bloqueWallet(cual, nombre, datos, textoEstado, abrirPorDefecto, chip) {
+    var s = el('section', 'wallet-config' + (datos.activo && !chip ? ' es-activo' : ''));
+    var cab = el('div', 'wallet-config__cabeza');
+    cab.appendChild(el('h4', null, nombre));
+    cab.appendChild(el('span', 'wallet-config__chip', chip || (datos.activo ? 'Lista' : 'Sin configurar')));
+    s.appendChild(cab);
+    s.appendChild(el('p', 'wallet-config__estado', textoEstado));
+    var det = el('details', 'wallet-config__pasos');
+    det.open = walletUi.abierto[cual] !== undefined ? walletUi.abierto[cual] : abrirPorDefecto;
+    det.addEventListener('toggle', function () { walletUi.abierto[cual] = det.open; });
+    s.appendChild(det);
+    var aviso = el('p', 'admin__estado wallet-config__aviso');
+    aviso.id = 'wallet-aviso-' + cual;
+    aviso.setAttribute('aria-live', 'polite');
+    s.appendChild(aviso);
+    return { seccion: s, detalles: det };
+  }
+
+  /* Si el fallo ya sale como estado de Google Wallet, no se repite debajo */
+  function mensajeComprobacion(r, c) {
+    var guardada = r.wallet && r.wallet.google.comprobacion;
+    if (!c.ok && guardada && !guardada.ok && guardada.mensaje === c.mensaje) avisoWallet('google', '');
+    else avisoWallet('google', c.mensaje, !c.ok, c.ok);
+  }
+
+  function descargarTexto(nombre, texto) {
+    var url = URL.createObjectURL(new Blob([texto], { type: 'application/octet-stream' }));
+    var a = el('a');
+    a.href = url; a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  }
+
   function pintarEstadoWallet() {
     var cont = $('club-wallet');
     if (!cont) return;
@@ -2478,23 +2554,207 @@
     var w = club.wallet;
     if (!w) return;
     cont.appendChild(el('p', 'meta', 'Tarjeta en el móvil (Wallet)'));
-    var lista = el('ul', 'club-admin__wallet-lista');
-    [['Apple Wallet', w.apple], ['Google Wallet', w.google]].forEach(function (x) {
-      var li = el('li', x[1].activo ? 'es-activo' : '');
-      li.appendChild(el('strong', null, x[0] + ': '));
-      var texto = x[1].activo ? 'lista' : 'sin configurar. ' + x[1].motivo;
-      if (x[0] === 'Apple Wallet' && x[1].activo) {
-        texto += ' (' + x[1].passTypeId + ')';
-        if (x[1].registrados) texto += ' · ' + (x[1].registrados === 1 ? '1 iPhone la tiene' : x[1].registrados + ' iPhone la tienen');
-        if (x[1].caduca) texto += ' · el certificado caduca el ' + fCorta.format(new Date(x[1].caduca));
-      }
-      li.appendChild(document.createTextNode(texto));
-      lista.appendChild(li);
+    var rejilla = el('div', 'wallet-config__rejilla');
+    cont.appendChild(rejilla);
+
+    /* ---- Apple Wallet ---- */
+    var a = w.apple;
+    var textoA;
+    var diasA = a.caduca ? Math.floor((new Date(a.caduca) - Date.now()) / 86400000) : null;
+    if (a.activo) {
+      textoA = 'Los socios con iPhone ya pueden añadir la tarjeta (' + a.passTypeId + ').';
+      if (a.registrados) textoA += ' ' + (a.registrados === 1 ? '1 iPhone la tiene.' : a.registrados + ' iPhone la tienen.');
+      if (a.caduca) textoA += ' El certificado caduca el ' + fCorta.format(new Date(a.caduca)) + '.';
+    } else textoA = a.motivo;
+    var bA = bloqueWallet('apple', 'Apple Wallet', a, textoA, !a.activo || (diasA !== null && diasA < 30));
+    if (a.activo && diasA !== null && diasA < 30) bA.seccion.classList.add('es-aviso');
+    var resumenA = el('summary', null, a.activo ? 'Renovar o cambiar el certificado' : 'Cómo activarla (unos 5 minutos)');
+    bA.detalles.appendChild(resumenA);
+    var pasosA = el('ol', 'wallet-config__lista');
+    var bSolicitud = el('button', 'boton boton--lleno boton--mini', a.solicitudPendiente ? 'Descargar la solicitud otra vez' : 'Descargar solicitud');
+    bSolicitud.type = 'button';
+    bSolicitud.addEventListener('click', function () {
+      walletOcupado(true);
+      avisoWallet('apple', 'Preparando la solicitud…');
+      api('POST', '/api/club/wallet/apple/solicitud').then(function (r) {
+        descargarTexto('SONO.certSigningRequest', r.solicitud);
+        walletUi.abierto.apple = true;
+        avisoWallet('apple', 'Solicitud descargada (SONO.certSigningRequest). Ahora el paso 2.', false, true);
+        ponerWallet(r);
+      }).catch(function (err) {
+        if (!sesionCaducada(err)) avisoWallet('apple', err.message, true);
+      }).then(function () { walletOcupado(false); });
     });
-    cont.appendChild(lista);
-    if ((w.apple.activo || w.google.activo) && !w.https) {
-      cont.appendChild(el('p', 'admin__ayuda', 'Para que las tarjetas se actualicen solas (y para Google Wallet), la web tiene que abrirse por https con su dominio.'));
+    pasoWallet(pasosA, ['Descarga la solicitud de certificado. La clave secreta se crea en el servidor y no sale de él.'], [bSolicitud]);
+    pasoWallet(pasosA, [
+      'En Apple Developer, en ', ['Identifiers'], ', pulsa + y crea un ', ['Pass Type ID'],
+      ' (por ejemplo «Club SOÑO» con pass.es.sono.club). Después, en ', ['Certificates'], ' pulsa +, elige ',
+      ['Pass Type ID Certificate'], ', escoge ese ID, sube la solicitud y descarga el certificado (pass.cer).'
+    ], [
+      enlaceFuera('Pass Type IDs', 'https://developer.apple.com/account/resources/identifiers/list/passTypeId'),
+      enlaceFuera('Certificados', 'https://developer.apple.com/account/resources/certificates/add')
+    ]);
+    var lCert = el('label', 'boton boton--lleno boton--mini wallet-config__archivo', 'Subir certificado');
+    var iCert = el('input', 'oculto');
+    iCert.type = 'file'; iCert.id = 'wallet-cert';
+    lCert.appendChild(iCert);
+    iCert.addEventListener('change', function () {
+      var f = iCert.files && iCert.files[0];
+      if (!f) return;
+      if (f.size > 60000) { avisoWallet('apple', 'Ese archivo es demasiado grande para ser un certificado.', true); iCert.value = ''; return; }
+      walletOcupado(true);
+      avisoWallet('apple', 'Subiendo el certificado…');
+      api('POST', '/api/club/wallet/apple/certificado', f, { binario: true }).then(function (r) {
+        var ok = r.wallet && r.wallet.apple.activo;
+        walletUi.abierto.apple = !ok;
+        ponerWallet(r);
+        avisoWallet('apple', ok ? '¡Listo! Apple Wallet ya está activa.' : 'Certificado guardado. ' + r.wallet.apple.motivo, !ok, ok);
+      }).catch(function (err) {
+        if (!sesionCaducada(err)) avisoWallet('apple', err.message, true);
+      }).then(function () { walletOcupado(false); iCert.value = ''; });
+    });
+    pasoWallet(pasosA, ['Sube aquí el certificado que te ha dado Apple. El certificado intermedio de Apple lo descarga el servidor solo.'], [lCert]);
+    if (!a.activo && /intermedio/.test(a.motivo)) {
+      pasoWallet(pasosA, ['El servidor no ha podido descargar el certificado intermedio de Apple. Descárgalo tú y súbelo con el mismo botón del paso 3.'], [
+        enlaceFuera('Certificado intermedio (G4)', 'https://www.apple.com/certificateauthority/AppleWWDRCAG4.cer')
+      ]);
     }
+    bA.detalles.appendChild(pasosA);
+    bA.detalles.appendChild(el('p', 'admin__ayuda', 'Si el iPhone no te deja guardar el archivo .cer, haz los pasos 2 y 3 desde un ordenador (también puedes abrir este panel allí). El certificado dura un año: cuando vaya a caducar, repite estos pasos.'));
+    rejilla.appendChild(bA.seccion);
+
+    /* ---- Google Wallet ---- */
+    var g = w.google;
+    var fallaG = g.activo && g.comprobacion && !g.comprobacion.ok;
+    var textoG = fallaG ? g.comprobacion.mensaje
+      : g.activo ? 'Los socios con Android ya pueden guardar la tarjeta (emisor ' + g.issuerId + ').' : g.motivo;
+    var bG = bloqueWallet('google', 'Google Wallet', g, textoG, !g.activo || fallaG, fallaG ? 'Falta un paso' : '');
+    if (fallaG) bG.seccion.classList.add('es-aviso');
+    bG.detalles.appendChild(el('summary', null, g.activo ? 'Cambiar los datos de Google' : 'Cómo activarla (unos 10 minutos)'));
+    var pasosG = el('ol', 'wallet-config__lista');
+    pasoWallet(pasosG, [
+      'En la Google Pay & Wallet Console, abre ', ['Google Wallet API'], ' y copia el ', ['Issuer ID'], ' (un número largo).'
+    ], [enlaceFuera('Wallet Console', 'https://pay.google.com/business/console')]);
+    pasoWallet(pasosG, [
+      'En Google Cloud, crea un proyecto y activa la ', ['Google Wallet API'], '. Luego, en ', ['Cuentas de servicio'],
+      ', crea una (sin permisos), entra en ella → Claves → Agregar clave → ', ['JSON'], '. Se descarga un archivo .json.'
+    ], [
+      enlaceFuera('Activar la API', 'https://console.cloud.google.com/apis/library/walletobjects.googleapis.com'),
+      enlaceFuera('Cuentas de servicio', 'https://console.cloud.google.com/iam-admin/serviceaccounts')
+    ]);
+    var form = el('form', 'wallet-config__form');
+    form.noValidate = true;
+    var cIssuer = el('div', 'campo');
+    var lIssuer = el('label', null, 'Issuer ID'); lIssuer.htmlFor = 'wallet-issuer';
+    var iIssuer = el('input'); iIssuer.id = 'wallet-issuer'; iIssuer.type = 'text'; iIssuer.inputMode = 'numeric';
+    iIssuer.placeholder = '3388000000012345678'; iIssuer.setAttribute('autocomplete', 'off');
+    iIssuer.value = walletUi.issuer || g.issuerId || '';
+    iIssuer.addEventListener('input', function () { walletUi.issuer = iIssuer.value; });
+    cIssuer.appendChild(lIssuer); cIssuer.appendChild(iIssuer);
+    form.appendChild(cIssuer);
+    var filaJson = el('div', 'wallet-config__acciones');
+    var lJson = el('label', 'boton boton--borde boton--mini wallet-config__archivo', walletUi.cuentaNombre ? 'Cambiar archivo .json' : 'Elegir archivo .json');
+    var iJson = el('input', 'oculto');
+    iJson.type = 'file'; iJson.id = 'wallet-json'; iJson.accept = 'application/json,.json';
+    lJson.appendChild(iJson);
+    var nombreJson = el('span', 'wallet-config__archivo-nombre', walletUi.cuentaNombre || (g.email ? 'Ya hay una cuenta guardada' : 'Ningún archivo elegido'));
+    iJson.addEventListener('change', function () {
+      var f = iJson.files && iJson.files[0];
+      if (!f) return;
+      if (f.size > 20000) { avisoWallet('google', 'Ese archivo es demasiado grande para ser la clave de una cuenta de servicio.', true); return; }
+      var lector = new FileReader();
+      lector.onload = function () {
+        var j = null;
+        try { j = JSON.parse(lector.result); } catch (e) { j = null; }
+        if (!j || j.type !== 'service_account' || !j.client_email || !j.private_key) {
+          walletUi.cuenta = null; walletUi.cuentaNombre = '';
+          avisoWallet('google', 'Ese archivo no es la clave JSON de una cuenta de servicio.', true);
+          nombreJson.textContent = 'Ningún archivo elegido';
+          return;
+        }
+        walletUi.cuenta = j; walletUi.cuentaNombre = f.name + ' · ' + j.client_email;
+        nombreJson.textContent = walletUi.cuentaNombre;
+        lJson.firstChild.textContent = 'Cambiar archivo .json';
+        avisoWallet('google', '');
+      };
+      lector.readAsText(f);
+      iJson.value = '';
+    });
+    filaJson.appendChild(lJson);
+    filaJson.appendChild(nombreJson);
+    form.appendChild(filaJson);
+    var bGuardar = el('button', 'boton boton--lleno boton--mini', 'Guardar y comprobar');
+    bGuardar.type = 'submit';
+    form.appendChild(bGuardar);
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var issuer = iIssuer.value.replace(/\s+/g, '');
+      if (!issuer && !g.issuerId) { avisoWallet('google', 'Escribe el Issuer ID.', true); iIssuer.focus(); return; }
+      if (issuer && !/^\d{6,25}$/.test(issuer)) { avisoWallet('google', 'El Issuer ID son solo números.', true); iIssuer.focus(); return; }
+      if (!walletUi.cuenta && !g.email) { avisoWallet('google', 'Elige el archivo .json de la cuenta de servicio.', true); return; }
+      var datos = {};
+      if (issuer) datos.issuerId = issuer;
+      if (walletUi.cuenta) datos.cuenta = walletUi.cuenta;
+      walletOcupado(true);
+      avisoWallet('google', 'Guardando y comprobando con Google…');
+      api('POST', '/api/club/wallet/google', datos).then(function (r) {
+        walletUi.cuenta = null; walletUi.cuentaNombre = ''; walletUi.issuer = '';
+        var c = r.comprobacion;
+        walletUi.abierto.google = !(c && c.ok);
+        ponerWallet(r);
+        if (c) mensajeComprobacion(r, c);
+        else avisoWallet('google', 'Guardado. ' + r.wallet.google.motivo, true);
+      }).catch(function (err) {
+        if (!sesionCaducada(err)) avisoWallet('google', err.message, true);
+      }).then(function () { walletOcupado(false); });
+    });
+    var liForm = pasoWallet(pasosG, ['Escribe aquí el Issuer ID y elige el archivo .json. Se guarda en el servidor (no lo mandes por correo ni por chat).']);
+    liForm.appendChild(form);
+    var textoInvita = ['En la Wallet Console, en ', ['Usuarios'], ', invita al correo de la cuenta de servicio con permiso de ', ['Desarrollador'], '.'];
+    var extraInvita = [];
+    if (g.email) {
+      textoInvita.push(' Es este: ');
+      textoInvita.push([g.email]);
+      var bCopiar = el('button', 'boton boton--borde boton--mini', 'Copiar correo');
+      bCopiar.type = 'button';
+      bCopiar.addEventListener('click', function () {
+        var hecho = function () { bCopiar.textContent = 'Copiado'; setTimeout(function () { if (bCopiar.isConnected) bCopiar.textContent = 'Copiar correo'; }, 2000); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(g.email).then(hecho, function () { avisoWallet('google', g.email); });
+        else avisoWallet('google', g.email);
+      });
+      extraInvita.push(bCopiar);
+    }
+    if (g.activo) {
+      var bComprobar = el('button', 'boton boton--borde boton--mini', 'Comprobar con Google');
+      bComprobar.type = 'button';
+      bComprobar.addEventListener('click', function () {
+        walletOcupado(true);
+        avisoWallet('google', 'Comprobando con Google…');
+        api('POST', '/api/club/wallet/google/comprobar').then(function (r) {
+          ponerWallet(r);
+          mensajeComprobacion(r, r.comprobacion);
+        }).catch(function (err) {
+          if (!sesionCaducada(err)) avisoWallet('google', err.message, true);
+        }).then(function () { walletOcupado(false); });
+      });
+      extraInvita.push(bComprobar);
+    }
+    pasoWallet(pasosG, textoInvita, extraInvita.length ? extraInvita : null);
+    pasoWallet(pasosG, [
+      'Mientras Google no revise tu cuenta, solo pueden guardar la tarjeta los usuarios de prueba. En la Wallet Console, en Google Wallet API, pulsa ',
+      ['Solicitar acceso de publicación'], ' para que la pueda guardar cualquiera.'
+    ]);
+    bG.detalles.appendChild(pasosG);
+    rejilla.appendChild(bG.seccion);
+
+    if (!w.https) {
+      cont.appendChild(el('p', 'admin__ayuda', 'Abre este panel desde la dirección https de la web (con su dominio): Google Wallet la necesita y así las tarjetas de los iPhone se actualizan solas.'));
+    }
+    ['apple', 'google'].forEach(function (cual) {
+      var x = walletUi.aviso[cual];
+      if (x) avisoWallet(cual, x.t, x.error, x.ok);
+    });
+    if (walletUi.ocupado) walletOcupado(true);
   }
 
   function cargarSocios() {

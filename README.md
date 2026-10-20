@@ -38,37 +38,26 @@ En **Ajustes → Club SOÑO** se elige cuántos sellos tiene la tarjeta (de 3 a 
 
 En la ventana de la tarjeta del socio salen los botones **Añadir a Apple Wallet** (en el iPhone y en el ordenador) y **Añadir a Google Wallet** (en Android y en el ordenador). La tarjeta lleva el logo, los colores de SOÑO, las tazas selladas y el mismo QR que se escanea en la barra, y **se actualiza sola** cuando se pone un sello, se canjea el premio o se cambian los sellos o el premio en Ajustes (en el iPhone sale un aviso: «Nuevo sello en tu tarjeta de SOÑO»).
 
-Cada botón solo sale cuando está configurado. En el panel, pestaña **Club**, se ve si Apple y Google están listos o qué falta, cuántos iPhone tienen la tarjeta y cuándo caduca el certificado de Apple.
+Cada botón solo sale cuando está configurado. **Todo se configura desde el panel, también desde el móvil**: pestaña **Club** → *Tarjeta en el móvil (Wallet)*. Ahí se ve si Apple y Google están listos o qué falta, cuántos iPhone tienen la tarjeta y cuándo caduca el certificado de Apple, con los pasos numerados y los enlaces a cada web.
 
 Hace falta que la web vaya por **https** con su dominio, y conviene poner esa dirección en el stack: `WALLET_URL=https://tu-dominio`. Las rutas `/wallet/…` tienen que llegar al contenedor sin contraseña del proxy (Apple y Google las llaman directamente).
 
-**Apple Wallet** (con la cuenta de Apple Developer):
-1. En [developer.apple.com](https://developer.apple.com/account/resources/identifiers/list/passTypeId) → *Identifiers* → **+** → *Pass Type IDs*. Descripción «Club SOÑO» e identificador tipo `pass.es.tudominio.club`.
-2. En el servidor (o en cualquier ordenador con OpenSSL), crea la clave y la solicitud del certificado:
-   ```bash
-   openssl req -new -newkey rsa:2048 -nodes -keyout pass.key -out pass.csr -subj "/CN=Club SONO"
-   ```
-3. En ese Pass Type ID → **Create Certificate** → sube `pass.csr` y descarga `pass.cer`.
-4. Descarga el certificado intermedio de Apple **WWDR G4**: [AppleWWDRCAG4.cer](https://www.apple.com/certificateauthority/AppleWWDRCAG4.cer).
-5. Copia los tres archivos al contenedor y reinícialo:
-   ```bash
-   docker exec sono2_web mkdir -p /app/data/wallet/apple
-   docker cp pass.cer sono2_web:/app/data/wallet/apple/
-   docker cp pass.key sono2_web:/app/data/wallet/apple/
-   docker cp AppleWWDRCAG4.cer sono2_web:/app/data/wallet/apple/
-   docker restart sono2_web
-   ```
-   Los nombres dan igual: la web reconoce cuál es cada uno. Si exportaste el certificado como `.p12` desde el Llavero del Mac, conviértelo antes: `openssl pkcs12 -in certificado.p12 -out pass.pem -nodes -legacy` (y copia `pass.pem` en lugar de `pass.cer` y `pass.key`). Si la clave tiene contraseña, ponla en `WALLET_APPLE_KEY_PASSWORD`.
-6. El certificado dura un año: cuando vaya a caducar (el panel avisa de la fecha), repite los pasos 2 a 5.
+**Apple Wallet** (con la cuenta de Apple Developer), desde el panel:
+1. **Descargar solicitud**: el servidor crea la clave privada (se queda en el volumen de datos, nunca sale de él) y te da el archivo `SONO.certSigningRequest`.
+2. En [developer.apple.com](https://developer.apple.com/account/resources/identifiers/list/passTypeId) → *Identifiers* → **+** → *Pass Type IDs*: descripción «Club SOÑO» e identificador tipo `pass.es.tudominio.club`. Después, en *Certificates* → **+** → *Pass Type ID Certificate*, eliges ese ID, subes la solicitud y descargas `pass.cer`.
+3. **Subir certificado** en el panel. El certificado intermedio de Apple (WWDR G4) lo descarga el servidor solo; si no tiene salida a internet, el panel da el enlace para subirlo con el mismo botón.
+4. El certificado dura un año: cuando falte menos de un mes el panel lo marca. Se repiten los mismos pasos (las tarjetas que ya tienen los socios siguen valiendo si usas el mismo Pass Type ID).
 
-**Google Wallet** (gratis):
-1. En la [Google Pay & Wallet Console](https://pay.google.com/business/console) → **Google Wallet API** → crea la cuenta de emisor. Apunta el **Issuer ID** (un número largo).
-2. En la [consola de Google Cloud](https://console.cloud.google.com/) crea un proyecto, activa la **Google Wallet API** y, en *IAM* → *Cuentas de servicio*, crea una cuenta de servicio y una clave **JSON**.
-3. En la Wallet Console → *Usuarios*, invita al email de esa cuenta de servicio con permiso de **Desarrollador**.
-4. Copia el JSON al contenedor (`docker exec sono2_web mkdir -p /app/data/wallet/google` y `docker cp clave.json sono2_web:/app/data/wallet/google/`), añade `WALLET_GOOGLE_ISSUER_ID=` con tu Issuer ID en el stack y vuelve a desplegarlo.
+Si el iPhone no deja guardar el `.cer`, los pasos 2 y 3 se pueden hacer desde un ordenador. También se pueden copiar los archivos a mano a `/app/data/wallet/apple/` (certificado, clave y WWDR G4, con cualquier nombre; un `.p12` del Llavero se convierte con `openssl pkcs12 -in certificado.p12 -out pass.pem -nodes -legacy`; si la clave tiene contraseña, va en `WALLET_APPLE_KEY_PASSWORD`).
+
+**Google Wallet** (gratis), desde el panel:
+1. En la [Google Pay & Wallet Console](https://pay.google.com/business/console) → **Google Wallet API** → crea la cuenta de emisor y copia el **Issuer ID** (un número largo).
+2. En [Google Cloud](https://console.cloud.google.com/) crea un proyecto, activa la **Google Wallet API** y, en *IAM* → *Cuentas de servicio*, crea una cuenta de servicio y una clave **JSON**.
+3. En el panel, escribe el Issuer ID, elige el `.json` y pulsa **Guardar y comprobar**. El servidor lo guarda en `wallet/google/` (no hace falta tocar el stack) y comprueba con Google que funciona; si todo va bien, crea la tarjeta del Club SOÑO en tu emisor.
+4. Si el panel dice que falta permiso: en la Wallet Console → *Usuarios*, invita al email de la cuenta de servicio (sale en el panel, con botón para copiarlo) con permiso de **Desarrollador** y pulsa **Comprobar con Google**. Mientras la comprobación diga que algo falla, el botón de Google Wallet no sale a los socios.
 5. Al principio la cuenta está en **modo de prueba**: solo pueden guardar la tarjeta las cuentas de Google que añadas como usuarios de prueba. Cuando funcione, pide el **acceso de publicación** en la Wallet Console para que la pueda guardar cualquiera.
 
-Los iPhone que tienen la tarjeta se guardan en `wallet/registros.json`, dentro del volumen de datos. La política de privacidad ya explica qué se guarda al añadir la tarjeta a la cartera.
+Las claves y certificados se guardan en `wallet/apple/` y `wallet/google/` dentro del volumen de datos (solo los puede leer el servidor) y los iPhone que tienen la tarjeta en `wallet/registros.json`. La política de privacidad ya explica qué se guarda al añadir la tarjeta a la cartera.
 
 Los socios pueden darse de baja ellos mismos desde su tarjeta (se borran sus datos). Las contraseñas se guardan cifradas (scrypt) y la sesión del socio dura 120 días. Al recoger nombre, email y teléfono, conviene mencionarlo en la política de privacidad de la cafetería.
 
@@ -135,7 +124,7 @@ docker-compose.yml     stack para Portainer con la imagen de GitHub
 | `TRUST_PROXY` | `true` si la web va detrás de un proxy (Nginx Proxy Manager, Traefik, Cloudflare Tunnel) | `true` |
 | `COOKIE_SECURE` | `auto` marca la sesión como segura cuando la web va por HTTPS | `auto` |
 | `WALLET_URL` | Dirección pública con https (para Apple Wallet y Google Wallet) | la de cada petición |
-| `WALLET_GOOGLE_ISSUER_ID` | Issuer ID de Google Wallet | — |
+| `WALLET_GOOGLE_ISSUER_ID` | Issuer ID de Google Wallet (opcional: mejor desde el panel, que manda sobre esta) | — |
 | `WALLET_APPLE_KEY_PASSWORD` | Contraseña de la clave del certificado de Apple, si tiene | — |
 
 La cookie de sesión se llama `sono2_sesion`, distinta de la de la primera web, así que las dos pueden estar en el mismo servidor sin cerrarse la sesión una a otra.
