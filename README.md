@@ -34,6 +34,42 @@ En el panel, pestaña **Club**:
 
 En **Ajustes → Club SOÑO** se elige cuántos sellos tiene la tarjeta (de 3 a 20; por defecto 10) y cuál es el premio. Activarlo o desactivarlo solo se hace con el interruptor de la pestaña **Club**.
 
+### La tarjeta en la cartera del móvil (Apple Wallet y Google Wallet)
+
+En la ventana de la tarjeta del socio salen los botones **Añadir a Apple Wallet** (en el iPhone y en el ordenador) y **Añadir a Google Wallet** (en Android y en el ordenador). La tarjeta lleva el logo, los colores de SOÑO, las tazas selladas y el mismo QR que se escanea en la barra, y **se actualiza sola** cuando se pone un sello, se canjea el premio o se cambian los sellos o el premio en Ajustes (en el iPhone sale un aviso: «Nuevo sello en tu tarjeta de SOÑO»).
+
+Cada botón solo sale cuando está configurado. En el panel, pestaña **Club**, se ve si Apple y Google están listos o qué falta, cuántos iPhone tienen la tarjeta y cuándo caduca el certificado de Apple.
+
+Hace falta que la web vaya por **https** con su dominio, y conviene poner esa dirección en el stack: `WALLET_URL=https://tu-dominio`. Las rutas `/wallet/…` tienen que llegar al contenedor sin contraseña del proxy (Apple y Google las llaman directamente).
+
+**Apple Wallet** (con la cuenta de Apple Developer):
+1. En [developer.apple.com](https://developer.apple.com/account/resources/identifiers/list/passTypeId) → *Identifiers* → **+** → *Pass Type IDs*. Descripción «Club SOÑO» e identificador tipo `pass.es.tudominio.club`.
+2. En el servidor (o en cualquier ordenador con OpenSSL), crea la clave y la solicitud del certificado:
+   ```bash
+   openssl req -new -newkey rsa:2048 -nodes -keyout pass.key -out pass.csr -subj "/CN=Club SONO"
+   ```
+3. En ese Pass Type ID → **Create Certificate** → sube `pass.csr` y descarga `pass.cer`.
+4. Descarga el certificado intermedio de Apple **WWDR G4**: [AppleWWDRCAG4.cer](https://www.apple.com/certificateauthority/AppleWWDRCAG4.cer).
+5. Copia los tres archivos al contenedor y reinícialo:
+   ```bash
+   docker exec sono2_web mkdir -p /app/data/wallet/apple
+   docker cp pass.cer sono2_web:/app/data/wallet/apple/
+   docker cp pass.key sono2_web:/app/data/wallet/apple/
+   docker cp AppleWWDRCAG4.cer sono2_web:/app/data/wallet/apple/
+   docker restart sono2_web
+   ```
+   Los nombres dan igual: la web reconoce cuál es cada uno. Si exportaste el certificado como `.p12` desde el Llavero del Mac, conviértelo antes: `openssl pkcs12 -in certificado.p12 -out pass.pem -nodes -legacy` (y copia `pass.pem` en lugar de `pass.cer` y `pass.key`). Si la clave tiene contraseña, ponla en `WALLET_APPLE_KEY_PASSWORD`.
+6. El certificado dura un año: cuando vaya a caducar (el panel avisa de la fecha), repite los pasos 2 a 5.
+
+**Google Wallet** (gratis):
+1. En la [Google Pay & Wallet Console](https://pay.google.com/business/console) → **Google Wallet API** → crea la cuenta de emisor. Apunta el **Issuer ID** (un número largo).
+2. En la [consola de Google Cloud](https://console.cloud.google.com/) crea un proyecto, activa la **Google Wallet API** y, en *IAM* → *Cuentas de servicio*, crea una cuenta de servicio y una clave **JSON**.
+3. En la Wallet Console → *Usuarios*, invita al email de esa cuenta de servicio con permiso de **Desarrollador**.
+4. Copia el JSON al contenedor (`docker exec sono2_web mkdir -p /app/data/wallet/google` y `docker cp clave.json sono2_web:/app/data/wallet/google/`), añade `WALLET_GOOGLE_ISSUER_ID=` con tu Issuer ID en el stack y vuelve a desplegarlo.
+5. Al principio la cuenta está en **modo de prueba**: solo pueden guardar la tarjeta las cuentas de Google que añadas como usuarios de prueba. Cuando funcione, pide el **acceso de publicación** en la Wallet Console para que la pueda guardar cualquiera.
+
+Los iPhone que tienen la tarjeta se guardan en `wallet/registros.json`, dentro del volumen de datos. La política de privacidad ya explica qué se guarda al añadir la tarjeta a la cartera.
+
 Los socios pueden darse de baja ellos mismos desde su tarjeta (se borran sus datos). Las contraseñas se guardan cifradas (scrypt) y la sesión del socio dura 120 días. Al recoger nombre, email y teléfono, conviene mencionarlo en la política de privacidad de la cafetería.
 
 Los datos del club están en `socios.json` y la clave que firma las sesiones en `secreto.json`, dentro del volumen de datos. Si se pierde `secreto.json`, los socios solo tienen que volver a entrar.
@@ -80,6 +116,8 @@ datos-iniciales.json   carta y horarios de partida (solo se usan el primer arran
 public/                la web: index.html, styles.css, app.js, tipografías
 public/legal.html      página de aviso legal, privacidad y cookies (el texto está en legal.js)
 public/cookies.js      aviso de cookies (lo usan la web y la página legal)
+wallet.js              tarjeta del club para Apple Wallet y Google Wallet (sin dependencias)
+wallet/                logo, iconos y sellos con los que se dibuja la tarjeta de Wallet
 public/vendor/         librerías del QR del club (dibujarlo y leerlo con la cámara), con sus licencias
 stack-portainer.yml    stack para el «Web editor» de Portainer (descarga el código de GitHub)
 Dockerfile             imagen de la web
@@ -96,6 +134,9 @@ docker-compose.yml     stack para Portainer con la imagen de GitHub
 | `PUERTO` | Puerto del servidor donde se publica la web (solo `docker-compose.yml`) | `8081` |
 | `TRUST_PROXY` | `true` si la web va detrás de un proxy (Nginx Proxy Manager, Traefik, Cloudflare Tunnel) | `true` |
 | `COOKIE_SECURE` | `auto` marca la sesión como segura cuando la web va por HTTPS | `auto` |
+| `WALLET_URL` | Dirección pública con https (para Apple Wallet y Google Wallet) | la de cada petición |
+| `WALLET_GOOGLE_ISSUER_ID` | Issuer ID de Google Wallet | — |
+| `WALLET_APPLE_KEY_PASSWORD` | Contraseña de la clave del certificado de Apple, si tiene | — |
 
 La cookie de sesión se llama `sono2_sesion`, distinta de la de la primera web, así que las dos pueden estar en el mismo servidor sin cerrarse la sesión una a otra.
 
@@ -139,7 +180,7 @@ Las reservas, los pedidos y los mensajes de cada web siguen separados.
 
 ## Copia de seguridad
 
-Todo está en el volumen del stack (Portainer lo llama `sono2_sono2_datos`): `contenido.json`, `reservas.json`, `pedidos.json`, `mensajes.json`, `socios.json`, `resenas.json`, `secreto.json`, `versiones.json` y la carpeta `fotos/`.
+Todo está en el volumen del stack (Portainer lo llama `sono2_sono2_datos`): `contenido.json`, `reservas.json`, `pedidos.json`, `mensajes.json`, `socios.json`, `resenas.json`, `secreto.json`, `versiones.json`, la carpeta `fotos/` y la carpeta `wallet/` (certificados de Apple, clave de Google y los iPhone registrados; guarda esa copia en un sitio seguro, porque lleva claves privadas).
 
 ```bash
 docker run --rm -v sono2_sono2_datos:/datos -v "$PWD":/copia alpine \
