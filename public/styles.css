@@ -1226,14 +1226,52 @@ input:focus-visible + .alergeno-chip { outline: 2px solid var(--cafe); outline-o
 @media (hover: hover) { a.boton-wallet:hover { opacity: 1; background: #2A1307; } }
 .boton-wallet:active { transform: scale(0.97); }
 .tarjeta-club__wallet-nota { flex: 1 1 200px; font-size: 0.8125rem; line-height: 1.45; }
-/* Panel: estado de Wallet */
-.club-admin__wallet { display: grid; gap: 6px; }
+/* Panel: tarjeta en el móvil (Wallet), estado y pasos para configurarla */
+.club-admin__wallet { display: grid; gap: 10px; }
 .club-admin__wallet:empty { display: none; }
-.club-admin__wallet-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.9375rem; }
-.club-admin__wallet-lista li { padding-left: 18px; position: relative; color: var(--cafe-suave); }
-.club-admin__wallet-lista li::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid currentColor; }
-.club-admin__wallet-lista li.es-activo { color: var(--cafe); }
-.club-admin__wallet-lista li.es-activo::before { background: var(--cafe); border-color: var(--cafe); }
+.wallet-config__rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 12px; align-items: start; }
+.wallet-config {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: var(--r-tarjeta);
+  border: 1px dashed var(--linea-fuerte);
+  background: var(--superficie);
+  min-width: 0;
+}
+.wallet-config.es-activo { border-style: solid; border-color: var(--linea); }
+.wallet-config.es-aviso { border-color: var(--alerta); }
+.wallet-config__cabeza { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.wallet-config__cabeza h4 { margin: 0; font-family: var(--f-cuerpo); font-size: 1rem; font-weight: 600; }
+.wallet-config__chip { flex: none; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--linea-fuerte); font-size: 0.75rem; font-weight: 500; color: var(--cafe-suave); }
+.wallet-config.es-activo .wallet-config__chip { background: var(--cafe); border-color: var(--cafe); color: var(--lienzo); }
+.wallet-config__estado { font-size: 0.9375rem; color: var(--cafe-suave); overflow-wrap: anywhere; }
+.wallet-config.es-activo .wallet-config__estado { color: var(--cafe); }
+.wallet-config__pasos summary { cursor: pointer; font-size: 0.9375rem; font-weight: 600; padding-block: 4px; width: fit-content; }
+.wallet-config__pasos summary:focus-visible { outline: 2px solid var(--cafe); outline-offset: 2px; border-radius: 4px; }
+.wallet-config__pasos[open] summary { margin-bottom: 8px; }
+.wallet-config__pasos > .admin__ayuda { margin-top: 10px; font-size: 0.8125rem; }
+.wallet-config__lista { margin: 0; padding: 0; list-style: none; counter-reset: paso; display: grid; gap: 14px; }
+.wallet-config__lista > li { counter-increment: paso; position: relative; padding-left: 34px; display: grid; gap: 8px; font-size: 0.9375rem; line-height: 1.5; min-width: 0; }
+.wallet-config__lista > li::before {
+  content: counter(paso);
+  position: absolute; left: 0; top: 0;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--beige); color: var(--cafe);
+  font-size: 0.75rem; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.wallet-config__lista p { margin: 0; overflow-wrap: anywhere; }
+.wallet-config__acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.wallet-config__archivo { position: relative; cursor: pointer; }
+.wallet-config__archivo:focus-within { outline: 2px solid var(--cafe); outline-offset: 2px; }
+.wallet-config__archivo-nombre { font-size: 0.8125rem; color: var(--cafe-suave); min-width: 0; overflow-wrap: anywhere; }
+.wallet-config__form { display: grid; gap: 10px; justify-items: start; }
+.wallet-config__form .campo { justify-self: stretch; max-width: 320px; }
+.wallet-config__aviso:empty { display: none; }
+.wallet-config__aviso { margin: 0; }
+.wallet-config__aviso.es-ok { padding: 10px 14px; border-radius: 10px; background: var(--beige); font-weight: 500; }
+.wallet-config__aviso.es-error { color: var(--alerta); font-weight: 500; }
 .movimientos { list-style: none; margin: 0; padding: 0; display: grid; }
 .movimiento { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-block: 10px; border-bottom: 1px solid var(--linea); font-size: 0.9375rem; }
 .movimiento:last-child { border-bottom: 0; }

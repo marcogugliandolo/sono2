@@ -21,10 +21,9 @@ services:
       - ADMIN_USER=soño
       # Misma contraseña que en el stack «sono»
       - ADMIN_PASSWORD=cambia-esta-clave
-      # Tarjeta del club en Apple Wallet y Google Wallet (ver README): la dirección https de la web
-      # y el Issuer ID de Google. Los certificados van en el volumen, en /app/data/wallet/
+      # Tarjeta del club en Apple Wallet y Google Wallet: se configura desde el panel (Club).
+      # Aquí solo hace falta la dirección https de la web.
       # - WALLET_URL=https://tu-dominio
-      # - WALLET_GOOGLE_ISSUER_ID=
     volumes:
       - sono2_datos:/app/data
     command: >

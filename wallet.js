@@ -353,19 +353,18 @@ function bloquesPem(texto) {
   return salida;
 }
 
-function cargarApple(dir) {
-  const r = { activo: false, motivo: '', passTypeId: '', teamId: '', caduca: '' };
-  let nombres;
-  try { nombres = fs.readdirSync(dir); } catch (e) { r.motivo = 'Faltan los certificados de Apple (carpeta wallet/apple de los datos).'; return r; }
+/* Lee todo lo que haya en la carpeta: certificados (PEM o DER) y claves privadas */
+function leerCarpetaApple(dir) {
   const certs = [];
-  let clave = null;
+  const claves = [];
   let claveCifrada = false;
+  let nombres = [];
+  try { nombres = fs.readdirSync(dir); } catch (e) { /* no existe */ }
   for (const n of nombres) {
     const ruta = path.join(dir, n);
     let buf;
     try { if (!fs.statSync(ruta).isFile()) continue; buf = fs.readFileSync(ruta); } catch (e) { continue; }
-    const texto = buf.toString('latin1');
-    const bloques = bloquesPem(texto);
+    const bloques = bloquesPem(buf.toString('latin1'));
     const intentos = bloques.length ? bloques : [{ tipo: 'DER', pem: null }];
     for (const b of intentos) {
       if (b.tipo === 'CERTIFICATE' || b.tipo === 'DER') {
@@ -373,24 +372,49 @@ function cargarApple(dir) {
       }
       if (/PRIVATE KEY/.test(b.tipo) || b.tipo === 'DER') {
         try {
-          clave = crypto.createPrivateKey({ key: b.pem || buf, format: b.pem ? 'pem' : 'der', type: b.pem ? undefined : 'pkcs8', passphrase: process.env.WALLET_APPLE_KEY_PASSWORD || undefined });
+          claves.push({ archivo: n, clave: crypto.createPrivateKey({ key: b.pem || buf, format: b.pem ? 'pem' : 'der', type: b.pem ? undefined : 'pkcs8', passphrase: process.env.WALLET_APPLE_KEY_PASSWORD || undefined }) });
         } catch (e) {
           if (/ENCRYPTED/.test(b.tipo) || /passphrase|decrypt|bad decrypt/i.test(e.message)) claveCifrada = true;
         }
       }
     }
   }
-  const tarjeta = certs.find((c) => /Pass Type ID|UID=pass\./.test(c.subject));
-  const wwdr = certs.find((c) => c !== tarjeta && tarjeta && tarjeta.checkIssued(c));
-  if (!tarjeta) { r.motivo = 'Falta el certificado de la tarjeta (Pass Type ID) de Apple.'; return r; }
-  r.passTypeId = (tarjeta.subject.match(/UID=([^\n,]+)/) || [])[1] || '';
-  r.teamId = (tarjeta.subject.match(/OU=([^\n,]+)/) || [])[1] || '';
-  r.caduca = new Date(tarjeta.validTo).toISOString();
+  return { certs, claves, claveCifrada, nombres };
+}
+function casaClave(cert, clave) { try { return cert.checkPrivateKey(clave); } catch (e) { return false; } }
+function esCertTarjeta(c) { return /Pass Type ID|UID=pass\./.test(c.subject); }
+
+function cargarApple(dir) {
+  const r = { activo: false, motivo: '', passTypeId: '', teamId: '', caduca: '', solicitudPendiente: false };
+  const { certs, claves, claveCifrada, nombres } = leerCarpetaApple(dir);
+  r.solicitudPendiente = nombres.includes('solicitud-pendiente.key');
+  // De los certificados de tarjeta, el más nuevo que tenga su clave privada y no haya caducado
+  const tarjetas = certs.filter(esCertTarjeta).sort((a, b) => new Date(b.validTo) - new Date(a.validTo));
+  if (!tarjetas.length) {
+    r.motivo = r.solicitudPendiente
+      ? 'Ya está creada la solicitud: falta subir el certificado que te da Apple.'
+      : 'Falta el certificado de la tarjeta (Pass Type ID) de Apple.';
+    return r;
+  }
+  let tarjeta = null;
+  let clave = null;
+  for (const c of tarjetas) {
+    const k = claves.find((x) => casaClave(c, x.clave));
+    if (k && new Date(c.validTo) > new Date()) { tarjeta = c; clave = k.clave; break; }
+  }
+  const muestra = tarjeta || tarjetas[0];
+  r.passTypeId = (muestra.subject.match(/UID=([^\n,]+)/) || [])[1] || '';
+  r.teamId = (muestra.subject.match(/OU=([^\n,]+)/) || [])[1] || '';
+  r.caduca = new Date(muestra.validTo).toISOString();
+  if (!tarjeta) {
+    if (tarjetas.every((c) => new Date(c.validTo) < new Date())) r.motivo = 'El certificado de la tarjeta ha caducado: crea una solicitud nueva y sube el certificado nuevo.';
+    else if (claveCifrada) r.motivo = 'La clave privada tiene contraseña: ponla en WALLET_APPLE_KEY_PASSWORD.';
+    else r.motivo = claves.length ? 'La clave privada no corresponde al certificado de la tarjeta.' : 'Falta la clave privada del certificado de la tarjeta.';
+    return r;
+  }
+  const wwdr = certs.find((c) => c !== tarjeta && tarjeta.checkIssued(c));
   if (!wwdr) { r.motivo = 'Falta el certificado intermedio de Apple (WWDR G4) que firma el de la tarjeta.'; return r; }
-  if (!clave) { r.motivo = claveCifrada ? 'La clave privada tiene contraseña: ponla en WALLET_APPLE_KEY_PASSWORD.' : 'Falta la clave privada del certificado de la tarjeta.'; return r; }
-  if (!tarjeta.checkPrivateKey(clave)) { r.motivo = 'La clave privada no corresponde al certificado de la tarjeta.'; return r; }
   if (!r.passTypeId || !r.teamId) { r.motivo = 'No se ha podido leer el Pass Type ID o el Team ID del certificado.'; return r; }
-  if (new Date(tarjeta.validTo) < new Date()) { r.motivo = 'El certificado de la tarjeta ha caducado: renuévalo en la web de Apple.'; return r; }
   r.activo = true;
   r.certDer = tarjeta.raw;
   r.certPem = tarjeta.toString();
@@ -400,25 +424,46 @@ function cargarApple(dir) {
   return r;
 }
 
+function leerAjustesGoogle(dir) {
+  try { return JSON.parse(fs.readFileSync(path.join(dir, 'ajustes.json'), 'utf8')) || {}; } catch (e) { return {}; }
+}
 function cargarGoogle(dir) {
-  const r = { activo: false, motivo: '', issuerId: String(process.env.WALLET_GOOGLE_ISSUER_ID || '').trim(), email: '' };
+  const ajustes = leerAjustesGoogle(dir);
+  const r = { activo: false, motivo: '', issuerId: String(ajustes.issuerId || process.env.WALLET_GOOGLE_ISSUER_ID || '').trim(), email: '', comprobacion: ajustes.comprobacion || null };
   let nombres;
   try { nombres = fs.readdirSync(dir); } catch (e) { r.motivo = 'Falta la cuenta de servicio de Google (carpeta wallet/google de los datos).'; return r; }
   let cuenta = null;
   for (const n of nombres) {
-    if (!/\.json$/i.test(n)) continue;
+    if (!/\.json$/i.test(n) || n === 'ajustes.json') continue;
     try {
       const j = JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8'));
       if (j && j.type === 'service_account' && j.private_key && j.client_email) { cuenta = j; break; }
     } catch (e) { /* no es la cuenta */ }
   }
+  if (!/^\d{6,25}$/.test(r.issuerId)) {
+    r.motivo = cuenta ? 'Falta el Issuer ID de Google Wallet.' : 'Faltan el Issuer ID y el archivo JSON de la cuenta de servicio de Google Cloud.';
+    if (cuenta) r.email = cuenta.client_email;
+    return r;
+  }
   if (!cuenta) { r.motivo = 'Falta el archivo JSON de la cuenta de servicio de Google Cloud.'; return r; }
   r.email = cuenta.client_email;
-  if (!/^\d{6,25}$/.test(r.issuerId)) { r.motivo = 'Falta el ID de emisor de Google Wallet en WALLET_GOOGLE_ISSUER_ID.'; return r; }
   try { r.clave = crypto.createPrivateKey(cuenta.private_key); } catch (e) { r.motivo = 'La clave de la cuenta de servicio de Google no es válida.'; return r; }
   r.clase = r.issuerId + '.' + String(process.env.WALLET_GOOGLE_CLASE || 'club_sono').replace(/[^\w.-]/g, '');
   r.activo = true;
   return r;
+}
+
+/* Solicitud de certificado (PKCS#10) para subir a Apple. La clave se queda en el servidor */
+function crearSolicitudCsr(clave, publica) {
+  const nombre = secuencia(
+    conjunto(secuencia(oid('2.5.4.6'), der(0x13, Buffer.from('ES', 'ascii')))),
+    conjunto(secuencia(oid('2.5.4.10'), der(0x0c, Buffer.from('SOÑO', 'utf8')))),
+    conjunto(secuencia(oid('2.5.4.3'), der(0x0c, Buffer.from('Club SOÑO', 'utf8'))))
+  );
+  const info = secuencia(entero(0), nombre, publica.export({ type: 'spki', format: 'der' }), der(0xa0, Buffer.alloc(0)));
+  const firma = crypto.sign('sha256', info, clave);
+  const csr = secuencia(info, secuencia(oid('1.2.840.113549.1.1.11'), NULO), der(0x03, Buffer.concat([Buffer.from([0]), firma])));
+  return '-----BEGIN CERTIFICATE REQUEST-----\n' + csr.toString('base64').match(/.{1,64}/g).join('\n') + '\n-----END CERTIFICATE REQUEST-----\n';
 }
 
 /* ======================================================================
@@ -454,20 +499,26 @@ function crearWallet(op) {
   let registros = [];          // { dispositivo, pushToken, serie, desde }
   let globalActualizado = 0;   // cuando cambian los sellos o el premio del club, cambian todas
   let baseConocida = String(op.urlPublica || '').replace(/\/+$/, '');
+  let tokenGoogle = { valor: '', caduca: 0 };
 
   function log(t) { console.log('[soño] Wallet: ' + t); }
 
+  const dirApple = path.join(dirWallet, 'apple');
+  const dirGoogle = path.join(dirWallet, 'google');
   function recargar() {
-    try { fs.mkdirSync(path.join(dirWallet, 'apple'), { recursive: true }); fs.mkdirSync(path.join(dirWallet, 'google'), { recursive: true }); } catch (e) { /* sin permisos: se informa abajo */ }
-    apple = cargarApple(path.join(dirWallet, 'apple'));
-    google = cargarGoogle(path.join(dirWallet, 'google'));
+    try { fs.mkdirSync(dirApple, { recursive: true }); fs.mkdirSync(dirGoogle, { recursive: true }); } catch (e) { /* sin permisos: se informa abajo */ }
+    apple = cargarApple(dirApple);
+    google = cargarGoogle(dirGoogle);
+    tokenGoogle = { valor: '', caduca: 0 };
+    log('Apple ' + (apple.activo ? 'activa (' + apple.passTypeId + ')' : 'sin configurar: ' + apple.motivo));
+    log('Google ' + (google.activo ? 'activa (emisor ' + google.issuerId + ')' : 'sin configurar: ' + google.motivo));
+  }
+  function cargarRegistros() {
     try {
       const guardado = JSON.parse(fs.readFileSync(archivoRegistros, 'utf8'));
       registros = Array.isArray(guardado.registros) ? guardado.registros : [];
       globalActualizado = Number(guardado.global) || 0;
     } catch (e) { registros = []; }
-    log('Apple ' + (apple.activo ? 'activa (' + apple.passTypeId + ')' : 'sin configurar: ' + apple.motivo));
-    log('Google ' + (google.activo ? 'activa (emisor ' + google.issuerId + ')' : 'sin configurar: ' + google.motivo));
   }
 
   let colaRegistros = Promise.resolve();
@@ -497,12 +548,161 @@ function crearWallet(op) {
 
   function estado() {
     return {
-      apple: { activo: apple.activo, motivo: apple.motivo, passTypeId: apple.passTypeId || '', caduca: apple.caduca || '', registrados: registros.length },
-      google: { activo: google.activo, motivo: google.motivo, issuerId: google.issuerId || '' },
+      apple: { activo: apple.activo, motivo: apple.motivo, passTypeId: apple.passTypeId || '', caduca: apple.caduca || '', registrados: registros.length, solicitudPendiente: !!apple.solicitudPendiente },
+      google: { activo: google.activo, motivo: google.motivo, issuerId: google.issuerId || '', email: google.email || '', comprobacion: google.activo ? google.comprobacion || null : null },
       https: /^https:\/\//.test(baseConocida)
     };
   }
-  function disponible() { return { apple: apple.activo, google: google.activo }; }
+
+  /* ---------- Configuración desde el panel ---------- */
+  function errorPublico(mensaje, status) { return Object.assign(new Error(mensaje), { status: status || 400, publico: true }); }
+  function escribirSeguro(ruta, datos) {
+    const tmp = ruta + '.' + process.pid + '.tmp';
+    fs.writeFileSync(tmp, datos, { mode: 0o600 });
+    fs.renameSync(tmp, ruta);
+  }
+  function sello() { return new Date().toISOString().slice(0, 10).replace(/-/g, ''); }
+
+  /* Apple, paso 1: clave privada nueva (se queda aquí) y la solicitud para subirla a Apple */
+  function solicitudApple() {
+    fs.mkdirSync(dirApple, { recursive: true });
+    const ruta = path.join(dirApple, 'solicitud-pendiente.key');
+    let clave;
+    try { clave = crypto.createPrivateKey(fs.readFileSync(ruta)); } catch (e) {
+      clave = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey;
+      escribirSeguro(ruta, clave.export({ type: 'pkcs8', format: 'pem' }));
+      log('creada una solicitud de certificado nueva');
+    }
+    const solicitud = crearSolicitudCsr(clave, crypto.createPublicKey(clave));
+    recargar();
+    return solicitud;
+  }
+
+  /* Apple, paso 3: el certificado que da Apple (y, si hace falta, el intermedio WWDR G4) */
+  async function subirCertificadoApple(buf) {
+    if (!buf || !buf.length) throw errorPublico('El archivo está vacío.');
+    const bloques = bloquesPem(buf.toString('latin1')).filter((b) => b.tipo === 'CERTIFICATE');
+    const certs = [];
+    for (const b of bloques.length ? bloques : [{ pem: null }]) {
+      try { certs.push(new crypto.X509Certificate(b.pem || buf)); } catch (e) { /* no es un certificado */ }
+    }
+    if (!certs.length) throw errorPublico('Ese archivo no es un certificado. Sube el .cer que descargas de Apple.');
+    fs.mkdirSync(dirApple, { recursive: true });
+    const { claves } = leerCarpetaApple(dirApple);
+    let guardados = 0;
+    for (const c of certs) {
+      if (esCertTarjeta(c)) {
+        const k = claves.find((x) => casaClave(c, x.clave));
+        if (!k) throw errorPublico('Este certificado no corresponde a la solicitud que hay en el servidor. Descarga la solicitud otra vez desde aquí, súbela a Apple y usa el certificado nuevo.');
+        if (new Date(c.validTo) < new Date()) throw errorPublico('Ese certificado ya ha caducado.');
+        escribirSeguro(path.join(dirApple, 'tarjeta-' + sello() + '-' + c.serialNumber.slice(-8).toLowerCase() + '.cer'), c.raw);
+        if (k.archivo === 'solicitud-pendiente.key') fs.renameSync(path.join(dirApple, k.archivo), path.join(dirApple, 'clave-' + sello() + '-' + c.serialNumber.slice(-8).toLowerCase() + '.key'));
+        guardados++;
+      } else if (c.ca || /Apple Worldwide Developer Relations/i.test(c.subject)) {
+        escribirSeguro(path.join(dirApple, 'apple-wwdr-' + c.serialNumber.slice(-8).toLowerCase() + '.cer'), c.raw);
+        guardados++;
+      }
+    }
+    if (!guardados) throw errorPublico('Ese certificado no es el de una tarjeta (Pass Type ID) ni el intermedio de Apple.');
+    recargar();
+    await buscarIntermedio();
+    return estado();
+  }
+
+  /* Si falta el certificado intermedio de Apple (WWDR G4), se descarga de apple.com */
+  async function buscarIntermedio() {
+    if (!apple.activo && /intermedio/.test(apple.motivo)) {
+      try {
+        const r = await fetch('https://www.apple.com/certificateauthority/AppleWWDRCAG4.cer', { signal: AbortSignal.timeout(15000) });
+        if (r.ok) {
+          const wwdr = new crypto.X509Certificate(Buffer.from(await r.arrayBuffer()));
+          if (leerCarpetaApple(dirApple).certs.some((c) => esCertTarjeta(c) && c.checkIssued(wwdr))) {
+            escribirSeguro(path.join(dirApple, 'AppleWWDRCAG4.cer'), wwdr.raw);
+            log('descargado el certificado intermedio de Apple (WWDR G4)');
+            recargar();
+          } else log('el certificado intermedio de apple.com no es el que firma la tarjeta');
+        }
+      } catch (e) {
+        log('no se ha podido descargar el certificado intermedio de Apple: ' + e.message);
+      }
+    }
+  }
+
+  /* Google: Issuer ID y la cuenta de servicio (el JSON que da Google Cloud) */
+  async function guardarGoogle(datos) {
+    const issuerId = String((datos && datos.issuerId) || '').replace(/\s+/g, '');
+    if (issuerId && !/^\d{6,25}$/.test(issuerId)) throw errorPublico('El Issuer ID son solo números (lo ves arriba en la Google Pay & Wallet Console).');
+    const cuenta = datos && datos.cuenta;
+    if (cuenta !== undefined && cuenta !== null) {
+      if (typeof cuenta !== 'object' || cuenta.type !== 'service_account' || !cuenta.private_key || !cuenta.client_email) {
+        throw errorPublico('Ese JSON no es la clave de una cuenta de servicio de Google Cloud.');
+      }
+      try { crypto.createPrivateKey(cuenta.private_key); } catch (e) { throw errorPublico('La clave de ese JSON no es válida.'); }
+    }
+    if (!issuerId && !cuenta) throw errorPublico('Escribe el Issuer ID o sube el JSON de la cuenta de servicio.');
+    fs.mkdirSync(dirGoogle, { recursive: true });
+    if (cuenta) {
+      for (const n of fs.readdirSync(dirGoogle)) {
+        if (/\.json$/i.test(n) && n !== 'ajustes.json') fs.unlinkSync(path.join(dirGoogle, n));
+      }
+      escribirSeguro(path.join(dirGoogle, 'cuenta-servicio.json'), JSON.stringify(cuenta));
+    }
+    const ajustes = leerAjustesGoogle(dirGoogle);
+    delete ajustes.comprobacion;
+    if (issuerId) ajustes.issuerId = issuerId;
+    escribirSeguro(path.join(dirGoogle, 'ajustes.json'), JSON.stringify(ajustes));
+    recargar();
+    const comprobacion = google.activo ? await comprobarGoogle() : null;
+    return { estado: estado(), comprobacion };
+  }
+
+  /* Comprueba con Google que la cuenta de servicio puede usar el emisor (y crea la clase de la tarjeta).
+     El resultado se guarda para mostrarlo en el panel y para no ofrecer Google Wallet si no va a funcionar */
+  async function comprobarGoogle() {
+    if (!google.activo) return { ok: false, mensaje: google.motivo };
+    const r = await probarGoogle();
+    const conexion = /No se ha podido conectar|Prueba otra vez/.test(r.mensaje);
+    if (!conexion) {
+      google.comprobacion = { ok: r.ok, mensaje: r.mensaje, definitivo: !r.ok, fecha: new Date().toISOString() };
+      try { escribirSeguro(path.join(dirGoogle, 'ajustes.json'), JSON.stringify(Object.assign(leerAjustesGoogle(dirGoogle), { comprobacion: google.comprobacion }))); } catch (e) { log('no se ha podido guardar la comprobación de Google: ' + e.message); }
+      log('comprobación de Google: ' + (r.ok ? 'correcta' : r.mensaje));
+    }
+    return r;
+  }
+  async function probarGoogle() {
+    let acceso;
+    try { acceso = await accesoGoogle(); } catch (e) {
+      if (!e.respuestaGoogle) return { ok: false, mensaje: 'No se ha podido conectar con Google ahora mismo. Prueba otra vez en un rato.' };
+      return { ok: false, mensaje: e.message + '. Comprueba que el archivo .json es el de la clave que acabas de crear y que no la has borrado en Google Cloud.' };
+    }
+    const url = 'https://walletobjects.googleapis.com/walletobjects/v1/loyaltyClass/';
+    try {
+      const r = await fetch(url + encodeURIComponent(google.clase), { headers: { Authorization: 'Bearer ' + acceso }, signal: AbortSignal.timeout(15000) });
+      if (r.ok) return { ok: true, mensaje: 'Todo correcto: Google Wallet está lista.' };
+      if (r.status === 403 || r.status === 401) {
+        return { ok: false, mensaje: 'La cuenta de servicio no tiene permiso en tu emisor. En la Google Pay & Wallet Console → Usuarios, invita a ' + google.email + ' con permiso de Desarrollador.' };
+      }
+      if (r.status === 404) {
+        if (!/^https:\/\//.test(baseConocida)) return { ok: true, mensaje: 'La conexión con Google funciona. Abre el panel desde la dirección https de la web para terminar.' };
+        const crear = await fetch(url, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + acceso, 'Content-Type': 'application/json' },
+          body: JSON.stringify(claseGoogle(baseConocida)),
+          signal: AbortSignal.timeout(15000)
+        });
+        if (crear.ok) return { ok: true, mensaje: 'Todo correcto: Google Wallet está lista (se ha creado la tarjeta del Club SOÑO en tu emisor).' };
+        if (crear.status === 403) return { ok: false, mensaje: 'La cuenta de servicio no tiene permiso en tu emisor. En la Google Pay & Wallet Console → Usuarios, invita a ' + google.email + ' con permiso de Desarrollador.' };
+        const texto = await crear.text().catch(() => '');
+        return { ok: false, mensaje: 'Google no ha dejado crear la tarjeta (' + crear.status + '): ' + texto.slice(0, 160) };
+      }
+      return { ok: false, mensaje: 'Google ha respondido ' + r.status + '. Prueba otra vez en un rato.' };
+    } catch (e) {
+      return { ok: false, mensaje: 'No se ha podido conectar con Google ahora mismo. Prueba otra vez en un rato.' };
+    }
+  }
+  /* Google se oculta si la última comprobación dijo que algo está mal (no si solo falló la conexión) */
+  function googleUsable() { return google.activo && !(google.comprobacion && !google.comprobacion.ok && google.comprobacion.definitivo); }
+  function disponible() { return { apple: apple.activo, google: googleUsable() }; }
 
   /* Datos de wallet de cada socio: la clave de su tarjeta y cuándo cambió por última vez */
   async function prepararSocio(socio) {
@@ -689,7 +889,6 @@ function crearWallet(op) {
     return 'https://pay.google.com/gp/v/save/' + jwtRS256(carga, google.clave);
   }
 
-  let tokenGoogle = { valor: '', caduca: 0 };
   async function accesoGoogle() {
     if (tokenGoogle.valor && tokenGoogle.caduca > Date.now() + 60000) return tokenGoogle.valor;
     const ahora = Math.floor(Date.now() / 1000);
@@ -707,7 +906,7 @@ function crearWallet(op) {
       signal: AbortSignal.timeout(15000)
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.access_token) throw new Error('Google no ha dado acceso (' + r.status + ')');
+    if (!r.ok || !j.access_token) throw Object.assign(new Error('Google no ha dado acceso (' + r.status + (j.error_description ? ': ' + j.error_description : '') + ')'), { respuestaGoogle: true });
     tokenGoogle = { valor: j.access_token, caduca: Date.now() + (j.expires_in || 3600) * 1000 };
     return tokenGoogle.valor;
   }
@@ -880,7 +1079,12 @@ function crearWallet(op) {
   }
 
   recargar();
-  return { estado, disponible, baseDe, passApple, enlaceGoogle, cambioSocio, cambioClub, olvidar, atender, recargar };
+  cargarRegistros();
+  buscarIntermedio();
+  return {
+    estado, disponible, baseDe, passApple, enlaceGoogle, cambioSocio, cambioClub, olvidar, atender, recargar,
+    solicitudApple, subirCertificadoApple, guardarGoogle, comprobarGoogle
+  };
 }
 
 module.exports = { crearWallet, tiraSellos, crearZip, crearPng, firmarPkcs7, emisorYSerie, CAFE };
