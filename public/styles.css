@@ -423,6 +423,21 @@ html.escena-activa .escena__recorrido { display: block; height: 130vh; height: 1
 /* ---------- Secciones ---------- */
 .seccion { padding-block: clamp(88px, 11vw, 152px); }
 .seccion--linea { border-top: 1px solid var(--linea); }
+/* Carta en su propia página (/carta) o fuera de la portada */
+.carta__volver { display: none; }
+.carta-aparte #carta { display: none; }
+.modo-carta main > section:not(#carta):not(#llevar) { display: none; }
+.modo-carta #carta { padding-top: clamp(28px, 5vw, 56px); }
+.modo-carta .carta__volver {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: clamp(20px, 4vw, 36px);
+  font-size: 0.9375rem;
+  color: var(--cafe-suave);
+  text-decoration: none;
+}
+@media (hover: hover) { .modo-carta .carta__volver:hover { color: var(--cafe); } }
 section[id] { scroll-margin-top: 76px; }
 .cabeza-seccion {
   display: flex;
@@ -1316,6 +1331,9 @@ input:focus-visible + .alergeno-chip { outline: 2px solid var(--cafe); outline-o
 .club-admin__estado.es-activo { border-style: solid; border-color: var(--beige); background: var(--beige); }
 .club-admin__estado-texto { font-size: 0.9375rem; color: var(--cafe-suave); }
 .club-admin__estado.es-activo .club-admin__estado-texto { color: var(--cafe); }
+.club-admin__estado .acciones-mini { margin-top: 4px; }
+.carta-admin__aviso:empty { display: none; }
+.carta-admin__aviso { margin: 0; }
 /* Interruptor (sí/no) */
 .interruptor { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; font-weight: 600; justify-self: start; }
 .interruptor input { position: absolute; opacity: 0; width: 1px; height: 1px; }

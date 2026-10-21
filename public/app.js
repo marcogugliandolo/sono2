@@ -192,6 +192,25 @@
     a.addEventListener('click', function (e) { e.preventDefault(); abrir(modalReserva); });
   });
 
+  /* ---------- La carta en su propia página (/carta) ---------- */
+  var enPaginaCarta = /^\/carta\/?$/.test(location.pathname);
+  if (enPaginaCarta) {
+    document.documentElement.classList.add('modo-carta');
+    document.title = 'Carta · SOÑO';
+    // Los enlaces a secciones de la portada llevan a la portada
+    document.querySelectorAll('a[href^="#"]').forEach(function (a) {
+      var id = a.getAttribute('href').slice(1);
+      var destino = id && document.getElementById(id);
+      if (destino && destino.closest('main') && id !== 'carta' && id !== 'llevar' && id !== 'contenido') a.setAttribute('href', '/#' + id);
+    });
+  }
+  function cartaAparte() { return !!(estado.datos && estado.datos.cartaAparte); }
+  function aplicarCartaAparte() {
+    var fuera = cartaAparte() && !enPaginaCarta;
+    document.documentElement.classList.toggle('carta-aparte', fuera);
+    document.querySelectorAll('[data-enlace-carta]').forEach(function (a) { a.setAttribute('href', fuera ? '/carta' : '#carta'); });
+  }
+
   /* ---------- Carta pública ---------- */
   /* Arriba, 4 favoritos en tarjetas; debajo, una caja por grupo con sus precios.
      Favoritos: primero los productos con la etiqueta «Favorito»; el resto se completa con uno
@@ -468,6 +487,7 @@
 
   function pintarDatos() {
     var d = estado.datos || {};
+    aplicarCartaAparte();
     pintarClub();
     pintarResenas();
     pintarZonas();
@@ -1679,8 +1699,60 @@
   }
 
   /* Pestaña: carta y precios */
+  /* Interruptor «Carta en su propia página»: se guarda al momento, como el del club o las reseñas */
+  function bloqueCartaAparte() {
+    var si = cartaAparte();
+    var bloque = el('section', 'club-admin__estado' + (si ? ' es-activo' : ''));
+    bloque.id = 'carta-aparte-estado';
+    var interruptor = el('label', 'interruptor');
+    var ch = el('input');
+    ch.type = 'checkbox';
+    ch.id = 'carta-aparte';
+    ch.setAttribute('role', 'switch');
+    ch.checked = si;
+    interruptor.appendChild(ch);
+    interruptor.appendChild(el('span', 'interruptor__pista'));
+    interruptor.appendChild(el('span', 'interruptor__texto', 'Carta en su propia página'));
+    bloque.appendChild(interruptor);
+    var explica = el('p', 'club-admin__estado-texto');
+    bloque.appendChild(explica);
+    var fila = el('div', 'acciones-mini');
+    var abrirCarta = el('a', 'boton boton--borde boton--mini', 'Ver la página de la carta ↗');
+    abrirCarta.href = '/carta'; abrirCarta.target = '_blank'; abrirCarta.rel = 'noopener';
+    fila.appendChild(abrirCarta);
+    bloque.appendChild(fila);
+    var aviso = el('p', 'admin__estado carta-admin__aviso');
+    aviso.setAttribute('aria-live', 'polite');
+    bloque.appendChild(aviso);
+    function textoEstado(v) {
+      explica.textContent = v
+        ? 'La carta no sale en la página de inicio: los botones «Carta» y «Ver la carta» abren su propia página (' + location.host + '/carta).'
+        : 'La carta sale en la página de inicio. Su propia página (' + location.host + '/carta) también funciona: va bien para un QR en las mesas.';
+      bloque.classList.toggle('es-activo', v);
+    }
+    textoEstado(si);
+    ch.addEventListener('change', function () {
+      var quiere = ch.checked;
+      ch.disabled = true;
+      aviso.textContent = '';
+      aviso.classList.remove('es-error');
+      api('POST', '/api/carta/aparte', { aparte: quiere }).then(function (r) {
+        estado.datos = Object.assign({}, estado.datos, { cartaAparte: r.cartaAparte });
+        if (borradores.datos) borradores.datos.cartaAparte = r.cartaAparte;
+        textoEstado(r.cartaAparte);
+        aplicarCartaAparte();
+        aviso.textContent = r.cartaAparte ? 'Hecho: la carta ya no sale en la página de inicio.' : 'Hecho: la carta vuelve a salir en la página de inicio.';
+      }).catch(function (err) {
+        ch.checked = !quiere;
+        if (!sesionCaducada(err)) { aviso.textContent = err.message; aviso.classList.add('es-error'); }
+      }).then(function () { ch.disabled = false; });
+    });
+    return bloque;
+  }
+
   function panelCarta() {
     var b = borrador('carta');
+    cuerpo.appendChild(bloqueCartaAparte());
     cuerpo.appendChild(el('p', 'admin__ayuda', 'Organiza la carta en grupos (por ejemplo «Zumos» o «Repostería») y dentro de cada grupo cambia nombres, precios, descripciones, alérgenos y fotos. Los cambios se ven en la web en cuanto pulsas «Guardar cambios». Revisa bien los alérgenos de cada producto: es información que la ley obliga a dar. Para destacar un producto en las tarjetas de arriba de la carta, ponle la etiqueta «Favorito» (hasta 4).'));
     if (!b.categorias.length) cuerpo.appendChild(el('p', 'estado-vacio', 'La carta no tiene grupos. Crea el primero con «+ Añadir grupo».'));
     b.categorias.forEach(function (cat, n) {
@@ -3583,6 +3655,8 @@
     cargarResenas();
     // Con «#escribir-resena» en la dirección (por ejemplo, un QR en las mesas) se abre la ventana
     if (location.hash === '#escribir-resena') abrirResena();
+    // Si la carta va en su propia página, un enlace antiguo a «/#carta» lleva allí
+    if (location.hash === '#carta' && cartaAparte() && !enPaginaCarta) location.replace('/carta');
   }).catch(function () {
     cargado = true;
     sinDatos = true;

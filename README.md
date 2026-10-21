@@ -63,6 +63,12 @@ Los socios pueden darse de baja ellos mismos desde su tarjeta (se borran sus dat
 
 Los datos del club están en `socios.json` y la clave que firma las sesiones en `secreto.json`, dentro del volumen de datos. Si se pierde `secreto.json`, los socios solo tienen que volver a entrar.
 
+## La carta en su propia página
+
+La carta también se puede ver sola en **`/carta`** (por ejemplo `https://gruposono.com/carta`), con la cabecera, la carta y el formulario de «Para llevar» debajo. Va bien para un QR en las mesas.
+
+En el panel, pestaña **Carta**, el interruptor **«Carta en su propia página»** la quita de la página de inicio: los enlaces «Carta» del menú y del pie y el botón «Ver la carta» pasan a abrir `/carta`, y los enlaces antiguos a `/#carta` también llevan allí. Se guarda al momento y no cambia al guardar Ajustes ni al volver a una versión anterior.
+
 ## Reseñas
 
 Sección «Lo que nos contáis», después de la galería. Arriba sale la nota media (por ejemplo, 4,6 con 12 reseñas) y debajo las reseñas en un **slider**: 3 tarjetas a la vez en el ordenador, 2 en la tableta y 1 en el móvil (asomando la siguiente). Se pasa con el dedo, arrastrando con el ratón (o con el trackpad) y con las flechas del teclado, y una barra fina indica por dónde vas; si caben todas, la barra no sale. Las reseñas largas se cortan a unas líneas con «Leer entera». Cualquiera puede escribir una desde «Escribir una reseña»: estrellas del 1 al 5, nombre (como quiera que salga), comentario y la casilla para aceptar que se publique. Si quien escribe tiene abierta su tarjeta del club, la reseña sale con la etiqueta «Socio del club».
