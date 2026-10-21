@@ -2473,7 +2473,7 @@
   }
 
   /* Tarjeta en el móvil: estado de Apple Wallet y Google Wallet, y los pasos para configurarlas desde aquí */
-  var walletUi = { abierto: {}, aviso: {}, issuer: '', cuenta: null, cuentaNombre: '', ocupado: false };
+  var walletUi = { abierto: {}, aviso: {}, issuer: '', email: '', cuenta: null, cuentaNombre: '', ocupado: false };
 
   function enlaceFuera(texto, url) {
     var a = el('a', 'boton boton--borde boton--mini', texto + ' ↗');
@@ -2639,27 +2639,32 @@
     ], [enlaceFuera('Wallet Console', 'https://pay.google.com/business/console')]);
     pasoWallet(pasosG, [
       'En Google Cloud, crea un proyecto y activa la ', ['Google Wallet API'], '. Luego, en ', ['Cuentas de servicio'],
-      ', crea una (sin permisos), entra en ella → Claves → Agregar clave → ', ['JSON'], '. Se descarga un archivo .json.'
+      ', crea una cuenta de servicio (sin permisos).'
     ], [
       enlaceFuera('Activar la API', 'https://console.cloud.google.com/apis/library/walletobjects.googleapis.com'),
       enlaceFuera('Cuentas de servicio', 'https://console.cloud.google.com/iam-admin/serviceaccounts')
     ]);
-    var form = el('form', 'wallet-config__form');
-    form.noValidate = true;
-    var cIssuer = el('div', 'campo');
-    var lIssuer = el('label', null, 'Issuer ID'); lIssuer.htmlFor = 'wallet-issuer';
-    var iIssuer = el('input'); iIssuer.id = 'wallet-issuer'; iIssuer.type = 'text'; iIssuer.inputMode = 'numeric';
-    iIssuer.placeholder = '3388000000012345678'; iIssuer.setAttribute('autocomplete', 'off');
-    iIssuer.value = walletUi.issuer || g.issuerId || '';
-    iIssuer.addEventListener('input', function () { walletUi.issuer = iIssuer.value; });
-    cIssuer.appendChild(lIssuer); cIssuer.appendChild(iIssuer);
-    form.appendChild(cIssuer);
-    var filaJson = el('div', 'wallet-config__acciones');
-    var lJson = el('label', 'boton boton--borde boton--mini wallet-config__archivo', walletUi.cuentaNombre ? 'Cambiar archivo .json' : 'Elegir archivo .json');
+
+    /* Paso 3: la clave. Lo recomendado es que la cree el servidor y solo se suba su certificado a Google Cloud */
+    var bCert = el('button', 'boton boton--lleno boton--mini', g.certificadoServidor ? 'Descargar el certificado otra vez' : 'Crear certificado');
+    bCert.type = 'button';
+    bCert.addEventListener('click', function () {
+      walletOcupado(true);
+      avisoWallet('google', 'Preparando el certificado…');
+      api('POST', '/api/club/wallet/google/certificado').then(function (r) {
+        descargarTexto('sono-google-wallet.pem', r.certificado);
+        walletUi.abierto.google = true;
+        ponerWallet(r);
+        avisoWallet('google', 'Certificado descargado (sono-google-wallet.pem). Súbelo en la cuenta de servicio: Claves → Agregar clave → Subir clave existente.', false, true);
+      }).catch(function (err) {
+        if (!sesionCaducada(err)) avisoWallet('google', err.message, true);
+      }).then(function () { walletOcupado(false); });
+    });
+    var lJson = el('label', 'boton boton--borde boton--mini wallet-config__archivo', walletUi.cuentaNombre ? 'Cambiar archivo .json' : 'O elegir una clave .json');
     var iJson = el('input', 'oculto');
     iJson.type = 'file'; iJson.id = 'wallet-json'; iJson.accept = 'application/json,.json';
     lJson.appendChild(iJson);
-    var nombreJson = el('span', 'wallet-config__archivo-nombre', walletUi.cuentaNombre || (g.email ? 'Ya hay una cuenta guardada' : 'Ningún archivo elegido'));
+    var nombreJson = el('span', 'wallet-config__archivo-nombre', walletUi.cuentaNombre || '');
     iJson.addEventListener('change', function () {
       var f = iJson.files && iJson.files[0];
       if (!f) return;
@@ -2671,36 +2676,63 @@
         if (!j || j.type !== 'service_account' || !j.client_email || !j.private_key) {
           walletUi.cuenta = null; walletUi.cuentaNombre = '';
           avisoWallet('google', 'Ese archivo no es la clave JSON de una cuenta de servicio.', true);
-          nombreJson.textContent = 'Ningún archivo elegido';
+          nombreJson.textContent = '';
           return;
         }
         walletUi.cuenta = j; walletUi.cuentaNombre = f.name + ' · ' + j.client_email;
         nombreJson.textContent = walletUi.cuentaNombre;
         lJson.firstChild.textContent = 'Cambiar archivo .json';
-        avisoWallet('google', '');
+        avisoWallet('google', 'Archivo elegido. Ahora pulsa «Guardar y comprobar».', false, true);
       };
       lector.readAsText(f);
       iJson.value = '';
     });
-    filaJson.appendChild(lJson);
-    filaJson.appendChild(nombreJson);
-    form.appendChild(filaJson);
+    pasoWallet(pasosG, [
+      'Dale una clave a la cuenta de servicio. Lo más seguro es que la cree el servidor: pulsa ', ['Crear certificado'],
+      ' y, en la cuenta de servicio → Claves → Agregar clave → ', ['Subir clave existente'],
+      ', sube ese archivo. Así la clave privada no sale nunca del servidor. (Si ya tienes una clave .json, también vale.)'
+    ], [bCert, lJson, nombreJson]);
+
+    var form = el('form', 'wallet-config__form');
+    form.noValidate = true;
+    var cIssuer = el('div', 'campo');
+    var lIssuer = el('label', null, 'Issuer ID'); lIssuer.htmlFor = 'wallet-issuer';
+    var iIssuer = el('input'); iIssuer.id = 'wallet-issuer'; iIssuer.type = 'text'; iIssuer.inputMode = 'numeric';
+    iIssuer.placeholder = '3388000000012345678'; iIssuer.setAttribute('autocomplete', 'off');
+    iIssuer.value = walletUi.issuer || g.issuerId || '';
+    iIssuer.addEventListener('input', function () { walletUi.issuer = iIssuer.value; });
+    cIssuer.appendChild(lIssuer); cIssuer.appendChild(iIssuer);
+    form.appendChild(cIssuer);
+    var cEmail = el('div', 'campo');
+    var lEmail = el('label', null, 'Correo de la cuenta de servicio'); lEmail.htmlFor = 'wallet-email';
+    var iEmail = el('input'); iEmail.id = 'wallet-email'; iEmail.type = 'email';
+    iEmail.placeholder = 'nombre@proyecto.iam.gserviceaccount.com'; iEmail.setAttribute('autocomplete', 'off');
+    iEmail.value = walletUi.email || (g.modo === 'servidor' ? g.email : '') || '';
+    iEmail.addEventListener('input', function () { walletUi.email = iEmail.value; });
+    cEmail.appendChild(lEmail); cEmail.appendChild(iEmail);
+    form.appendChild(cEmail);
     var bGuardar = el('button', 'boton boton--lleno boton--mini', 'Guardar y comprobar');
     bGuardar.type = 'submit';
     form.appendChild(bGuardar);
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var issuer = iIssuer.value.replace(/\s+/g, '');
+      var email = iEmail.value.trim().toLowerCase();
       if (!issuer && !g.issuerId) { avisoWallet('google', 'Escribe el Issuer ID.', true); iIssuer.focus(); return; }
       if (issuer && !/^\d{6,25}$/.test(issuer)) { avisoWallet('google', 'El Issuer ID son solo números.', true); iIssuer.focus(); return; }
-      if (!walletUi.cuenta && !g.email) { avisoWallet('google', 'Elige el archivo .json de la cuenta de servicio.', true); return; }
       var datos = {};
       if (issuer) datos.issuerId = issuer;
       if (walletUi.cuenta) datos.cuenta = walletUi.cuenta;
+      else if (email && email !== (g.modo === 'servidor' ? g.email : '')) datos.email = email;
+      if (!datos.cuenta && !datos.email && !g.email) {
+        avisoWallet('google', g.certificadoServidor ? 'Escribe el correo de la cuenta de servicio a la que subiste el certificado.' : 'Primero crea el certificado (paso 3) o elige una clave .json.', true);
+        if (g.certificadoServidor) iEmail.focus();
+        return;
+      }
       walletOcupado(true);
       avisoWallet('google', 'Guardando y comprobando con Google…');
       api('POST', '/api/club/wallet/google', datos).then(function (r) {
-        walletUi.cuenta = null; walletUi.cuentaNombre = ''; walletUi.issuer = '';
+        walletUi.cuenta = null; walletUi.cuentaNombre = ''; walletUi.issuer = ''; walletUi.email = '';
         var c = r.comprobacion;
         walletUi.abierto.google = !(c && c.ok);
         ponerWallet(r);
@@ -2710,7 +2742,7 @@
         if (!sesionCaducada(err)) avisoWallet('google', err.message, true);
       }).then(function () { walletOcupado(false); });
     });
-    var liForm = pasoWallet(pasosG, ['Escribe aquí el Issuer ID y elige el archivo .json. Se guarda en el servidor (no lo mandes por correo ni por chat).']);
+    var liForm = pasoWallet(pasosG, ['Escribe aquí el Issuer ID y el correo de la cuenta de servicio, y pulsa «Guardar y comprobar».']);
     liForm.appendChild(form);
     var textoInvita = ['En la Wallet Console, en ', ['Usuarios'], ', invita al correo de la cuenta de servicio con permiso de ', ['Desarrollador'], '.'];
     var extraInvita = [];

@@ -863,9 +863,13 @@ async function apiClub(req, res, pathname, metodo, ip) {
     exigirAdmin(req);
     const datos = await leerJSON(req);
     wallet.baseDe(req);
-    const r = await wallet.guardarGoogle({ issuerId: datos.issuerId, cuenta: datos.cuenta });
+    const r = await wallet.guardarGoogle({ issuerId: datos.issuerId, cuenta: datos.cuenta, email: datos.email });
     console.log('[soño] Wallet: datos de Google guardados desde el panel');
     return enviarJSON(res, 200, { wallet: r.estado, comprobacion: r.comprobacion });
+  }
+  if (pathname === '/api/club/wallet/google/certificado' && metodo === 'POST') {
+    exigirAdmin(req);
+    return enviarJSON(res, 200, { certificado: wallet.certificadoGoogle(), wallet: wallet.estado() });
   }
   if (pathname === '/api/club/wallet/google/comprobar' && metodo === 'POST') {
     exigirAdmin(req);

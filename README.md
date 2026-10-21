@@ -52,8 +52,8 @@ Si el iPhone no deja guardar el `.cer`, los pasos 2 y 3 se pueden hacer desde un
 
 **Google Wallet** (gratis), desde el panel:
 1. En la [Google Pay & Wallet Console](https://pay.google.com/business/console) → **Google Wallet API** → crea la cuenta de emisor y copia el **Issuer ID** (un número largo).
-2. En [Google Cloud](https://console.cloud.google.com/) crea un proyecto, activa la **Google Wallet API** y, en *IAM* → *Cuentas de servicio*, crea una cuenta de servicio y una clave **JSON**.
-3. En el panel, escribe el Issuer ID, elige el `.json` y pulsa **Guardar y comprobar**. El servidor lo guarda en `wallet/google/` (no hace falta tocar el stack) y comprueba con Google que funciona; si todo va bien, crea la tarjeta del Club SOÑO en tu emisor.
+2. En [Google Cloud](https://console.cloud.google.com/) crea un proyecto, activa la **Google Wallet API** y, en *IAM* → *Cuentas de servicio*, crea una cuenta de servicio (sin permisos).
+3. La clave de esa cuenta: en el panel pulsa **Crear certificado** (el servidor crea la clave privada, que nunca sale de él, y te da `sono-google-wallet.pem`) y súbelo en la cuenta de servicio → *Claves* → *Agregar clave* → **Subir clave existente**. Después escribe en el panel el Issuer ID y el correo de la cuenta de servicio y pulsa **Guardar y comprobar**: el servidor comprueba con Google que funciona y, si todo va bien, crea la tarjeta del Club SOÑO en tu emisor. (También vale una clave **JSON** descargada de Google Cloud: se elige en el panel con «O elegir una clave .json».)
 4. Si el panel dice que falta permiso: en la Wallet Console → *Usuarios*, invita al email de la cuenta de servicio (sale en el panel, con botón para copiarlo) con permiso de **Desarrollador** y pulsa **Comprobar con Google**. Mientras la comprobación diga que algo falla, el botón de Google Wallet no sale a los socios.
 5. Al principio la cuenta está en **modo de prueba**: solo pueden guardar la tarjeta las cuentas de Google que añadas como usuarios de prueba. Cuando funcione, pide el **acceso de publicación** en la Wallet Console para que la pueda guardar cualquiera.
 
