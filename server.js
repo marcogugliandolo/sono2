@@ -425,6 +425,7 @@ function validarDatos(d) {
     zonas,
     club: validarClub(d.club),
     resenas: { activo: !(d.resenas && d.resenas.activo === false) },
+    cartaAparte: d.cartaAparte === true,
     legal: validarLegal(d.legal)
   };
 }
@@ -445,11 +446,12 @@ function validarLegal(l) {
   };
 }
 
-/* Al guardar Ajustes o volver a una versión: el club y las reseñas no se encienden ni se apagan
+/* Al guardar Ajustes o volver a una versión: el club, las reseñas y la carta aparte no cambian
    (eso se hace en sus pestañas) y la fecha de los textos legales se pone sola si cambian sus datos */
 function prepararDatos(limpio, antes) {
   limpio.club.activo = ajustesClub().activo !== false;
   limpio.resenas.activo = ajustesResenas().activo !== false;
+  limpio.cartaAparte = contenido.datos.cartaAparte === true;
   const sinFecha = (l) => JSON.stringify(Object.assign({}, LEGAL_VACIO, l || {}, { actualizado: '' }));
   const previo = (antes && antes.legal) || {};
   limpio.legal.actualizado = sinFecha(previo) !== sinFecha(limpio.legal) ? hoyISO(0) : (previo.actualizado || hoyISO(0));
@@ -591,6 +593,34 @@ async function servirArchivo(req, res, ruta, cache) {
   if (req.method === 'HEAD') { res.end(); return true; }
   fs.createReadStream(ruta).pipe(res);
   return true;
+}
+
+/* La portada y la página de la carta salen del mismo index.html, ya preparado según el ajuste
+   «carta en su propia página», para que no parpadee mientras carga el JavaScript */
+let indiceCache = { mtime: 0, html: '' };
+async function leerIndice() {
+  const ruta = path.join(DIR_PUBLICO, 'index.html');
+  const info = await fsp.stat(ruta);
+  if (info.mtimeMs !== indiceCache.mtime) indiceCache = { mtime: info.mtimeMs, html: await fsp.readFile(ruta, 'utf8') };
+  return indiceCache.html;
+}
+async function servirIndice(req, res, enCarta) {
+  let html = await leerIndice();
+  const aparte = !!(contenido && contenido.datos && contenido.datos.cartaAparte);
+  if (enCarta) {
+    html = html.replace('<html lang="es">', '<html lang="es" class="modo-carta">')
+      .replace('<title>SOÑO</title>', '<title>Carta · SOÑO</title>');
+  } else if (aparte) {
+    html = html.replace('<html lang="es">', '<html lang="es" class="carta-aparte">')
+      .replace(/href="#carta" data-enlace-carta/g, 'href="/carta" data-enlace-carta');
+  }
+  const cuerpo = Buffer.from(html, 'utf8');
+  const etag = 'W/"' + crypto.createHash('sha1').update(cuerpo).digest('hex').slice(0, 20) + '"';
+  res.setHeader('ETag', etag);
+  res.setHeader('Cache-Control', 'no-cache');
+  if (req.headers['if-none-match'] === etag) { res.writeHead(304); return res.end(); }
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': cuerpo.length });
+  res.end(req.method === 'HEAD' ? undefined : cuerpo);
 }
 
 async function servirPublico(req, res, pathname) {
@@ -1183,6 +1213,17 @@ async function api(req, res, pathname) {
   if (pathname === '/api/versiones' || pathname.startsWith('/api/versiones/')) return apiVersiones(req, res, pathname, metodo);
   if (pathname === '/api/resenas' || pathname.startsWith('/api/resenas/')) return apiResenas(req, res, pathname, metodo, ip);
 
+  /* La carta en su propia página (/carta) en lugar de en la portada */
+  if (pathname === '/api/carta/aparte' && metodo === 'POST') {
+    exigirAdmin(req);
+    const datos = await leerJSON(req);
+    if (typeof datos.aparte !== 'boolean') throw errorCliente('Indica si la carta va en su propia página o no.');
+    contenido.datos = Object.assign({}, contenido.datos, { cartaAparte: datos.aparte });
+    await guardarArchivo('contenido.json', contenido);
+    console.log('[soño] Carta ' + (datos.aparte ? 'en su propia página' : 'en la portada'));
+    return enviarJSON(res, 200, { cartaAparte: datos.aparte });
+  }
+
   if (pathname === '/api/contenido' && metodo === 'GET') {
     return enviarJSON(res, 200, contenido);
   }
@@ -1452,12 +1493,13 @@ async function atender(req, res) {
     if (await servirArchivo(req, res, path.join(DIR_PUBLICO, 'legal.html'), 'no-cache')) return;
   }
 
+  if (pathname === '/' || pathname === '/index.html') return servirIndice(req, res, false);
+  if (pathname === '/carta' || pathname === '/carta/') return servirIndice(req, res, true);
+
   if (await servirPublico(req, res, pathname)) return;
 
   /* Cualquier otra ruta muestra la portada, sin cambiar de URL */
-  if (!path.extname(pathname)) {
-    if (await servirArchivo(req, res, path.join(DIR_PUBLICO, 'index.html'), 'no-cache')) return;
-  }
+  if (!path.extname(pathname)) return servirIndice(req, res, false);
   enviarTexto(res, 404, 'No encontrado');
 }
 
