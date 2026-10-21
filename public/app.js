@@ -2380,10 +2380,6 @@
       }).then(function () { ch.disabled = false; });
     });
     cuerpo.appendChild(bloque);
-    var estadoWallet = el('div', 'club-admin__wallet');
-    estadoWallet.id = 'club-wallet';
-    cuerpo.appendChild(estadoWallet);
-    pintarEstadoWallet();
 
     cuerpo.appendChild(el('p', 'admin__ayuda', 'Al escanear el QR de la tarjeta, el sello se pone solo. También puedes escribir el código que sale debajo del QR o buscar al socio en la lista y pulsar «+1 sello».'));
 
@@ -2454,6 +2450,12 @@
     lista.appendChild(el('p', 'estado-vacio', 'Cargando socios…'));
     gLista.appendChild(lista);
     cuerpo.appendChild(gLista);
+
+    /* La configuración de la tarjeta en el móvil va al final: se toca poco */
+    var estadoWallet = el('div', 'club-admin__wallet');
+    estadoWallet.id = 'club-wallet';
+    cuerpo.appendChild(estadoWallet);
+    pintarEstadoWallet();
 
     if (club.elegido) pintarFicha();
     cargarSocios();
