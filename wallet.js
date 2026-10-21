@@ -440,14 +440,34 @@ function cargarGoogle(dir) {
       if (j && j.type === 'service_account' && j.private_key && j.client_email) { cuenta = j; break; }
     } catch (e) { /* no es la cuenta */ }
   }
+  // Sin JSON: clave creada en el servidor (su certificado se sube a la cuenta de servicio) y el correo de la cuenta
+  let claveServidor = null;
+  if (!cuenta && ajustes.email) {
+    try { claveServidor = crypto.createPrivateKey(fs.readFileSync(path.join(dir, 'clave-servidor.key'))); } catch (e) { /* aún no hay */ }
+  }
+  r.certificadoServidor = nombres.includes('clave-servidor.key');
   if (!/^\d{6,25}$/.test(r.issuerId)) {
-    r.motivo = cuenta ? 'Falta el Issuer ID de Google Wallet.' : 'Faltan el Issuer ID y el archivo JSON de la cuenta de servicio de Google Cloud.';
+    r.motivo = (cuenta || claveServidor) ? 'Falta el Issuer ID de Google Wallet.'
+      : r.certificadoServidor ? 'Faltan el Issuer ID y el correo de la cuenta de servicio.'
+      : 'Faltan el Issuer ID y la clave de la cuenta de servicio de Google Cloud.';
     if (cuenta) r.email = cuenta.client_email;
+    else if (claveServidor) r.email = ajustes.email;
     return r;
   }
-  if (!cuenta) { r.motivo = 'Falta el archivo JSON de la cuenta de servicio de Google Cloud.'; return r; }
-  r.email = cuenta.client_email;
-  try { r.clave = crypto.createPrivateKey(cuenta.private_key); } catch (e) { r.motivo = 'La clave de la cuenta de servicio de Google no es válida.'; return r; }
+  if (!cuenta && !claveServidor) {
+    r.motivo = r.certificadoServidor && !ajustes.email
+      ? 'Falta el correo de la cuenta de servicio a la que subiste el certificado.'
+      : 'Falta la clave de la cuenta de servicio (el certificado del servidor o un archivo .json).';
+    return r;
+  }
+  if (cuenta) {
+    r.email = cuenta.client_email;
+    try { r.clave = crypto.createPrivateKey(cuenta.private_key); } catch (e) { r.motivo = 'La clave de la cuenta de servicio de Google no es válida.'; return r; }
+  } else {
+    r.email = ajustes.email;
+    r.clave = claveServidor;
+    r.modo = 'servidor';
+  }
   r.clase = r.issuerId + '.' + String(process.env.WALLET_GOOGLE_CLASE || 'club_sono').replace(/[^\w.-]/g, '');
   r.activo = true;
   return r;
@@ -464,6 +484,39 @@ function crearSolicitudCsr(clave, publica) {
   const firma = crypto.sign('sha256', info, clave);
   const csr = secuencia(info, secuencia(oid('1.2.840.113549.1.1.11'), NULO), der(0x03, Buffer.concat([Buffer.from([0]), firma])));
   return '-----BEGIN CERTIFICATE REQUEST-----\n' + csr.toString('base64').match(/.{1,64}/g).join('\n') + '\n-----END CERTIFICATE REQUEST-----\n';
+}
+
+/* Certificado autofirmado (X.509 v3, RSA + SHA-256) de una clave del servidor. Google Cloud lo acepta en
+   «Cuentas de servicio → Claves → Subir clave existente»: así la clave privada nunca sale del servidor */
+function enteroGrande(buf) {
+  let b = Buffer.from(buf);
+  while (b.length > 1 && b[0] === 0 && !(b[1] & 0x80)) b = b.subarray(1);
+  if (b[0] & 0x80) b = Buffer.concat([Buffer.from([0]), b]);
+  return der(0x02, b);
+}
+function crearCertificadoPropio(clave, nombreComun, anios) {
+  const nombre = secuencia(
+    conjunto(secuencia(oid('2.5.4.6'), der(0x13, Buffer.from('ES', 'ascii')))),
+    conjunto(secuencia(oid('2.5.4.10'), der(0x0c, Buffer.from('SONO', 'utf8')))),
+    conjunto(secuencia(oid('2.5.4.3'), der(0x0c, Buffer.from(nombreComun, 'utf8'))))
+  );
+  const desde = new Date(Date.now() - 3600000);
+  const hasta = new Date(desde.getTime() + anios * 365 * 86400000);
+  const serie = crypto.randomBytes(16);
+  serie[0] &= 0x7f;
+  const algoritmo = secuencia(oid('1.2.840.113549.1.1.11'), NULO);
+  const tbs = secuencia(
+    der(0xa0, der(0x02, Buffer.from([2]))),   // versión 3
+    enteroGrande(serie),
+    algoritmo,
+    nombre,
+    secuencia(horaUtc(desde), horaUtc(hasta)),
+    nombre,
+    crypto.createPublicKey(clave).export({ type: 'spki', format: 'der' })
+  );
+  const firma = crypto.sign('sha256', tbs, clave);
+  const cert = secuencia(tbs, algoritmo, der(0x03, Buffer.concat([Buffer.from([0]), firma])));
+  return '-----BEGIN CERTIFICATE-----\n' + cert.toString('base64').match(/.{1,64}/g).join('\n') + '\n-----END CERTIFICATE-----\n';
 }
 
 /* ======================================================================
@@ -549,7 +602,7 @@ function crearWallet(op) {
   function estado() {
     return {
       apple: { activo: apple.activo, motivo: apple.motivo, passTypeId: apple.passTypeId || '', caduca: apple.caduca || '', registrados: registros.length, solicitudPendiente: !!apple.solicitudPendiente },
-      google: { activo: google.activo, motivo: google.motivo, issuerId: google.issuerId || '', email: google.email || '', comprobacion: google.activo ? google.comprobacion || null : null },
+      google: { activo: google.activo, motivo: google.motivo, issuerId: google.issuerId || '', email: google.email || '', comprobacion: google.activo ? google.comprobacion || null : null, modo: google.modo || (google.activo ? 'json' : ''), certificadoServidor: !!google.certificadoServidor },
       https: /^https:\/\//.test(baseConocida)
     };
   }
@@ -639,21 +692,48 @@ function crearWallet(op) {
       }
       try { crypto.createPrivateKey(cuenta.private_key); } catch (e) { throw errorPublico('La clave de ese JSON no es válida.'); }
     }
-    if (!issuerId && !cuenta) throw errorPublico('Escribe el Issuer ID o sube el JSON de la cuenta de servicio.');
+    const email = String((datos && datos.email) || '').trim().toLowerCase();
+    if (email && !/^[a-z0-9-]{3,40}@[a-z0-9-]{3,40}\.iam\.gserviceaccount\.com$/.test(email)) {
+      throw errorPublico('Ese no es el correo de una cuenta de servicio (acaba en .iam.gserviceaccount.com).');
+    }
+    if (email && cuenta) throw errorPublico('Usa el archivo JSON o el certificado del servidor, no los dos.');
+    if (email && !fs.existsSync(path.join(dirGoogle, 'clave-servidor.key'))) throw errorPublico('Primero crea el certificado del servidor y súbelo a la cuenta de servicio.');
+    if (!issuerId && !cuenta && !email) throw errorPublico('Escribe el Issuer ID o sube el JSON de la cuenta de servicio.');
     fs.mkdirSync(dirGoogle, { recursive: true });
-    if (cuenta) {
+    const quitarJson = () => {
       for (const n of fs.readdirSync(dirGoogle)) {
         if (/\.json$/i.test(n) && n !== 'ajustes.json') fs.unlinkSync(path.join(dirGoogle, n));
       }
+    };
+    if (cuenta) {
+      quitarJson();
       escribirSeguro(path.join(dirGoogle, 'cuenta-servicio.json'), JSON.stringify(cuenta));
     }
+    if (email) quitarJson();   // con la clave del servidor no hace falta (ni conviene guardar) ningún JSON
     const ajustes = leerAjustesGoogle(dirGoogle);
     delete ajustes.comprobacion;
     if (issuerId) ajustes.issuerId = issuerId;
+    if (email) ajustes.email = email;
+    if (cuenta) delete ajustes.email;
     escribirSeguro(path.join(dirGoogle, 'ajustes.json'), JSON.stringify(ajustes));
     recargar();
     const comprobacion = google.activo ? await comprobarGoogle() : null;
     return { estado: estado(), comprobacion };
+  }
+
+  /* Google sin descargar ninguna clave: el servidor crea la suya y da el certificado para subirlo a Google Cloud */
+  function certificadoGoogle() {
+    fs.mkdirSync(dirGoogle, { recursive: true });
+    const ruta = path.join(dirGoogle, 'clave-servidor.key');
+    let clave;
+    try { clave = crypto.createPrivateKey(fs.readFileSync(ruta)); } catch (e) {
+      clave = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey;
+      escribirSeguro(ruta, clave.export({ type: 'pkcs8', format: 'pem' }));
+      log('creada la clave del servidor para Google');
+    }
+    const certificado = crearCertificadoPropio(clave, 'Club SONO Google Wallet', 10);
+    recargar();
+    return certificado;
   }
 
   /* Comprueba con Google que la cuenta de servicio puede usar el emisor (y crea la clase de la tarjeta).
@@ -673,7 +753,9 @@ function crearWallet(op) {
     let acceso;
     try { acceso = await accesoGoogle(); } catch (e) {
       if (!e.respuestaGoogle) return { ok: false, mensaje: 'No se ha podido conectar con Google ahora mismo. Prueba otra vez en un rato.' };
-      return { ok: false, mensaje: e.message + '. Comprueba que el archivo .json es el de la clave que acabas de crear y que no la has borrado en Google Cloud.' };
+      return { ok: false, mensaje: e.message + (google.modo === 'servidor'
+        ? '. Comprueba que has subido el certificado del servidor a la cuenta ' + google.email + ' (Claves → Agregar clave → Subir clave existente). Si lo acabas de subir, espera un par de minutos y vuelve a comprobar.'
+        : '. Comprueba que el archivo .json es el de la clave que acabas de crear y que no la has borrado en Google Cloud.') };
     }
     const url = 'https://walletobjects.googleapis.com/walletobjects/v1/loyaltyClass/';
     try {
@@ -1083,8 +1165,8 @@ function crearWallet(op) {
   buscarIntermedio();
   return {
     estado, disponible, baseDe, passApple, enlaceGoogle, cambioSocio, cambioClub, olvidar, atender, recargar,
-    solicitudApple, subirCertificadoApple, guardarGoogle, comprobarGoogle
+    solicitudApple, subirCertificadoApple, guardarGoogle, comprobarGoogle, certificadoGoogle
   };
 }
 
-module.exports = { crearWallet, tiraSellos, crearZip, crearPng, firmarPkcs7, emisorYSerie, CAFE };
+module.exports = { crearCertificadoPropio, crearWallet, tiraSellos, crearZip, crearPng, firmarPkcs7, emisorYSerie, CAFE };
