@@ -1519,7 +1519,7 @@
   });
 
   /* ---------- Panel de administración ---------- */
-  var pestana = 'carta';
+  var pestana = 'datos';   // el panel se abre en Ajustes
   var borradores = {};
   var sucio = {};
   var guardando = false;
