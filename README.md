@@ -59,9 +59,17 @@ Si el iPhone no deja guardar el `.cer`, los pasos 2 y 3 se pueden hacer desde un
 
 Las claves y certificados se guardan en `wallet/apple/` y `wallet/google/` dentro del volumen de datos (solo los puede leer el servidor) y los iPhone que tienen la tarjeta en `wallet/registros.json`. La política de privacidad ya explica qué se guarda al añadir la tarjeta a la cartera.
 
+Con la sesión de socio iniciada, en el menú de arriba (y en la cabecera del móvil) el enlace del club se cambia por la **Ñ del logo resaltada**, que abre su tarjeta.
+
 Los socios pueden darse de baja ellos mismos desde su tarjeta (se borran sus datos). Las contraseñas se guardan cifradas (scrypt) y la sesión del socio dura 120 días. Al recoger nombre, email y teléfono, conviene mencionarlo en la política de privacidad de la cafetería.
 
 Los datos del club están en `socios.json` y la clave que firma las sesiones en `secreto.json`, dentro del volumen de datos. Si se pierde `secreto.json`, los socios solo tienen que volver a entrar.
+
+## Soñito, el asistente de la web
+
+Abajo a la derecha sale un botón **«¿Te ayudo?»** con un ayudante que responde al momento, con la información que ya tiene la web: horario (y si hoy está abierto), dirección con enlace a Google Maps, la carta (precio, descripción y alérgenos de cada producto: «¿cuánto cuesta el capuchino?», «¿el cruasán lleva huevo?»), qué se puede tomar sin un alérgeno («algo sin gluten»), reservas, pedidos para llevar y el club. Si no sabe algo, ofrece **llamar**, **WhatsApp**, email o el formulario de contacto. Tiene preguntas rápidas para tocar sin escribir.
+
+No usa inteligencia artificial ni servicios de fuera, no guarda nada de lo que se escribe y no cuesta nada. Sale cuando la persona ya ha elegido en el aviso de cookies (así no se tapan). En **Ajustes → Asistente de la web** se quita o se le cambia el nombre.
 
 ## Textos y menú
 
