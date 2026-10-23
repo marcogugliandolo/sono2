@@ -23,8 +23,9 @@ const TEXTOS_EXTRA = {
 
 /* Nombre de cada parte de la web, para el historial */
 const PARTES = {
-  portada: 'Portada', escena: 'Así preparamos tu café', nosotros: 'Nosotros', carta: 'Carta', llevar: 'Para llevar',
-  club: 'Club', galeria: 'Galería', resenas: 'Reseñas', contacto: 'Visítanos', escribenos: 'Visítanos', pie: 'Pie de página'
+  portada: 'Portada', escena: 'Así preparamos tu café', nosotros: 'Nosotros', mes: 'Carta (lo mejor del mes)', carta: 'Carta', llevar: 'Para llevar',
+  club: 'Club', galeria: 'Galería', resenas: 'Reseñas', contacto: 'Visítanos', escribenos: 'Visítanos', empleo: 'Trabaja con nosotros',
+  pie: 'Pie de página'
 };
 
 const RE_ELEMENTO = /<([a-z0-9]+)\b([^>]*?)\sdata-texto="([a-z0-9.]+)"([^>]*)>([\s\S]*?)<\/\1>/g;
@@ -66,6 +67,24 @@ function textosOriginales(html) {
   return Object.assign(base, TEXTOS_EXTRA);
 }
 
+/* Un menú guardado antes de que existiera una sección nueva: la sección entra en su sitio
+   (detrás de la que tiene delante en el menú original), no al principio ni al final */
+function completarMenu(menu) {
+  const lista = (Array.isArray(menu) ? menu : []).filter((m) => m && MENU_IDS.includes(m.id))
+    .filter((m, i, todos) => todos.findIndex((x) => x.id === m.id) === i)
+    .map((m) => ({ id: m.id, texto: m.texto }));
+  MENU.forEach((m, i) => {
+    if (lista.some((x) => x.id === m.id)) return;
+    let pos = 0;
+    for (let j = i - 1; j >= 0; j--) {
+      const k = lista.findIndex((x) => x.id === MENU[j].id);
+      if (k !== -1) { pos = k + 1; break; }
+    }
+    lista.splice(pos, 0, { id: m.id, texto: m.texto });
+  });
+  return lista;
+}
+
 function limpiarTexto(v, max) {
   if (typeof v !== 'string') return '';
   return v.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, max);
@@ -74,15 +93,10 @@ function limpiarTexto(v, max) {
 /* Lo que llega del panel → lo que se guarda (solo los textos cambiados) */
 function validarTextos(v, base) {
   const x = v && typeof v === 'object' ? v : {};
-  const vistos = new Set();
-  const menu = [];
-  (Array.isArray(x.menu) ? x.menu : []).forEach((item) => {
-    if (!item || !MENU_IDS.includes(item.id) || vistos.has(item.id)) return;
-    vistos.add(item.id);
+  const menu = completarMenu(x.menu).map((item) => {
     const original = MENU.find((m) => m.id === item.id).texto;
-    menu.push({ id: item.id, texto: limpiarTexto(item.texto, MAX_MENU).replace(/\n/g, ' ') || original });
+    return { id: item.id, texto: limpiarTexto(item.texto, MAX_MENU).replace(/\n/g, ' ') || original };
   });
-  MENU.forEach((m) => { if (!vistos.has(m.id)) menu.push({ id: m.id, texto: m.texto }); });
   const textos = {};
   const entrada = x.textos && typeof x.textos === 'object' ? x.textos : {};
   Object.keys(base).forEach((clave) => {
@@ -110,8 +124,9 @@ function aplicarAlHtml(html, guardado, base, datos) {
     if (!valor) return todo;
     return '<' + etiqueta + antes + ' data-texto="' + clave + '"' + despues + '>' + aHtml(clave, valor, club) + '</' + etiqueta + '>';
   });
-  const orden = (g.menu || MENU).map((m) => m.id);
-  const nombre = new Map((g.menu || MENU).map((m) => [m.id, m.texto]));
+  const menu = completarMenu(g.menu || MENU);
+  const orden = menu.map((m) => m.id);
+  const nombre = new Map(menu.map((m) => [m.id, m.texto]));
   return html.replace(/(<ul\b[^>]*\sdata-menu-lista[^>]*>)([\s\S]*?)(\n[ \t]*<\/ul>)/g, (todo, abre, dentro, cierra) => {
     const items = dentro.match(/\n[ \t]*<li\b[\s\S]*?<\/li>/g) || [];
     const fijos = [];
@@ -146,4 +161,4 @@ function resumenTextos(a, b, base) {
   return lineas;
 }
 
-module.exports = { MENU, MENU_IDS, textosOriginales, validarTextos, textosIniciales, aplicarAlHtml, resumenTextos, aTexto, aHtml };
+module.exports = { MENU, MENU_IDS, completarMenu, textosOriginales, validarTextos, textosIniciales, aplicarAlHtml, resumenTextos, aTexto, aHtml };

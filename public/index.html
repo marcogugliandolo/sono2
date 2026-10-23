@@ -115,6 +115,13 @@
       <path class="trazo" d="M44 54 L26 84 C24 88 27 91 31 91 H69 C73 91 76 88 74 84 L56 54"/>
       <path class="trazo" d="M33 74 H67"/>
     </symbol>
+    <symbol id="i-documento" viewBox="0 0 100 100">
+      <path class="trazo" d="M26 8 H62 L78 24 V92 H26 Z"/>
+      <path class="trazo" d="M62 8 V24 H78"/>
+      <circle class="trazo" cx="45" cy="38" r="7"/>
+      <path class="trazo" d="M33 58 C33 49 57 49 57 58"/>
+      <path class="trazo" d="M35 70 H69 M35 78 H69 M35 86 H56"/>
+    </symbol>
     <symbol id="i-estrella" viewBox="0 0 24 24">
       <path class="trazo" d="M12 2.9 L14.7 8.5 L20.8 9.3 L16.3 13.5 L17.5 19.6 L12 16.6 L6.5 19.6 L7.7 13.5 L3.2 9.3 L9.3 8.5 Z"/>
     </symbol>
@@ -358,6 +365,17 @@
         <h2 class="titulo" id="t-carta" data-texto="carta.titulo">Los favoritos de la casa</h2>
         <p class="cabeza-centro__nota" data-texto="carta.texto">Toca cualquier producto para ver la descripción y los alérgenos.</p>
       </div>
+      <!-- Lo mejor del mes: arriba de la carta. Se activa o se quita en el panel (pestaña «Del mes»); app.js pinta los destacados -->
+      <section class="mes" id="mes" aria-labelledby="t-mes" data-mes hidden data-aparece>
+        <div class="mes__cabeza">
+          <div>
+            <p class="meta" data-texto="mes.etiqueta">Lo mejor del mes</p>
+            <h3 class="mes__titulo" id="t-mes" data-texto="mes.titulo">Elegido para este mes</h3>
+          </div>
+          <p class="mes__nota" data-texto="mes.texto">Cada mes elegimos algo especial de la casa. Pruébalo antes de que cambie.</p>
+        </div>
+        <div class="mes__lista" id="mes-lista"></div>
+      </section>
       <ul class="favoritos" id="carta-favoritos" aria-label="Productos destacados"></ul>
       <div class="carta" id="carta-grupos">
         <p class="estado-vacio">Cargando la carta…</p>
@@ -563,13 +581,25 @@
         </div>
       </div>
 
-      <div class="escribenos">
+      <div class="escribenos" id="escribenos">
         <div class="escribenos__texto" data-aparece>
-          <p class="meta" data-texto="escribenos.etiqueta">Escríbenos</p>
-          <h3 class="titulo titulo--medio" data-texto="escribenos.titulo">Eventos, grupos o cualquier duda</h3>
-          <p data-texto="escribenos.texto">Cuéntanos qué necesitas y te respondemos lo antes posible.</p>
+          <div class="escribenos__variante" id="escribenos-texto-consulta">
+            <p class="meta" data-texto="escribenos.etiqueta">Escríbenos</p>
+            <h3 class="titulo titulo--medio" data-texto="escribenos.titulo">Eventos, grupos o cualquier duda</h3>
+            <p data-texto="escribenos.texto">Cuéntanos qué necesitas y te respondemos lo antes posible.</p>
+          </div>
+          <div class="escribenos__variante" id="escribenos-texto-empleo" hidden>
+            <p class="meta" data-texto="empleo.etiqueta">Trabaja con nosotros</p>
+            <h3 class="titulo titulo--medio" data-texto="empleo.titulo">¿Te vienes al equipo?</h3>
+            <p data-texto="empleo.texto">Buscamos gente con ganas de hacer buen café y de cuidar a quien entra por la puerta. Cuéntanos quién eres y adjunta tu currículum.</p>
+          </div>
         </div>
-        <form class="formulario" id="formulario-contacto" novalidate data-aparece>
+        <div class="escribenos__formularios" data-aparece>
+        <div class="escribenos__tipos" role="radiogroup" aria-label="¿Qué quieres enviarnos?" data-empleo>
+          <input class="oculto" type="radio" name="escribenos-tipo" id="escribenos-consulta" value="consulta" checked><label class="chip chip--tipo" for="escribenos-consulta">Una consulta</label>
+          <input class="oculto" type="radio" name="escribenos-tipo" id="escribenos-empleo" value="empleo"><label class="chip chip--tipo" for="escribenos-empleo">Trabaja con nosotros</label>
+        </div>
+        <form class="formulario" id="formulario-contacto" novalidate>
           <div class="trampa" aria-hidden="true"><label for="contacto-web">No rellenar</label><input id="contacto-web" name="web" type="text" tabindex="-1" autocomplete="off"></div>
           <div class="campos-dos">
             <div class="campo">
@@ -589,6 +619,63 @@
           <p class="nota-legal">Usamos tu nombre y tu email solo para responderte. <a href="/privacidad" target="_blank" rel="noopener">Política de privacidad</a></p>
           <p class="aviso" id="aviso" aria-live="polite"></p>
         </form>
+
+        <form class="formulario" id="formulario-empleo" novalidate hidden>
+          <div class="trampa" aria-hidden="true"><label for="empleo-web">No rellenar</label><input id="empleo-web" name="web" type="text" tabindex="-1" autocomplete="off"></div>
+          <div class="campos-dos">
+            <div class="campo">
+              <label for="empleo-nombre">Nombre y apellidos</label>
+              <input id="empleo-nombre" name="nombre" type="text" autocomplete="name" maxlength="80" required>
+            </div>
+            <div class="campo">
+              <label for="empleo-email">Email</label>
+              <input id="empleo-email" name="email" type="email" autocomplete="email" inputmode="email" required>
+            </div>
+          </div>
+          <div class="campos-dos">
+            <div class="campo">
+              <label for="empleo-telefono">Teléfono (opcional)</label>
+              <input id="empleo-telefono" name="telefono" type="tel" autocomplete="tel" inputmode="tel">
+            </div>
+            <div class="campo">
+              <label for="empleo-puesto">¿Qué te gustaría hacer? (opcional)</label>
+              <input id="empleo-puesto" name="puesto" type="text" maxlength="80" placeholder="Barra, cocina, fines de semana…">
+            </div>
+          </div>
+          <div class="campo">
+            <span class="campo__titulo" id="empleo-cv-titulo">Tu currículum</span>
+            <div class="adjunto" id="empleo-adjunto">
+              <input class="oculto" type="file" id="empleo-cv" name="cv" aria-labelledby="empleo-cv-titulo" aria-describedby="empleo-cv-ayuda" accept=".pdf,.doc,.docx,.odt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,image/*">
+              <label class="adjunto__zona" for="empleo-cv" id="empleo-cv-zona">
+                <svg viewBox="0 0 100 100" aria-hidden="true"><use href="#i-documento"/></svg>
+                <span class="adjunto__texto"><strong>Adjunta tu CV</strong> <span class="adjunto__arrastra">o arrástralo aquí</span><span class="adjunto__ayuda" id="empleo-cv-ayuda">PDF, Word o foto · hasta 5 MB</span></span>
+              </label>
+              <div class="adjunto__elegido" id="empleo-cv-elegido" hidden>
+                <svg viewBox="0 0 100 100" aria-hidden="true"><use href="#i-documento"/></svg>
+                <span class="adjunto__nombre"><strong id="empleo-cv-nombre"></strong><span id="empleo-cv-peso"></span></span>
+                <button class="boton boton--borde boton--mini" type="button" id="empleo-cv-cambiar">Cambiar</button>
+                <button class="adjunto__quitar" type="button" id="empleo-cv-quitar" aria-label="Quitar el currículum"><svg viewBox="0 0 20 20" aria-hidden="true"><use href="#i-cerrar"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <div class="campo">
+            <label for="empleo-mensaje">Cuéntanos un poco de ti</label>
+            <textarea id="empleo-mensaje" name="mensaje" maxlength="1500" style="min-height:110px" placeholder="Dónde has trabajado, qué disponibilidad tienes, por qué te apetece SOÑO…"></textarea>
+            <p class="campo__ayuda">Si no tienes el currículum a mano, con esto nos vale.</p>
+          </div>
+          <label class="casilla casilla--texto"><input type="checkbox" id="empleo-acepto" name="acepto"> <span>Acepto que SOÑO guarde mi candidatura y mi currículum para sus procesos de selección durante un año como mucho. Puedo pedir que la borren cuando quiera. <a href="/privacidad" target="_blank" rel="noopener">Política de privacidad</a></span></label>
+          <button class="boton boton--lleno" type="submit">Enviar candidatura</button>
+          <p class="aviso" id="aviso-empleo" aria-live="polite"></p>
+        </form>
+
+        <div class="confirmacion" id="confirmacion-empleo" hidden>
+          <svg viewBox="0 0 100 100" aria-hidden="true"><use href="#i-documento"/></svg>
+          <h3>¡Candidatura recibida!</h3>
+          <p class="detalle" id="confirmacion-empleo-detalle"></p>
+          <p class="demo">La leeremos con calma. Si encaja con lo que buscamos, te escribiremos o te llamaremos.</p>
+          <button class="boton boton--borde" type="button" id="otra-candidatura">Volver al formulario</button>
+        </div>
+        </div>
       </div>
     </div>
   </section>
@@ -613,6 +700,12 @@
             <li data-menu="galeria" data-galeria hidden><a href="#galeria">Galería</a></li>
             <li data-menu="resenas" data-resenas><a href="#resenas">Reseñas</a></li>
             <li data-menu="contacto"><a href="#contacto">Visítanos</a></li>
+          </ul>
+        </div>
+        <div data-empleo>
+          <p class="meta">Equipo</p>
+          <ul>
+            <li><a href="#trabaja" data-abrir-empleo>Trabaja con nosotros</a></li>
           </ul>
         </div>
         <div>
@@ -987,6 +1080,7 @@
       <button class="pestana" type="button" role="tab" id="tab-datos" data-pestana="datos" aria-controls="admin-cuerpo" aria-selected="true">Ajustes</button>
       <button class="pestana" type="button" role="tab" id="tab-textos" data-pestana="textos" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Textos</button>
       <button class="pestana" type="button" role="tab" id="tab-carta" data-pestana="carta" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Carta</button>
+      <button class="pestana" type="button" role="tab" id="tab-mes" data-pestana="mes" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Del mes</button>
       <button class="pestana" type="button" role="tab" id="tab-fotos" data-pestana="fotos" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Fotos</button>
       <button class="pestana" type="button" role="tab" id="tab-horarios" data-pestana="horarios" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Horarios</button>
       <button class="pestana" type="button" role="tab" id="tab-reservas" data-pestana="reservas" aria-controls="admin-cuerpo" aria-selected="false" tabindex="-1">Reservas</button>
