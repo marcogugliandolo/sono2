@@ -927,6 +927,26 @@ async function apiClub(req, res, pathname, metodo, ip) {
     return enviarJSON(res, 200, { club: ajustesClub() });
   }
 
+  /* Premio y sellos de la tarjeta (pestaña Club del panel). Queda en el historial de Ajustes */
+  if (pathname === '/api/club/ajustes' && metodo === 'POST') {
+    exigirAdmin(req);
+    const datos = await leerJSON(req);
+    const antes = contenido.datos;
+    const club = validarClub(Object.assign({}, ajustesClub(), { premio: datos.premio, sellos: datos.sellos }));
+    club.activo = ajustesClub().activo !== false;
+    const nuevo = Object.assign({}, contenido.datos, { club });
+    if (JSON.stringify(antes.club) !== JSON.stringify(club)) {
+      contenido.datos = nuevo;
+      await guardarArchivo('contenido.json', contenido);
+      avisarCambioClub(antes, nuevo);
+      if (!versiones.some((x) => x.seccion === 'datos')) registrarVersion('datos', antes, ['Cómo estaba antes del primer cambio']);
+      registrarVersion('datos', nuevo, resumenCambios('datos', antes, nuevo));
+      await guardarArchivo('versiones.json', versiones);
+      console.log('[soño] Club: ' + club.sellos + ' sellos, premio «' + club.premio + '»');
+    }
+    return enviarJSON(res, 200, { club: ajustesClub() });
+  }
+
   /* Configurar la tarjeta en el móvil (Apple Wallet y Google Wallet) desde el panel */
   if (pathname === '/api/club/wallet/apple/solicitud' && metodo === 'POST') {
     exigirAdmin(req);
@@ -1325,7 +1345,10 @@ async function api(req, res, pathname) {
     const clave = mContenido[1];
     const limpio = VALIDADORES[clave](await leerJSON(req));
     const antes = contenido[clave];
-    if (clave === 'datos') prepararDatos(limpio, antes);
+    if (clave === 'datos') {
+      prepararDatos(limpio, antes);
+      limpio.club = Object.assign({}, ajustesClub());   // el premio y los sellos se cambian en la pestaña Club
+    }
     contenido = Object.assign({}, contenido, { [clave]: limpio });
     await guardarArchivo('contenido.json', contenido);
     if (clave === 'datos') avisarCambioClub(antes, limpio);

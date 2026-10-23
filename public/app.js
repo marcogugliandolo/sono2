@@ -1806,7 +1806,7 @@
     ['Carta', [['carta.etiqueta', 'Etiqueta'], ['carta.titulo', 'Título'], ['carta.texto', 'Texto', true]]],
     ['Para llevar', [['llevar.etiqueta', 'Etiqueta'], ['llevar.titulo', 'Título'], ['llevar.texto', 'Texto (con envío a domicilio)', true],
       ['llevar.textoRecoger', 'Texto (si solo se puede recoger)', true], ['llevar.nota1', 'Nota 1'], ['llevar.nota2', 'Nota 2']]],
-    ['Club', [['club.etiqueta', 'Etiqueta'], ['club.titulo', 'Título'], ['club.texto', 'Texto. {premio} se cambia por el premio de Ajustes', true],
+    ['Club', [['club.etiqueta', 'Etiqueta'], ['club.titulo', 'Título'], ['club.texto', 'Texto. {premio} se cambia por el premio de la pestaña Club', true],
       ['club.p1t', 'Paso 1: título'], ['club.p1', 'Paso 1: texto', true], ['club.p2t', 'Paso 2: título'], ['club.p2', 'Paso 2: texto', true],
       ['club.p3t', 'Paso 3: título'], ['club.p3', 'Paso 3: texto. {sellos} se cambia por el número de sellos', true]]],
     ['Galería', [['galeria.etiqueta', 'Etiqueta'], ['galeria.titulo', 'Título'], ['galeria.texto', 'Texto', true]]],
@@ -2252,17 +2252,6 @@
     grupo.appendChild(camposLlevar);
     cuerpo.appendChild(grupo);
 
-    var gc = el('section', 'admin__grupo');
-    gc.appendChild(el('h3', null, 'Club SOÑO'));
-    gc.appendChild(el('p', 'admin__ayuda', 'Tarjeta de sellos para los socios. Cada desayuno es un sello; al completar la tarjeta, el socio tiene el premio. Para activar o desactivar el club y poner sellos, ve a la pestaña «Club».'));
-    var camposClub = el('div', 'admin__campos');
-    var filaClub = el('div', 'fila-2');
-    filaClub.appendChild(campoTexto('adm-club-premio', 'Premio al completar la tarjeta', b.club.premio, function (v) { b.club.premio = v; }, { maxlength: '60', placeholder: 'un desayuno gratis' }));
-    filaClub.appendChild(campoTexto('adm-club-sellos', 'Sellos de la tarjeta', String(b.club.sellos), function (v) { b.club.sellos = Number(String(v).trim()); }, { inputmode: 'numeric', placeholder: '10' }));
-    camposClub.appendChild(filaClub);
-    gc.appendChild(camposClub);
-    cuerpo.appendChild(gc);
-
     var gl = el('section', 'admin__grupo');
     gl.appendChild(el('h3', null, 'Datos legales'));
     var ayudaLegal = el('p', 'admin__ayuda');
@@ -2643,6 +2632,7 @@
       }).then(function () { ch.disabled = false; });
     });
     cuerpo.appendChild(bloque);
+    cuerpo.appendChild(bloqueTarjetaClub());
 
     cuerpo.appendChild(el('p', 'admin__ayuda', 'Al escanear el QR de la tarjeta, el sello se pone solo. También puedes escribir el código que sale debajo del QR o buscar al socio en la lista y pulsar «+1 sello».'));
 
@@ -2722,6 +2712,77 @@
 
     if (club.elegido) pintarFicha();
     cargarSocios();
+  }
+
+  /* Premio y número de sellos de la tarjeta: se guardan con su propio botón */
+  function bloqueTarjetaClub() {
+    var c = ajustesClub();
+    var g = el('section', 'admin__grupo club-admin__tarjeta');
+    g.appendChild(el('h3', null, 'Tarjeta de sellos'));
+    g.appendChild(el('p', 'admin__ayuda', 'Cada desayuno es un sello; al completar la tarjeta, el socio tiene el premio. Si cambias el premio o los sellos, las tarjetas de los socios se actualizan solas (también en Apple Wallet y Google Wallet).'));
+    var form = el('form', 'club-admin__tarjeta-form');
+    form.noValidate = true;
+    var fila = el('div', 'fila-2');
+    var cPremio = el('div', 'campo');
+    var lPremio = el('label', null, 'Premio al completar la tarjeta'); lPremio.htmlFor = 'club-premio-panel';
+    var iPremio = el('input'); iPremio.id = 'club-premio-panel'; iPremio.type = 'text'; iPremio.maxLength = 60;
+    iPremio.placeholder = 'un desayuno gratis'; iPremio.value = c.premio;
+    cPremio.appendChild(lPremio); cPremio.appendChild(iPremio);
+    var cSellos = el('div', 'campo');
+    var lSellos = el('label', null, 'Sellos de la tarjeta'); lSellos.htmlFor = 'club-sellos-panel';
+    var iSellos = el('input'); iSellos.id = 'club-sellos-panel'; iSellos.type = 'text'; iSellos.inputMode = 'numeric';
+    iSellos.placeholder = '10'; iSellos.value = String(c.sellos);
+    cSellos.appendChild(lSellos); cSellos.appendChild(iSellos);
+    fila.appendChild(cPremio); fila.appendChild(cSellos);
+    form.appendChild(fila);
+    var pie = el('div', 'club-admin__tarjeta-pie');
+    var bGuardar = el('button', 'boton boton--lleno boton--mini', 'Guardar premio y sellos');
+    bGuardar.type = 'submit';
+    bGuardar.disabled = true;
+    var aviso = el('p', 'admin__estado club-admin__tarjeta-aviso');
+    aviso.setAttribute('aria-live', 'polite');
+    pie.appendChild(bGuardar); pie.appendChild(aviso);
+    form.appendChild(pie);
+    function cambiado() {
+      var a = ajustesClub();
+      return iPremio.value.trim() !== a.premio || iSellos.value.trim() !== String(a.sellos);
+    }
+    [iPremio, iSellos].forEach(function (i) {
+      i.addEventListener('input', function () {
+        bGuardar.disabled = !cambiado();
+        aviso.textContent = cambiado() ? 'Sin guardar.' : '';
+        aviso.classList.remove('es-error', 'es-ok');
+      });
+    });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var sellos = Number(iSellos.value.trim());
+      if (!Number.isInteger(sellos) || sellos < 3 || sellos > 20) {
+        aviso.textContent = 'Los sellos para conseguir el premio van de 3 a 20.';
+        aviso.classList.add('es-error');
+        iSellos.focus();
+        return;
+      }
+      bGuardar.disabled = true;
+      aviso.textContent = 'Guardando…';
+      aviso.classList.remove('es-error', 'es-ok');
+      api('POST', '/api/club/ajustes', { premio: iPremio.value.trim(), sellos: sellos }).then(function (r) {
+        estado.datos = Object.assign({}, estado.datos, { club: r.club });
+        if (borradores.datos) borradores.datos.club = Object.assign({}, r.club);
+        club.ajustes = r.club;
+        iPremio.value = r.club.premio;
+        iSellos.value = String(r.club.sellos);
+        pintarClub();
+        pintarListaSocios();
+        aviso.textContent = 'Guardado. Ya se ve en la web y en las tarjetas de los socios.';
+        aviso.classList.add('es-ok');
+      }).catch(function (err) {
+        bGuardar.disabled = false;
+        if (!sesionCaducada(err)) { aviso.textContent = err.message; aviso.classList.add('es-error'); }
+      });
+    });
+    g.appendChild(form);
+    return g;
   }
 
   /* Campo de texto que no marca «cambios sin guardar» (se guarda en este dispositivo) */
