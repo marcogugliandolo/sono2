@@ -300,6 +300,8 @@ html.menu-abierto { overflow: hidden; }
   .menu-movil:not([hidden]) li:nth-child(5) { animation-delay: 0.16s; }
   .menu-movil:not([hidden]) li:nth-child(6) { animation-delay: 0.2s; }
   .menu-movil:not([hidden]) li:nth-child(7) { animation-delay: 0.24s; }
+  .menu-movil:not([hidden]) li:nth-child(8) { animation-delay: 0.28s; }
+  .menu-movil:not([hidden]) li:nth-child(9) { animation-delay: 0.32s; }
   .menu-movil:not([hidden]) .menu-movil__pie { animation: subir 0.45s var(--suave) 0.18s both; }
 }
 .menu ul {
@@ -1745,12 +1747,199 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
   .fila-2--legal { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* ---------- Lo mejor del mes (arriba de la carta) ----------
+   Un recuadro beige con una tarjeta grande (si hay un destacado) o dos o tres en fila.
+   El sello redondo lleva el nombre del mes. */
+.mes {
+  display: grid;
+  gap: clamp(20px, 3vw, 30px);
+  margin-bottom: clamp(48px, 7vw, 88px);
+  padding: clamp(18px, 3.4vw, 40px);
+  border-radius: var(--r-tarjeta);
+  background: var(--beige);
+}
+.mes__cabeza { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 10px 40px; }
+.mes__cabeza > div { display: grid; gap: 8px; }
+.mes .meta { color: var(--cafe); }
+.mes__titulo { font-family: var(--f-titulo); font-weight: 400; font-size: clamp(1.9rem, 3vw, 2.6rem); line-height: 1.05; letter-spacing: -0.015em; text-wrap: balance; }
+.mes__nota { max-width: 40ch; font-size: 0.9375rem; line-height: 1.5; }
+.mes__lista { display: grid; gap: 16px; }
+.mes__lista[data-n="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mes__lista[data-n="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.destacado {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  min-width: 0;
+  padding: 12px 12px 22px;
+  border-radius: var(--r-tarjeta);
+  background: var(--superficie);
+}
+.destacado--grande {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(24px, 5vw, 72px);
+  padding: 14px clamp(24px, 5vw, 64px) 14px 14px;
+}
+.destacado__media {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  background: var(--beige-suave);
+  overflow: hidden;
+}
+.destacado--grande .destacado__media { aspect-ratio: 1 / 1; }
+.destacado__media img, .destacado__media video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.destacado__dibujo { position: relative; display: grid; place-items: center; width: 58%; aspect-ratio: 1; }
+.destacado__dibujo::before { content: ""; position: absolute; inset: 4%; border-radius: 50%; background: var(--beige); }
+.destacado__dibujo svg { position: relative; width: 78%; height: auto; --grosor: 2; overflow: visible; }
+.sello-mes {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1px;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--cafe);
+  color: var(--beige);
+  text-align: center;
+  transform: rotate(-9deg);
+  box-shadow: 0 0 0 4px var(--superficie);
+}
+.sello-mes::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; border: 1px dashed rgba(243, 224, 166, 0.55); }
+.sello-mes__mes { font-family: var(--f-titulo); font-style: italic; font-size: 1.05rem; line-height: 1; text-transform: capitalize; }
+.sello-mes__del { font-family: var(--f-mono); font-size: 0.5625rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; }
+.sello-mes--grande { top: 18px; left: 18px; width: 104px; height: 104px; }
+.sello-mes--grande .sello-mes__mes { font-size: 1.45rem; }
+.sello-mes--grande .sello-mes__del { font-size: 0.625rem; }
+.destacado__info { display: grid; gap: 10px; justify-items: start; align-content: start; min-width: 0; padding-inline: 6px; }
+.destacado__etiqueta { color: var(--cafe); }
+.destacado__nombre { font-family: var(--f-titulo); font-weight: 400; font-size: clamp(1.7rem, 2.4vw, 2.1rem); line-height: 1.05; letter-spacing: -0.015em; text-wrap: balance; overflow-wrap: anywhere; }
+.destacado--grande .destacado__nombre { font-size: clamp(2.3rem, 4.4vw, 3.6rem); line-height: 1; letter-spacing: -0.02em; }
+.destacado__desc { color: var(--cafe-suave); font-size: 0.9875rem; line-height: 1.55; max-width: 46ch; white-space: pre-line; }
+.destacado--grande .destacado__desc { font-size: clamp(1.0625rem, 1.4vw, 1.1875rem); }
+.destacado__precio { font-family: var(--f-mono); font-size: 1rem; font-variant-numeric: tabular-nums; }
+.destacado--grande .destacado__precio { font-size: 1.125rem; }
+.destacado__acciones { margin-top: 6px; gap: 10px; }
+@media (prefers-reduced-motion: no-preference) {
+  .destacado__media img, .destacado__media video, .destacado__dibujo svg { transition: transform 0.5s var(--salida); }
+}
+@media (hover: hover) {
+  .destacado:hover .destacado__media img, .destacado:hover .destacado__media video { transform: scale(1.03); }
+  .destacado:hover .destacado__dibujo svg { transform: rotate(-5deg) scale(1.04); }
+}
+
+/* ---------- Escríbenos: consulta o «Trabaja con nosotros» ---------- */
+.escribenos__variante { display: grid; gap: 14px; align-content: start; }
+.escribenos__formularios { display: grid; gap: 22px; align-content: start; min-width: 0; }
+.escribenos__tipos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.campo__titulo { font-weight: 500; font-size: 0.875rem; }
+/* Adjuntar el currículum: zona para tocar (o soltar el archivo encima) */
+.adjunto { position: relative; }
+.adjunto__zona {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1.5px dashed var(--linea-fuerte);
+  border-radius: var(--r-tarjeta);
+  background: var(--superficie);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.adjunto__zona svg, .adjunto__elegido svg { flex: none; width: 46px; height: 46px; --grosor: 1.8; overflow: visible; }
+.adjunto__texto { display: block; min-width: 0; font-size: 0.9375rem; line-height: 1.4; }
+.adjunto__texto strong { font-weight: 600; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.adjunto__arrastra { color: var(--cafe-suave); }
+.adjunto__ayuda { display: block; margin-top: 2px; font-family: var(--f-mono); font-size: 0.75rem; color: var(--cafe-suave); }
+@media (hover: hover) { .adjunto__zona:hover { border-color: var(--cafe); background: var(--beige-suave); } }
+@media (hover: none) { .adjunto__arrastra { display: none; } }
+.adjunto__zona.arrastrando { border-color: var(--cafe); border-style: solid; background: var(--beige-suave); }
+.adjunto input:focus-visible + .adjunto__zona { outline: 2px solid var(--cafe); outline-offset: 2px; }
+.adjunto__elegido {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 12px 12px 16px;
+  border: 1px solid var(--cafe);
+  border-radius: var(--r-tarjeta);
+  background: var(--beige-suave);
+}
+.adjunto__nombre { flex: 1; display: grid; min-width: 0; font-size: 0.9375rem; line-height: 1.35; }
+.adjunto__nombre strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adjunto__nombre span { font-family: var(--f-mono); font-size: 0.75rem; color: var(--cafe-suave); }
+.adjunto__quitar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--linea-fuerte);
+  border-radius: 50%;
+  background: var(--superficie);
+  color: var(--cafe);
+  cursor: pointer;
+}
+.adjunto__quitar svg { width: 12px; height: 12px; }
+@media (hover: hover) { .adjunto__quitar:hover { border-color: var(--alerta); color: var(--alerta); } }
+
+/* Panel: candidaturas con currículum y «Del mes» */
+.etiqueta-tipo--empleo { background: var(--cafe); color: var(--lienzo); }
+.registro--candidatura { border-color: var(--linea-fuerte); }
+.cv-admin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--beige-suave);
+}
+.cv-admin > svg { flex: none; width: 40px; height: 40px; --grosor: 1.8; overflow: visible; }
+.cv-admin__info { flex: 1 1 180px; display: grid; min-width: 0; }
+.cv-admin__nombre { font-weight: 600; font-size: 0.9375rem; overflow-wrap: anywhere; }
+.cv-admin__peso { font-family: var(--f-mono); font-size: 0.75rem; color: var(--cafe-suave); }
+.fila-2--mes { grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); }
+.mes-admin .tarjeta-admin { margin-top: 4px; padding: 0; border: 0; background: none; }
+
+@media (max-width: 900px) {
+  .mes__lista[data-n="3"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .destacado--grande { grid-template-columns: minmax(0, 1fr); padding: 12px 12px 26px; gap: 22px; }
+  .destacado--grande .destacado__media { aspect-ratio: 4 / 3; }
+}
+@media (max-width: 640px) {
+  .mes { margin-inline: -8px; }
+  .mes__lista[data-n="2"], .mes__lista[data-n="3"] { grid-template-columns: minmax(0, 1fr); }
+  .sello-mes--grande { width: 84px; height: 84px; top: 12px; left: 12px; }
+  .sello-mes--grande .sello-mes__mes { font-size: 1.2rem; }
+  .fila-2--mes { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 420px) {
+  .escribenos__tipos { gap: 8px; }
+  .escribenos__tipos .chip--tipo { padding-inline: 8px; font-size: 0.9375rem; }
+  .adjunto__zona { padding: 14px; gap: 12px; }
+  .adjunto__zona svg { width: 38px; height: 38px; }
+}
+
 /* ---------- Tableta y móvil ---------- */
 @media (max-width: 1024px) {
   .menu ul { gap: 4px 20px; }
 }
 @media (min-width: 761px) {
-  .menu-movil { display: none !important; }
+  html:not(.menu-justo) .menu-movil { display: none !important; }
+  /* El menú entero no cabe en la cabecera: se pliega como en el móvil */
+  .menu-justo .menu { display: none; }
+  .menu-justo .menu-boton { display: grid; }
+  .menu-justo .cabecera__fila { grid-template-columns: auto minmax(0, 1fr); }
+  .menu-justo .cabecera__acciones { justify-self: end; }
 }
 @media (max-width: 900px) {
   .historia__rejilla, .escribenos, .dos-tarjetas { grid-template-columns: minmax(0, 1fr); }

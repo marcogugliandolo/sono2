@@ -116,7 +116,26 @@ Para evitar spam: hay una trampa para bots, cada IP puede enviar 3 reseñas por 
 - Los textos se adaptan a lo que está activo (pedidos para llevar, club y reseñas) y cuentan lo que hace la web de verdad: qué datos se guardan, para qué y cuánto tiempo. Si se cambia algo de eso en el código, hay que cambiarlo también en `public/legal.js`.
 - Son una base pensada para esta web, no asesoramiento legal: conviene que la gestoría o un abogado los revise antes de abrir. Si la web va detrás de Cloudflare u otro servicio fuera de la UE, también habría que mencionarlo en la política de privacidad.
 
-**Borrado automático** (lo que dice la política de privacidad): las reservas se borran 90 días después de su fecha, los pedidos a los 30 días y los mensajes al año. Se hace al arrancar y cada 6 horas.
+**Borrado automático** (lo que dice la política de privacidad): las reservas se borran 90 días después de su fecha, los pedidos a los 30 días y los mensajes y las candidaturas (con su currículum) al año. Se hace al arrancar y cada 6 horas.
+
+## Lo mejor del mes (en la carta)
+
+Arriba de la carta, antes de los favoritos, sale un recuadro beige con **lo mejor del mes**: hasta 3 destacados (por ejemplo «Café del mes», «Dulce del mes» y «Desayuno del mes»). Con uno solo, la tarjeta va en grande; con dos o tres, en fila. Cada tarjeta lleva un sello redondo con el nombre del mes en curso, que cambia solo.
+
+Se gestiona en la pestaña **Del mes** del panel:
+- **«Lo mejor del mes» en la carta**: interruptor arriba, como el del club o las reseñas. Se guarda al momento. Apagado, el recuadro no sale y lo que haya preparado se guarda.
+- Cada destacado tiene una **etiqueta** libre y puede ser un **producto de la carta** (sale con su nombre, precio, foto y alérgenos, con los botones «Pedir para llevar» y «Ver detalles y alérgenos») o algo **escrito a mano** (nombre, precio opcional y un dibujo). En los dos casos se puede escribir por qué lo recomendáis y poner una foto, un GIF o un vídeo corto propios.
+- Se guarda con «Guardar cambios» y queda en **Historial**. Los títulos del recuadro se cambian en **Textos → Carta: lo mejor del mes**.
+- Si es un producto de la carta, no se repite en las tarjetas de favoritos de debajo.
+- Soñito lo sabe: a «¿qué me recomendáis?» responde con lo mejor del mes.
+
+## Trabaja con nosotros (candidaturas con currículum)
+
+En «Escríbenos» (sección Visítanos) se elige entre **Una consulta** y **Trabaja con nosotros**. La candidatura pide nombre y email, y deja poner teléfono, qué le gustaría hacer, unas líneas sobre la persona y el **currículum** (PDF, Word u OpenDocument, o una foto; hasta 5 MB, tocando la zona o arrastrando el archivo). Hace falta el currículum o al menos unas líneas, y aceptar la casilla de privacidad. En el pie hay un enlace «Trabaja con nosotros», y `#trabaja` al final de la dirección (`https://tu-dominio/#trabaja`) abre directamente el formulario, por ejemplo para un cartel con QR.
+
+Las candidaturas llegan a la pestaña **Mensajes** del panel, junto a las consultas, con los filtros **Todos**, **Consultas** y **Candidaturas**. En cada una: **Ver currículum** (los PDF y las fotos se abren en el navegador), **Descargar**, **Responder por email** y **Borrar** (borra también el archivo). Arriba de la pestaña está el interruptor **«Trabaja con nosotros» en la web**: apagado, desaparece de la web y nadie puede mandar su currículum; lo recibido se guarda.
+
+Los currículums se guardan en la carpeta `cv/` de los datos, **no se pueden abrir desde la web pública** (solo con la sesión del panel) y se comprueban por su contenido, no por el nombre. Se borran solos al año, como los mensajes. Cada IP puede mandar 3 candidaturas por hora y se guardan como mucho 300. La política de privacidad ya lo explica (qué datos, para qué, base legal y plazo).
 
 ## Novedad: favoritos
 
@@ -199,7 +218,7 @@ Las reservas, los pedidos y los mensajes de cada web siguen separados.
 
 ## Copia de seguridad
 
-Todo está en el volumen del stack (Portainer lo llama `sono2_sono2_datos`): `contenido.json`, `reservas.json`, `pedidos.json`, `mensajes.json`, `socios.json`, `resenas.json`, `secreto.json`, `versiones.json`, la carpeta `fotos/` y la carpeta `wallet/` (certificados de Apple, clave de Google y los iPhone registrados; guarda esa copia en un sitio seguro, porque lleva claves privadas).
+Todo está en el volumen del stack (Portainer lo llama `sono2_sono2_datos`): `contenido.json`, `reservas.json`, `pedidos.json`, `mensajes.json`, `socios.json`, `resenas.json`, `secreto.json`, `versiones.json`, la carpeta `fotos/`, la carpeta `cv/` (currículums de «Trabaja con nosotros») y la carpeta `wallet/` (certificados de Apple, clave de Google y los iPhone registrados; guarda esa copia en un sitio seguro, porque lleva claves privadas).
 
 ```bash
 docker run --rm -v sono2_sono2_datos:/datos -v "$PWD":/copia alpine \
@@ -212,7 +231,8 @@ docker run --rm -v sono2_sono2_datos:/datos -v "$PWD":/copia alpine \
 - Tras 5 intentos fallidos desde la misma IP, el acceso se bloquea 15 minutos.
 - La sesión dura 12 horas y la cookie solo la puede leer el servidor.
 - Las fotos y vídeos se comprueban por su contenido, no por el nombre (JPG, PNG, WebP o GIF hasta 10 MB; MP4, MOV o WebM hasta 30 MB) y el navegador reduce las fotos antes de subirlas.
-- Las reservas, los pedidos y los mensajes tienen límite de envíos por IP y una trampa para bots.
+- Las reservas, los pedidos, los mensajes y las candidaturas tienen límite de envíos por IP y una trampa para bots.
+- Los currículums solo se abren con la sesión del panel y se aceptan solo PDF, Word, OpenDocument o fotos, mirando su contenido (hasta 5 MB).
 - El total de cada pedido lo calcula el servidor con los precios de la carta, no el navegador.
 - Usa una contraseña larga en `ADMIN_PASSWORD`, sobre todo si la web es pública.
 

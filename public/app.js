@@ -37,7 +37,7 @@
   var MAX_ZONAS = 6;
   var DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   var PIES_GALERIA = ['El local', 'La barra', 'Latte art', 'Desayunos', 'Buenos ratos'];
-  var CLAVE_DE = { carta: 'carta', fotos: 'galeria', horarios: 'horario', datos: 'datos', textos: 'textos' };
+  var CLAVE_DE = { carta: 'carta', fotos: 'galeria', horarios: 'horario', datos: 'datos', textos: 'textos', mes: 'mes' };
   var RE_PRECIO = /^\d{1,3}([.,]\d{1,2})?$/;
   var RE_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
   var RE_NIF = /^([0-9]{8}[A-Z]|[XYZ][0-9]{7}[A-Z]|[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J])$/;
@@ -248,14 +248,17 @@
   }
 
   var mostrarAsistenteGlobal = function () {};
+  var ajustarMenu = function () {};   // pliega el menú de la cabecera si no cabe (ver «Menú del móvil»)
   function pintarTodo() {
     aplicarTextos();
     pintarCarta();
+    pintarMes();
     pintarGaleria();
     pintarHorario();
     pintarDatos();
     pintarLineas();
     pintarRecogida();
+    ajustarMenu();
   }
 
   /* ---------- Ventanas emergentes ---------- */
@@ -316,6 +319,9 @@
      de cada grupo (antes los que tienen foto). */
   var MAX_FAVORITOS = 4;
   function favoritos(lista) {
+    // Lo que ya sale en «Lo mejor del mes», justo encima, no se repite aquí
+    var delMes = cargado && mesActivo() ? destacadosMes().filter(function (d) { return d.producto; }).map(function (d) { return d.producto.id; }) : [];
+    lista = lista.filter(function (p) { return delMes.indexOf(p.id) === -1; });
     var marcados = lista.filter(function (p) {
       return (Array.isArray(p.etiquetas) ? p.etiquetas : []).some(function (t) { return /^favorit/i.test(texto(t)); });
     });
@@ -497,6 +503,109 @@
     if (e.key === 'ArrowRight') mostrarProducto(actual + 1);
   });
 
+  /* ---------- Lo mejor del mes (arriba de la carta) ----------
+     Hasta 3 destacados: un producto de la carta (con su foto, su precio y sus alérgenos) o algo
+     escrito a mano. Con uno solo, la tarjeta va en grande; con dos o tres, en fila. El sello lleva
+     el nombre del mes en curso, así nunca se queda viejo. */
+  var fNombreMes = new Intl.DateTimeFormat('es-ES', { month: 'long' });
+  function mesActivo() {
+    var m = estado.datos && estado.datos.mes;
+    return !(m && m.activo === false);
+  }
+  function productoPorId(id) {
+    if (!id) return null;
+    return productos().filter(function (p) { return p.id === id; })[0] || null;
+  }
+  function destacadosMes() {
+    var items = (estado.mes && Array.isArray(estado.mes.items)) ? estado.mes.items : [];
+    return items.map(function (x) {
+      var p = productoPorId(x.producto);
+      return {
+        item: x,
+        producto: p,
+        nombre: p ? p.nombre : texto(x.nombre),
+        precio: p ? p.precio : texto(x.precio),
+        desc: texto(x.desc) || (p ? texto(p.desc) : ''),
+        foto: x.foto || (p && p.foto) || null,
+        icono: p ? (p.icono || 'taza') : (x.icono || 'taza'),
+        etiqueta: texto(x.etiqueta) || 'Del mes'
+      };
+    }).filter(function (d) { return d.nombre; });
+  }
+  function mesVisible() { return cargado && !sinDatos && mesActivo() && destacadosMes().length > 0; }
+  function selloMes(grande) {
+    var s = el('span', 'sello-mes' + (grande ? ' sello-mes--grande' : ''));
+    s.setAttribute('aria-hidden', 'true');
+    s.appendChild(el('span', 'sello-mes__mes', fNombreMes.format(new Date())));
+    s.appendChild(el('span', 'sello-mes__del', 'del mes'));
+    return s;
+  }
+  function dibujoMes(icono) {
+    var d = el('span', 'destacado__dibujo');
+    d.appendChild(svgUso(icono));
+    return d;
+  }
+  function pintarMes() {
+    // Hasta tener los datos se deja como viene del servidor (así no aparece y desaparece)
+    if (!cargado) return;
+    var lista = sinDatos ? [] : destacadosMes();
+    var visible = mesActivo() && lista.length > 0;
+    document.querySelectorAll('[data-mes]').forEach(function (n) { n.hidden = !visible; });
+    ajustarMenu();
+    var cont = $('mes-lista');
+    cont.innerHTML = '';
+    if (!visible) return;
+    cont.setAttribute('data-n', String(lista.length));
+    var grande = lista.length === 1;
+    var hayLlevar = (estado.datos || {}).paraLlevar !== false;
+    lista.forEach(function (d, n) {
+      var art = el('article', 'destacado' + (grande ? ' destacado--grande' : ''));
+      art.style.setProperty('--i', n);
+      var media = el('div', 'destacado__media' + (d.foto ? ' con-foto' : ''));
+      if (d.foto) {
+        var m = crearMedio(d.foto, d.nombre);
+        if (m.tagName === 'IMG') { m.loading = 'lazy'; m.decoding = 'async'; }
+        m.addEventListener('error', function () { m.replaceWith(dibujoMes(d.icono)); media.classList.remove('con-foto'); });
+        media.appendChild(m);
+      } else {
+        media.appendChild(dibujoMes(d.icono));
+      }
+      media.appendChild(selloMes(grande));
+      art.appendChild(media);
+      var info = el('div', 'destacado__info');
+      info.appendChild(el('p', 'meta destacado__etiqueta', d.etiqueta));
+      info.appendChild(el('h3', 'destacado__nombre', d.nombre));
+      if (d.desc) info.appendChild(el('p', 'destacado__desc', d.desc));
+      if (d.precio) info.appendChild(el('p', 'destacado__precio', precioBonito(d.precio)));
+      if (d.producto) {
+        var acc = el('div', 'acciones destacado__acciones');
+        var tam = grande ? ' boton--peque' : ' boton--mini';
+        if (hayLlevar) {
+          var pedir = el('button', 'boton boton--lleno' + tam, 'Pedir para llevar');
+          pedir.type = 'button';
+          pedir.addEventListener('click', function () {
+            agregarAlPedido(d.producto.id);
+            var seccion = $('llevar');
+            if (seccion && !seccion.hidden) seccion.scrollIntoView({ behavior: sinMovimiento ? 'auto' : 'smooth', block: 'start' });
+            avisoPedido.textContent = '«' + d.producto.nombre + '» añadido a tu pedido.';
+          });
+          acc.appendChild(pedir);
+        }
+        var ver = el('button', 'boton boton--borde' + tam, 'Ver detalles y alérgenos');
+        ver.type = 'button';
+        ver.setAttribute('aria-haspopup', 'dialog');
+        ver.addEventListener('click', function () {
+          var i = productos().indexOf(d.producto);
+          if (i >= 0) abrirProducto(i);
+        });
+        acc.appendChild(ver);
+        info.appendChild(acc);
+      }
+      art.appendChild(info);
+      cont.appendChild(art);
+    });
+  }
+
   /* ---------- Galería pública (solo aparece cuando hay fotos) ---------- */
   function pintarGaleria() {
     var ul = $('galeria-lista');
@@ -604,6 +713,7 @@
     mostrarAsistenteGlobal();
     pintarClub();
     pintarResenas();
+    pintarEmpleo();
     pintarZonas();
     actualizarResumen();
     ponerDato('dato-direccion', d.direccion);
@@ -1070,6 +1180,178 @@
     });
   });
 
+  /* ---------- Trabaja con nosotros ----------
+     En «Escríbenos» se elige entre una consulta y una candidatura con currículum (PDF, Word o foto).
+     El archivo va dentro del envío; las fotos se reducen antes (y las del iPhone se pasan a JPG si
+     el navegador sabe). Las candidaturas llegan a «Mensajes» del panel. */
+  var formEmpleo = $('formulario-empleo');
+  var avisoEmpleo = $('aviso-empleo');
+  var confEmpleo = $('confirmacion-empleo');
+  var inputCv = $('empleo-cv');
+  var zonaCv = $('empleo-cv-zona');
+  var MAX_CV_MB = 5;
+  var cvElegido = null;   // { blob, nombre }
+
+  function empleoActivo() {
+    var e = estado.datos && estado.datos.empleo;
+    return !(e && e.activo === false);
+  }
+  function pesoBonito(n) {
+    return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  }
+  function tipoEscribenos(cual) {
+    var empleo = cual === 'empleo' && empleoActivo();
+    $('escribenos-consulta').checked = !empleo;
+    $('escribenos-empleo').checked = empleo;
+    $('escribenos-texto-consulta').hidden = empleo;
+    $('escribenos-texto-empleo').hidden = !empleo;
+    fc.hidden = empleo;
+    formEmpleo.hidden = !empleo;
+    confEmpleo.hidden = true;
+  }
+  document.querySelectorAll('input[name="escribenos-tipo"]').forEach(function (r) {
+    r.addEventListener('change', function () { if (r.checked) tipoEscribenos(r.value); });
+  });
+  function irAEmpleo() {
+    if (!empleoActivo()) return;
+    if (enPaginaCarta) { location.href = '/#trabaja'; return; }
+    tipoEscribenos('empleo');
+    var bloque = $('escribenos');
+    bloque.scrollIntoView({ behavior: sinMovimiento ? 'auto' : 'smooth', block: 'start' });
+    setTimeout(function () { $('empleo-nombre').focus({ preventScroll: true }); }, sinMovimiento ? 0 : 600);
+  }
+  document.querySelectorAll('[data-abrir-empleo]').forEach(function (a) {
+    a.addEventListener('click', function (e) { e.preventDefault(); irAEmpleo(); });
+  });
+  function pintarEmpleo() {
+    if (!cargado) return;   // hasta tener los datos se deja como viene del servidor
+    var activo = empleoActivo() && !sinDatos;
+    document.querySelectorAll('[data-empleo]').forEach(function (n) { n.hidden = !activo; });
+    if (!activo && !formEmpleo.hidden) tipoEscribenos('consulta');
+  }
+
+  function pintarCv() {
+    $('empleo-cv-elegido').hidden = !cvElegido;
+    zonaCv.hidden = !!cvElegido;
+    if (cvElegido) {
+      $('empleo-cv-nombre').textContent = cvElegido.nombre;
+      $('empleo-cv-peso').textContent = pesoBonito(cvElegido.blob.size);
+    }
+  }
+  function ponerCv(file) {
+    if (!file) return;
+    var nombre = file.name || 'curriculum';
+    var esImagen = /^image\//.test(file.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(nombre);
+    var esDoc = /\.(pdf|docx?|odt)$/i.test(nombre) || /pdf|msword|wordprocessingml|opendocument\.text/.test(file.type || '');
+    if (!esImagen && !esDoc) { avisoEmpleo.textContent = 'Ese archivo no vale. Sube tu currículum en PDF (mejor), Word o una foto.'; return; }
+    avisoEmpleo.textContent = esImagen ? 'Preparando la foto…' : '';
+    (esImagen ? reducirImagen(file) : Promise.resolve(file)).then(function (blob) {
+      avisoEmpleo.textContent = '';
+      if (blob.size > MAX_CV_MB * 1048576) {
+        avisoEmpleo.textContent = 'El archivo pesa ' + pesoBonito(blob.size) + ' y el máximo son ' + MAX_CV_MB + ' MB. Prueba a guardarlo en PDF.';
+        return;
+      }
+      if (blob !== file && blob.type === 'image/jpeg') nombre = nombre.replace(/\.[a-z0-9]{1,5}$/i, '') + '.jpg';
+      cvElegido = { blob: blob, nombre: nombre };
+      pintarCv();
+    });
+  }
+  inputCv.addEventListener('change', function () {
+    var f = inputCv.files && inputCv.files[0];
+    inputCv.value = '';
+    ponerCv(f);
+  });
+  $('empleo-cv-cambiar').addEventListener('click', function () { inputCv.click(); });
+  $('empleo-cv-quitar').addEventListener('click', function () {
+    cvElegido = null;
+    pintarCv();
+    zonaCv.focus();
+  });
+  // Arrastrar el archivo encima (en el ordenador)
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    zonaCv.addEventListener(ev, function (e) { e.preventDefault(); zonaCv.classList.add('arrastrando'); });
+  });
+  ['dragleave', 'dragend', 'drop'].forEach(function (ev) {
+    zonaCv.addEventListener(ev, function () { zonaCv.classList.remove('arrastrando'); });
+  });
+  zonaCv.addEventListener('drop', function (e) {
+    e.preventDefault();
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    ponerCv(f);
+  });
+
+  function leerBase64(blob) {
+    return new Promise(function (resolve, reject) {
+      if (!blob) { resolve(''); return; }
+      var r = new FileReader();
+      r.onload = function () { resolve(String(r.result || '').replace(/^data:[^,]*,/, '')); };
+      r.onerror = function () { reject(new Error('No se ha podido leer el archivo. Prueba a adjuntarlo otra vez.')); };
+      r.readAsDataURL(blob);
+    });
+  }
+  /* Envío con barra de progreso (un currículum puede tardar con mala cobertura) */
+  function enviarConProgreso(ruta, datos, alAvanzar) {
+    return new Promise(function (resolve, reject) {
+      var x = new XMLHttpRequest();
+      x.open('POST', ruta);
+      x.setRequestHeader('X-Requested-With', 'sono');
+      x.setRequestHeader('Content-Type', 'application/json');
+      x.withCredentials = true;
+      x.upload.onprogress = function (e) { if (e.lengthComputable && alAvanzar) alAvanzar(e.loaded / e.total); };
+      x.onload = function () {
+        var j = {};
+        try { j = JSON.parse(x.responseText || '{}'); } catch (e) { j = {}; }
+        if (x.status >= 200 && x.status < 300) { resolve(j); return; }
+        var mensaje = j.error;
+        if (!mensaje && x.status === 413) mensaje = 'El archivo es demasiado grande. Prueba a guardarlo en PDF.';
+        reject(new Error(mensaje || 'No se ha podido enviar (error ' + x.status + '). Inténtalo de nuevo.'));
+      };
+      x.onerror = function () { reject(new Error('No hay conexión con el servidor. Revisa tu conexión e inténtalo de nuevo.')); };
+      x.send(JSON.stringify(datos));
+    });
+  }
+
+  formEmpleo.addEventListener('input', function () { if (!formEmpleo.querySelector('button[type="submit"]').disabled) avisoEmpleo.textContent = ''; });
+  formEmpleo.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = formEmpleo;
+    var boton = f.querySelector('button[type="submit"]');
+    var nombre = f.nombre.value.trim();
+    var email = f.email.value.trim();
+    var tel = f.telefono.value.trim();
+    var mensaje = f.mensaje.value.trim();
+    if (nombre.length < 2) { avisoEmpleo.textContent = 'Escribe tu nombre.'; f.nombre.focus(); return; }
+    if (email.indexOf('@') < 1) { avisoEmpleo.textContent = 'Revisa el email: parece que le falta algo.'; f.email.focus(); return; }
+    if (tel && tel.replace(/[^\d]/g, '').length < 9) { avisoEmpleo.textContent = 'Revisa el teléfono: necesita al menos 9 cifras (o déjalo vacío).'; f.telefono.focus(); return; }
+    if (!cvElegido && mensaje.length < 20) { avisoEmpleo.textContent = 'Adjunta tu currículum o cuéntanos un poco de ti (al menos 20 caracteres).'; zonaCv.focus(); return; }
+    if (!f.acepto.checked) { avisoEmpleo.textContent = 'Para enviarla tienes que aceptar que guardemos tu candidatura.'; f.acepto.focus(); return; }
+    var conCv = !!cvElegido;
+    boton.disabled = true;
+    avisoEmpleo.textContent = 'Enviando tu candidatura…';
+    leerBase64(cvElegido && cvElegido.blob).then(function (b64) {
+      return enviarConProgreso('/api/candidaturas', {
+        nombre: nombre, email: email, telefono: tel, puesto: f.puesto.value, mensaje: mensaje,
+        cv: b64 ? { nombre: cvElegido.nombre, datos: b64 } : null, acepto: true, web: f.web.value
+      }, function (k) { if (cvElegido) avisoEmpleo.textContent = 'Enviando tu candidatura… ' + Math.round(k * 100) + ' %'; });
+    }).then(function () {
+      f.reset();
+      cvElegido = null;
+      pintarCv();
+      avisoEmpleo.textContent = '';
+      $('confirmacion-empleo-detalle').textContent = 'Gracias, ' + nombre.split(' ')[0] + '. Ya tenemos tu candidatura' + (conCv ? ' y tu currículum.' : '.');
+      formEmpleo.hidden = true;
+      confEmpleo.hidden = false;
+      $('otra-candidatura').focus({ preventScroll: true });
+    }).catch(function (err) {
+      avisoEmpleo.textContent = err.message;
+    }).then(function () { boton.disabled = false; });
+  });
+  $('otra-candidatura').addEventListener('click', function () {
+    confEmpleo.hidden = true;
+    formEmpleo.hidden = false;
+    $('empleo-nombre').focus();
+  });
+
   /* ---------- Club SOÑO: tarjeta de sellos ----------
      El socio entra con su email y contraseña y ve su tarjeta en una ventana:
      los sellos (la Ñ del logo), su QR para enseñarlo en la barra y los últimos movimientos.
@@ -1203,6 +1485,7 @@
     }
     document.querySelectorAll('[data-enlace-club]').forEach(pintarEnlaceClub);
     document.querySelectorAll('[data-socio-boton]').forEach(function (b) { b.hidden = !socio; });
+    ajustarMenu();
   }
 
   /* Botones de Wallet: en el iPhone solo Apple, en Android solo Google y en el ordenador los dos
@@ -1410,6 +1693,7 @@
   function pintarResenas() {
     var activas = resenasActivas();
     document.querySelectorAll('[data-resenas]').forEach(function (n) { n.hidden = !activas; });
+    ajustarMenu();
     if (!activas) {
       if (modalResena.open) cerrar(modalResena);
       return;
@@ -1658,6 +1942,7 @@
     if (k === 'galeria') return { fotos: PIES_GALERIA.map(function (pie, i) { return { id: 'g' + (i + 1), pie: pie, foto: null }; }) };
     if (k === 'horario') return { dias: DIAS_SEMANA.map(function (dia) { return { dia: dia, texto: '' }; }), manana: [], tarde: [] };
     if (k === 'textos') return { menu: clonar(MENU_INICIAL), textos: {} };
+    if (k === 'mes') return { items: [] };
     return { direccion: '', email: '', telefono: '', instagram: '', whatsapp: '', abrimosPronto: true, paraLlevar: true, domicilio: true };
   }
   function normalizar(k, b) {
@@ -1665,6 +1950,7 @@
       if (!Array.isArray(b.menu) || !b.menu.length) b.menu = clonar(MENU_INICIAL);
       if (!b.textos || typeof b.textos !== 'object') b.textos = {};
     }
+    if (k === 'mes' && !Array.isArray(b.items)) b.items = [];
     if (k === 'carta' && !Array.isArray(b.productos)) b.productos = [];
     if (k === 'carta' && !Array.isArray(b.categorias)) b.categorias = [];
     if (k === 'galeria' && (!Array.isArray(b.fotos) || !b.fotos.length)) b.fotos = vacio('galeria').fotos;
@@ -1755,6 +2041,7 @@
     btnDescartar.hidden = !k;
     if (k && !cargado) { cuerpo.appendChild(el('p', 'estado-vacio', 'Cargando…')); return; }
     if (pestana === 'carta') panelCarta();
+    if (pestana === 'mes') panelMes();
     if (pestana === 'fotos') panelFotos();
     if (pestana === 'horarios') panelHorarios();
     if (pestana === 'datos') panelDatos();
@@ -1831,6 +2118,7 @@
       ['nosotros.p1t', 'Punto 1: título'], ['nosotros.p1', 'Punto 1: texto', true], ['nosotros.p2t', 'Punto 2: título'], ['nosotros.p2', 'Punto 2: texto', true],
       ['nosotros.p3t', 'Punto 3: título'], ['nosotros.p3', 'Punto 3: texto', true]]],
     ['Carta', [['carta.etiqueta', 'Etiqueta'], ['carta.titulo', 'Título'], ['carta.texto', 'Texto', true]]],
+    ['Carta: lo mejor del mes', [['mes.etiqueta', 'Etiqueta'], ['mes.titulo', 'Título'], ['mes.texto', 'Texto', true]]],
     ['Para llevar', [['llevar.etiqueta', 'Etiqueta'], ['llevar.titulo', 'Título'], ['llevar.texto', 'Texto (con envío a domicilio)', true],
       ['llevar.textoRecoger', 'Texto (si solo se puede recoger)', true], ['llevar.nota1', 'Nota 1'], ['llevar.nota2', 'Nota 2']]],
     ['Club', [['club.etiqueta', 'Etiqueta'], ['club.titulo', 'Título'], ['club.texto', 'Texto. {premio} se cambia por el premio de la pestaña Club', true],
@@ -1840,6 +2128,7 @@
     ['Reseñas', [['resenas.etiqueta', 'Etiqueta'], ['resenas.titulo', 'Título']]],
     ['Visítanos', [['contacto.etiqueta', 'Etiqueta'], ['contacto.titulo', 'Título'], ['contacto.texto', 'Texto', true],
       ['escribenos.etiqueta', 'Escríbenos: etiqueta'], ['escribenos.titulo', 'Escríbenos: título'], ['escribenos.texto', 'Escríbenos: texto', true]]],
+    ['Trabaja con nosotros', [['empleo.etiqueta', 'Etiqueta'], ['empleo.titulo', 'Título'], ['empleo.texto', 'Texto', true]]],
     ['Pie de página', [['pie.lema', 'Frase del pie', true]]]
   ];
   var NOTA_MENU = { llevar: 'solo sale si «Para llevar» está activo en Ajustes', club: 'solo sale con el club activo', galeria: 'solo sale si hay fotos en la galería', resenas: 'solo sale con las reseñas activas' };
@@ -2006,7 +2295,7 @@
       }, { maxlength: '40', placeholder: 'Zumos y batidos' }));
       fila.appendChild(campoTexto('adm-grupo-desc-' + cat.id, 'Frase debajo del nombre (opcional)', cat.desc, function (v) { cat.desc = v; }, { maxlength: '120', placeholder: 'Naturales y hechos al momento.' }));
       datosGrupo.appendChild(fila);
-      datosGrupo.appendChild(selectorIcono(cat));
+      datosGrupo.appendChild(selectorIcono(cat, 'adm-grupo-icono-' + cat.id, 'Dibujo del grupo'));
       grupo.appendChild(datosGrupo);
 
       var lista = el('div', 'admin__lista admin__lista--productos');
@@ -2052,18 +2341,19 @@
       pintarPanel();
     }
   }
-  function selectorIcono(cat) {
+  /* Dibujos para elegir (grupos de la carta y destacados del mes escritos a mano) */
+  function selectorIcono(cat, prefijo, leyenda, alElegir) {
     var fs = el('fieldset', 'iconos-admin');
-    fs.appendChild(el('legend', null, 'Dibujo del grupo'));
+    fs.appendChild(el('legend', null, leyenda));
     var lista = el('div', 'iconos-admin__lista');
     ICONOS.forEach(function (ic) {
-      var id = 'adm-grupo-icono-' + cat.id + '-' + ic.id;
+      var id = prefijo + '-' + ic.id;
       var inp = el('input', 'oculto');
       inp.type = 'radio';
-      inp.name = 'adm-grupo-icono-' + cat.id;
+      inp.name = prefijo;
       inp.id = id;
       inp.checked = (cat.icono || 'taza') === ic.id;
-      inp.addEventListener('change', function () { if (inp.checked) { cat.icono = ic.id; marcar(); } });
+      inp.addEventListener('change', function () { if (inp.checked) { cat.icono = ic.id; marcar(); if (alElegir) alElegir(ic.id); } });
       var lab = el('label', 'icono-chip');
       lab.htmlFor = id;
       lab.title = ic.nombre;
@@ -2144,6 +2434,185 @@
     campos.appendChild(acc);
     t.appendChild(campos);
     return t;
+  }
+
+  /* Interruptor que se guarda al momento (como el del club o el de las reseñas) */
+  function interruptorAlMomento(o) {
+    var bloque = el('section', 'club-admin__estado' + (o.activo ? ' es-activo' : ''));
+    var interruptor = el('label', 'interruptor');
+    var ch = el('input');
+    ch.type = 'checkbox';
+    ch.id = o.id;
+    ch.setAttribute('role', 'switch');
+    ch.checked = o.activo;
+    interruptor.appendChild(ch);
+    interruptor.appendChild(el('span', 'interruptor__pista'));
+    interruptor.appendChild(el('span', 'interruptor__texto', o.texto));
+    bloque.appendChild(interruptor);
+    var explica = el('p', 'club-admin__estado-texto');
+    bloque.appendChild(explica);
+    var aviso = el('p', 'admin__estado carta-admin__aviso');
+    aviso.setAttribute('aria-live', 'polite');
+    bloque.appendChild(aviso);
+    function poner(si) {
+      explica.textContent = o.explicar(si);
+      bloque.classList.toggle('es-activo', si);
+    }
+    poner(o.activo);
+    ch.addEventListener('change', function () {
+      var quiere = ch.checked;
+      ch.disabled = true;
+      aviso.textContent = '';
+      aviso.classList.remove('es-error');
+      api('POST', o.ruta, { activo: quiere }).then(function (r) {
+        var valor = r[o.clave];
+        var cambio = {};
+        cambio[o.clave] = valor;
+        estado.datos = Object.assign({}, estado.datos, cambio);
+        if (borradores.datos) borradores.datos[o.clave] = Object.assign({}, borradores.datos[o.clave], { activo: valor.activo });
+        poner(valor.activo);
+        if (o.alCambiar) o.alCambiar(valor.activo);
+        aviso.textContent = o.avisoOk(valor.activo);
+      }).catch(function (err) {
+        ch.checked = !quiere;
+        if (!sesionCaducada(err)) { aviso.textContent = err.message; aviso.classList.add('es-error'); }
+      }).then(function () { ch.disabled = false; });
+    });
+    return bloque;
+  }
+
+  /* Pestaña: lo mejor del mes */
+  var ETIQUETAS_MES = ['Café del mes', 'Dulce del mes', 'Desayuno del mes', 'Bebida del mes'];
+  var MAX_MES = 3;
+  function panelMes() {
+    var b = borrador('mes');
+    cuerpo.appendChild(interruptorAlMomento({
+      id: 'mes-activo',
+      texto: '«Lo mejor del mes» en la carta',
+      activo: mesActivo(),
+      ruta: '/api/mes/activo',
+      clave: 'mes',
+      explicar: function (si) {
+        return si ? 'Sale arriba de la carta, antes de los favoritos (también en la página de la carta, si la tienes aparte).'
+          : 'No sale en la carta. Lo que tengas aquí se guarda para cuando lo vuelvas a activar.';
+      },
+      avisoOk: function (si) { return si ? 'Hecho: ya se ve en la web.' : 'Hecho: ya no sale en la web.'; },
+      alCambiar: function () { pintarMes(); }
+    }));
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'Elige hasta ' + MAX_MES + ' cosas para destacar este mes: un café, un dulce, un desayuno… Puede ser un producto de la carta (sale con su foto, su precio y sus alérgenos, y se puede pedir para llevar) o algo escrito a mano. El sello con el nombre del mes cambia solo. Los títulos de este bloque se cambian en «Textos».'));
+    var sugerencias = el('datalist');
+    sugerencias.id = 'mes-etiquetas';
+    ETIQUETAS_MES.forEach(function (t) { var o = el('option'); o.value = t; sugerencias.appendChild(o); });
+    cuerpo.appendChild(sugerencias);
+    if (!b.items.length) cuerpo.appendChild(el('p', 'estado-vacio', 'No hay nada destacado. Añade el primero con «+ Añadir destacado».'));
+    b.items.forEach(function (x, n) { cuerpo.appendChild(tarjetaMesAdmin(b, x, n)); });
+    var nuevo = el('div', 'grupo-carta__nuevo');
+    var boton = el('button', 'boton boton--lleno boton--peque', '+ Añadir destacado');
+    boton.type = 'button';
+    boton.disabled = b.items.length >= MAX_MES;
+    boton.addEventListener('click', function () {
+      var usadas = b.items.map(function (x) { return x.etiqueta; });
+      var etiqueta = ETIQUETAS_MES.filter(function (t) { return usadas.indexOf(t) === -1; })[0] || 'Del mes';
+      var x = { id: 'm' + Date.now().toString(36), etiqueta: etiqueta, producto: null, nombre: '', precio: '', icono: 'taza', desc: '', foto: null };
+      b.items.push(x);
+      marcar();
+      pintarPanel();
+      var campo = $('adm-mes-producto-' + x.id);
+      if (campo) enfocarEnPanel(campo);
+    });
+    nuevo.appendChild(boton);
+    nuevo.appendChild(el('p', 'admin__ayuda', b.items.length >= MAX_MES ? 'Has llegado al máximo de ' + MAX_MES + ' destacados.' : 'Con uno solo, sale en grande; con dos o tres, en fila.'));
+    cuerpo.appendChild(nuevo);
+  }
+  function tarjetaMesAdmin(b, x, n) {
+    var g = el('section', 'admin__grupo grupo-carta mes-admin');
+    var cab = el('div', 'grupo-carta__cabecera');
+    var titulo = el('h3', null, texto(x.etiqueta) || 'Destacado ' + (n + 1));
+    cab.appendChild(titulo);
+    var acc = el('div', 'acciones-mini');
+    function mover(paso) {
+      var destino = n + paso;
+      if (destino < 0 || destino >= b.items.length) return;
+      b.items.splice(destino, 0, b.items.splice(n, 1)[0]);
+      marcar();
+      pintarPanel();
+    }
+    var subir = botonMini('↑ Subir', function () { mover(-1); });
+    subir.disabled = n === 0;
+    var bajar = botonMini('↓ Bajar', function () { mover(1); });
+    bajar.disabled = n === b.items.length - 1;
+    acc.appendChild(subir);
+    acc.appendChild(bajar);
+    acc.appendChild(botonBorrar('Quitar', function () { b.items.splice(n, 1); marcar(); pintarPanel(); }));
+    cab.appendChild(acc);
+    g.appendChild(cab);
+
+    var p = productoPorId(x.producto);
+    var t = el('div', 'tarjeta-admin');
+    var mini = el('div', 'tarjeta-admin__mini');
+    var foto = x.foto || (p && p.foto);
+    if (foto) { var im = crearMedio(foto, ''); if (im.tagName === 'VIDEO') { im.autoplay = false; im.preload = 'metadata'; } mini.appendChild(im); }
+    else mini.appendChild(svgUso(p ? (p.icono || 'taza') : (x.icono || 'taza')));
+    t.appendChild(mini);
+
+    var campos = el('div', 'tarjeta-admin__campos');
+    var fila = el('div', 'fila-2 fila-2--mes');
+    fila.appendChild(campoTexto('adm-mes-etiqueta-' + x.id, 'Etiqueta', x.etiqueta, function (v) {
+      x.etiqueta = v;
+      titulo.textContent = texto(v) || 'Destacado ' + (n + 1);
+    }, { maxlength: '40', placeholder: 'Café del mes', list: 'mes-etiquetas', autocomplete: 'off' }));
+    var cSel = el('div', 'campo');
+    var lSel = el('label', null, 'Producto');
+    lSel.htmlFor = 'adm-mes-producto-' + x.id;
+    var sel = el('select');
+    sel.id = 'adm-mes-producto-' + x.id;
+    var mano = el('option', null, '— Escribirlo a mano —');
+    mano.value = '';
+    sel.appendChild(mano);
+    categorias().forEach(function (c) {
+      var og = el('optgroup');
+      og.label = c.nombre;
+      productos().forEach(function (q) {
+        if (q.cat !== c.id) return;
+        var o = el('option', null, q.nombre + ' · ' + precioBonito(q.precio));
+        o.value = q.id;
+        if (q.id === x.producto) o.selected = true;
+        og.appendChild(o);
+      });
+      if (og.children.length) sel.appendChild(og);
+    });
+    if (x.producto && !p) { var perdido = el('option', null, '(Ya no está en la carta)'); perdido.value = x.producto; perdido.selected = true; sel.appendChild(perdido); }
+    sel.addEventListener('change', function () {
+      x.producto = sel.value || null;
+      if (x.producto) { x.nombre = ''; x.precio = ''; }
+      marcar();
+      pintarPanel();
+    });
+    cSel.appendChild(lSel);
+    cSel.appendChild(sel);
+    fila.appendChild(cSel);
+    campos.appendChild(fila);
+
+    if (x.producto && !p) campos.appendChild(el('p', 'admin__alerta', 'Este producto ya no está en la carta. Elige otro o escríbelo a mano.'));
+    if (p) {
+      campos.appendChild(el('p', 'admin__ayuda', 'Sale con el nombre, el precio' + (p.foto ? ', la foto' : '') + ' y los alérgenos de la carta. Para cambiarlos, ve a la pestaña «Carta».'));
+    } else if (!x.producto) {
+      var fila2 = el('div', 'fila-2');
+      fila2.appendChild(campoTexto('adm-mes-nombre-' + x.id, 'Nombre', x.nombre, function (v) { x.nombre = v; }, { maxlength: '80', placeholder: 'Tarta de queso de la abuela' }));
+      fila2.appendChild(campoTexto('adm-mes-precio-' + x.id, 'Precio (€, opcional)', x.precio, function (v) { x.precio = v; }, { inputmode: 'decimal', placeholder: '3,50' }));
+      campos.appendChild(fila2);
+      if (!x.foto) campos.appendChild(selectorIcono(x, 'adm-mes-icono-' + x.id, 'Dibujo (si no tiene foto)', function () { pintarPanel(); }));
+    }
+    campos.appendChild(campoArea('adm-mes-desc-' + x.id, p ? 'Por qué lo recomendáis (si lo dejas vacío, sale la descripción de la carta)' : 'Por qué lo recomendáis', x.desc, function (v) { x.desc = v; }));
+    var accFoto = el('div', 'acciones-mini');
+    accFoto.appendChild(botonFoto('adm-mes-foto-' + x.id, x.foto ? 'Cambiar foto o vídeo' : (p && p.foto ? 'Poner otra foto' : 'Subir foto o vídeo'), function (f) {
+      subirFoto(f, function (idFoto) { x.foto = idFoto; }, true);
+    }, true));
+    if (x.foto) accFoto.appendChild(botonMini(p && p.foto ? 'Usar la foto de la carta' : (esVideo(x.foto) ? 'Quitar vídeo' : 'Quitar foto'), function () { x.foto = null; marcar(); pintarPanel(); }));
+    campos.appendChild(accFoto);
+    t.appendChild(campos);
+    g.appendChild(t);
+    return g;
   }
 
   /* Pestaña: fotos de la galería */
@@ -2377,40 +2846,126 @@
   }
   function panelReservasDeNuevo() { if (pestana === 'reservas') pintarPanel(); }
 
-  /* Pestaña: mensajes del formulario de contacto */
+  /* Pestaña: mensajes de «Escríbenos» y candidaturas de «Trabaja con nosotros» (con su currículum) */
+  var bandeja = { filtro: '' };
+  var NOMBRE_CV = { pdf: 'PDF', doc: 'Word', docx: 'Word', odt: 'OpenDocument', jpg: 'Foto', png: 'Foto', webp: 'Foto' };
   function panelMensajes() {
-    cuerpo.appendChild(el('p', 'admin__ayuda', 'Mensajes que llegan desde el formulario «Escríbenos» de la web. Bórralos cuando estén atendidos. Los de hace más de un año se borran solos.'));
+    cuerpo.appendChild(interruptorAlMomento({
+      id: 'empleo-activo',
+      texto: '«Trabaja con nosotros» en la web',
+      activo: empleoActivo(),
+      ruta: '/api/empleo/activo',
+      clave: 'empleo',
+      explicar: function (si) {
+        return si ? 'En «Escríbenos» se puede elegir «Trabaja con nosotros» y mandar el currículum. Las candidaturas llegan aquí.'
+          : 'Nadie puede mandar su currículum desde la web. Las candidaturas que ya tienes se guardan.';
+      },
+      avisoOk: function (si) { return si ? 'Hecho: ya se pueden mandar candidaturas desde la web.' : 'Hecho: «Trabaja con nosotros» ya no sale en la web.'; },
+      alCambiar: function () { pintarEmpleo(); }
+    }));
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'Aquí llegan los mensajes de «Escríbenos» y las candidaturas de «Trabaja con nosotros», con su currículum. Bórralos cuando estén atendidos. Los de hace más de un año se borran solos, con su currículum.'));
+    var filtros = el('div', 'historial__filtros');
+    filtros.setAttribute('role', 'group');
+    filtros.setAttribute('aria-label', 'Ver');
+    cuerpo.appendChild(filtros);
     var cont = el('div', 'registros');
     cont.appendChild(el('p', 'estado-vacio', 'Cargando mensajes…'));
     cuerpo.appendChild(cont);
     api('GET', '/api/mensajes').then(function (r) {
       if (pestana !== 'mensajes') return;
       cont.innerHTML = '';
-      ponerContador('mensajes', r.mensajes.length);
-      if (!r.mensajes.length) { cont.appendChild(el('p', 'estado-vacio', 'Todavía no hay mensajes.')); return; }
-      r.mensajes.forEach(function (m) {
-        var t = el('article', 'registro');
-        var cab = el('div', 'registro__cabecera');
-        cab.appendChild(el('p', 'registro__titulo', m.nombre));
-        cab.appendChild(el('p', 'registro__meta', fRecibido.format(new Date(m.creado))));
-        t.appendChild(cab);
-        var datos = el('p', 'registro__datos');
-        var mail = el('a', null, m.email); mail.href = 'mailto:' + m.email; datos.appendChild(mail);
-        t.appendChild(datos);
-        t.appendChild(el('p', 'registro__texto', m.mensaje));
-        var acc = el('div', 'acciones-mini');
-        acc.appendChild(botonBorrar('Borrar mensaje', function () {
-          api('DELETE', '/api/mensajes/' + m.id).then(function () { if (pestana === 'mensajes') pintarPanel(); })
-            .catch(function (err) { if (!sesionCaducada(err)) mostrarEstado(err.message, true); });
-        }));
-        t.appendChild(acc);
-        cont.appendChild(t);
+      var todos = r.mensajes || [];
+      var nEmpleo = todos.filter(function (m) { return m.tipo === 'empleo'; }).length;
+      ponerContador('mensajes', todos.length);
+      [['', 'Todos', todos.length], ['consulta', 'Consultas', todos.length - nEmpleo], ['empleo', 'Candidaturas', nEmpleo]].forEach(function (f) {
+        var b = el('button', 'historial__filtro', f[1] + ' (' + f[2] + ')');
+        b.type = 'button';
+        b.setAttribute('aria-pressed', bandeja.filtro === f[0] ? 'true' : 'false');
+        b.addEventListener('click', function () { bandeja.filtro = f[0]; pintarPanel(); });
+        filtros.appendChild(b);
       });
+      var visibles = todos.filter(function (m) {
+        if (!bandeja.filtro) return true;
+        return bandeja.filtro === 'empleo' ? m.tipo === 'empleo' : m.tipo !== 'empleo';
+      });
+      if (!todos.length) { cont.appendChild(el('p', 'estado-vacio', 'Todavía no hay mensajes.')); return; }
+      if (!visibles.length) { cont.appendChild(el('p', 'estado-vacio', bandeja.filtro === 'empleo' ? 'Todavía no hay candidaturas.' : 'No hay consultas.')); return; }
+      visibles.forEach(function (m) { cont.appendChild(m.tipo === 'empleo' ? tarjetaCandidatura(m) : tarjetaMensaje(m)); });
     }).catch(function (err) {
       if (sesionCaducada(err)) return;
       cont.innerHTML = '';
       cont.appendChild(el('p', 'estado-vacio', err.message));
     });
+  }
+  function borrarMensaje(m, textoBoton) {
+    return botonBorrar(textoBoton, function () {
+      api('DELETE', '/api/mensajes/' + m.id).then(function () { if (pestana === 'mensajes') pintarPanel(); })
+        .catch(function (err) { if (!sesionCaducada(err)) mostrarEstado(err.message, true); });
+    });
+  }
+  function tarjetaMensaje(m) {
+    var t = el('article', 'registro');
+    var cab = el('div', 'registro__cabecera');
+    var titulo = el('p', 'registro__titulo');
+    titulo.appendChild(el('span', 'etiqueta-tipo', 'Consulta'));
+    titulo.appendChild(document.createTextNode(m.nombre));
+    cab.appendChild(titulo);
+    cab.appendChild(el('p', 'registro__meta', fRecibido.format(new Date(m.creado))));
+    t.appendChild(cab);
+    var datos = el('p', 'registro__datos');
+    var mail = el('a', null, m.email); mail.href = 'mailto:' + m.email; datos.appendChild(mail);
+    t.appendChild(datos);
+    t.appendChild(el('p', 'registro__texto', m.mensaje));
+    var acc = el('div', 'acciones-mini');
+    acc.appendChild(borrarMensaje(m, 'Borrar mensaje'));
+    t.appendChild(acc);
+    return t;
+  }
+  function tarjetaCandidatura(m) {
+    var t = el('article', 'registro registro--candidatura');
+    var cab = el('div', 'registro__cabecera');
+    var titulo = el('p', 'registro__titulo');
+    titulo.appendChild(el('span', 'etiqueta-tipo etiqueta-tipo--empleo', 'Candidatura'));
+    titulo.appendChild(document.createTextNode(m.nombre));
+    cab.appendChild(titulo);
+    cab.appendChild(el('p', 'registro__meta', fRecibido.format(new Date(m.creado))));
+    t.appendChild(cab);
+    var datos = el('p', 'registro__datos');
+    var mail = el('a', null, m.email); mail.href = 'mailto:' + m.email; datos.appendChild(mail);
+    if (m.telefono) { var tel = el('a', null, m.telefono); tel.href = 'tel:' + m.telefono.replace(/[^\d+]/g, ''); datos.appendChild(tel); }
+    t.appendChild(datos);
+    if (m.puesto) t.appendChild(el('p', 'registro__recogida', 'Le gustaría: ' + m.puesto));
+    if (m.mensaje) t.appendChild(el('p', 'registro__texto', m.mensaje));
+    if (m.cv) {
+      var cv = el('div', 'cv-admin');
+      cv.appendChild(svgUso('documento'));
+      var info = el('div', 'cv-admin__info');
+      info.appendChild(el('span', 'cv-admin__nombre', m.cv.nombre));
+      info.appendChild(el('span', 'cv-admin__peso', (NOMBRE_CV[m.cv.tipo] || 'Archivo') + ' · ' + pesoBonito(m.cv.tamano || 0)));
+      cv.appendChild(info);
+      var botones = el('div', 'acciones-mini');
+      var url = '/api/mensajes/' + m.id + '/cv';
+      if (['pdf', 'jpg', 'png', 'webp'].indexOf(m.cv.tipo) !== -1) {
+        var ver = el('a', 'boton boton--lleno boton--mini', 'Ver currículum');
+        ver.href = url; ver.target = '_blank'; ver.rel = 'noopener';
+        botones.appendChild(ver);
+      }
+      var bajar = el('a', 'boton boton--borde boton--mini', 'Descargar');
+      bajar.href = url + '?descargar=1';
+      bajar.setAttribute('download', m.cv.nombre);
+      botones.appendChild(bajar);
+      cv.appendChild(botones);
+      t.appendChild(cv);
+    } else {
+      t.appendChild(el('p', 'registro__meta', 'Sin currículum adjunto'));
+    }
+    var acc = el('div', 'acciones-mini');
+    var responder = el('a', 'boton boton--borde boton--mini', 'Responder por email');
+    responder.href = 'mailto:' + m.email + '?subject=' + encodeURIComponent('Tu candidatura en SOÑO');
+    acc.appendChild(responder);
+    acc.appendChild(borrarMensaje(m, 'Borrar candidatura'));
+    t.appendChild(acc);
+    return t;
   }
 
   /* Pestaña: Reseñas
@@ -3448,14 +4003,14 @@
      Volver a una versión cambia solo esa parte de la web y también se puede deshacer. */
   var historial = { filtro: '' };
   var fHistorial = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
-  var CLAVE_DE_SECCION = { carta: 'carta', galeria: 'galeria', horario: 'horario', datos: 'datos', textos: 'textos' };
+  var CLAVE_DE_SECCION = { carta: 'carta', galeria: 'galeria', horario: 'horario', datos: 'datos', textos: 'textos', mes: 'mes' };
 
   function panelHistorial() {
-    cuerpo.appendChild(el('p', 'admin__ayuda', 'Cada vez que guardas cambios en los ajustes, los textos, la carta, las fotos o los horarios queda aquí una versión con lo que cambió. Si algo no te convence, vuelve a una versión anterior: solo cambia esa parte de la web, y la versión de ahora también se guarda, así que puedes deshacerlo.'));
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'Cada vez que guardas cambios en los ajustes, los textos, la carta, lo mejor del mes, las fotos o los horarios queda aquí una versión con lo que cambió. Si algo no te convence, vuelve a una versión anterior: solo cambia esa parte de la web, y la versión de ahora también se guarda, así que puedes deshacerlo.'));
     var filtros = el('div', 'historial__filtros');
     filtros.setAttribute('role', 'group');
     filtros.setAttribute('aria-label', 'Ver versiones de');
-    [['', 'Todo'], ['datos', 'Ajustes'], ['textos', 'Textos'], ['carta', 'Carta'], ['galeria', 'Fotos'], ['horario', 'Horarios']].forEach(function (f) {
+    [['', 'Todo'], ['datos', 'Ajustes'], ['textos', 'Textos'], ['carta', 'Carta'], ['mes', 'Del mes'], ['galeria', 'Fotos'], ['horario', 'Horarios']].forEach(function (f) {
       var b = el('button', 'historial__filtro', f[1]);
       b.type = 'button';
       b.setAttribute('aria-pressed', historial.filtro === f[0] ? 'true' : 'false');
@@ -3600,6 +4155,14 @@
         var p = b.productos[i];
         if (!texto(p.nombre)) return 'Hay un producto sin nombre en «' + (nombreGrupo(b.categorias, p.cat) || 'la carta') + '». Escríbelo o elimina el producto.';
         if (!RE_PRECIO.test(texto(p.precio))) return 'Revisa el precio de «' + texto(p.nombre) + '»: escribe solo el número, por ejemplo 2,50.';
+      }
+    }
+    if (k === 'mes') {
+      for (var d = 0; d < b.items.length; d++) {
+        var it = b.items[d];
+        if (it.producto && !productoPorId(it.producto)) return 'El destacado ' + (d + 1) + ' es un producto que ya no está en la carta. Elige otro o escríbelo a mano.';
+        if (!it.producto && !texto(it.nombre)) return 'Escribe el nombre del destacado ' + (d + 1) + ' o elige un producto de la carta.';
+        if (!it.producto && texto(it.precio) && !RE_PRECIO.test(texto(it.precio))) return 'Revisa el precio de «' + texto(it.nombre) + '»: escribe solo el número, por ejemplo 2,50.';
       }
     }
     if (k === 'horario') {
@@ -4132,6 +4695,22 @@
           : accion('Unirme al club', function () { cerrarPanel(); abrirAccesoClub('alta'); })]
       };
     }
+    function empleo() {
+      if (!empleoActivo()) return contacto('Ahora mismo no estamos buscando a nadie, pero gracias por pensar en nosotros. Si quieres, escríbenos:');
+      return {
+        partes: ['¡Qué bien que quieras trabajar en SOÑO! Mándanos tu currículum desde la web: en «Escríbenos», elige «Trabaja con nosotros». Si encaja, te escribimos.'],
+        acciones: [accion('Mandar mi currículum', function () { cerrarPanel(); irAEmpleo(); })]
+      };
+    }
+    function mesInfo() {
+      var lista = mesActivo() ? destacadosMes() : [];
+      if (!lista.length) return carta();
+      return {
+        partes: ['Este mes te recomendamos:', listaHtml(lista.map(function (d) { return d.etiqueta + ': ' + d.nombre + (d.precio ? ' · ' + precioBonito(d.precio) : ''); }))],
+        acciones: [cartaAparte() && !enPaginaCarta ? enlace('Ver lo mejor del mes', '/carta#mes') : accion('Ver lo mejor del mes', function () { irA('mes'); })]
+          .concat(lista.filter(function (d) { return d.producto; }).slice(0, 2).map(function (d) { return verProducto(d.producto); }))
+      };
+    }
     function ayuda(intro) {
       return {
         partes: [intro || 'Te puedo ayudar con el horario, dónde estamos, la carta y los alérgenos, las reservas, los pedidos para llevar y el club. ¿Qué necesitas?'],
@@ -4176,6 +4755,7 @@
         return ayuda('¡Hola! ☕ ¿En qué te ayudo? Pregúntame por el horario, la carta, los alérgenos, reservas o pedidos.');
       }
       if (/ (gracias|genial|perfecto|vale|ok|guay) /.test(q) && q.trim().split(' ').length <= 4) return { partes: ['¡A ti! Si necesitas algo más, aquí estoy ☕'] };
+      if (/(trabaj|empleo|curricul| cv |vacante|contrat|currela|camarer)/.test(q)) return empleo();
       if (/(hablar con|persona|llamar|telefono|whatsapp|contact|email|correo|escribir)/.test(q)) return contacto();
       var p = buscarProducto(q);
       if (p && p.varios) {
@@ -4188,6 +4768,7 @@
       var ids = PALABRAS_ALERGENOS.filter(function (x) { return x[1].test(qSin); }).map(function (x) { return x[0]; });
       if (p) return producto(p, ids);
       if (ids.length) return sinAlergenos(ids);
+      if (/(del mes|recomienda|recomendais|recomendacion|sugerencia|especial|novedad)/.test(q)) return mesInfo();
       if (/(alerg|intoleran|celiac)/.test(q)) return alergenosGeneral();
       if (/(vegan|vegetarian)/.test(q)) return contacto('Eso no lo tenemos marcado en la carta todavía. Pregúntanos y te decimos qué puedes tomar:');
       if (/(horario|hora|abr(is|e|en|ir)|cerr|abierto|cuando)/.test(q)) return horario();
@@ -4209,7 +4790,7 @@
     function pintarChips() {
       chips.innerHTML = '';
       var d = estado.datos || {};
-      [['¿Qué horario tenéis?', true], ['¿Dónde estáis?', true], ['Ver la carta', true], ['Alérgenos', true], ['Reservar mesa', true],
+      [['¿Qué horario tenéis?', true], ['¿Dónde estáis?', true], ['Ver la carta', true], ['¿Qué me recomendáis?', mesVisible()], ['Alérgenos', true], ['Reservar mesa', true],
         ['Pedir para llevar', d.paraLlevar !== false], ['El club de desayunos', ajustesClub().activo], ['Hablar con alguien', true]].forEach(function (c) {
         if (!c[1]) return;
         var b = el('button', 'asistente__chip', c[0]);
@@ -4285,9 +4866,35 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && !panel.hidden) { poner(false); boton.focus(); }
     });
+    /* En la tableta (o con nombres largos en el menú, la galería, la Ñ del socio…) el menú entero
+       puede no caber en la cabecera: entonces se pliega como en el móvil */
+    var nav = document.querySelector('.cabecera .menu');
+    var ul = nav && nav.querySelector('ul');
+    var midiendo = false;
+    function medir() {
+      midiendo = false;
+      if (!ul) return;
+      var antes = raiz.classList.contains('menu-justo');
+      raiz.classList.remove('menu-justo');
+      // El menú va alineado a la derecha: si no cabe, se mete debajo del logo o del botón de reservar
+      var m = nav.getBoundingClientRect();
+      var logo = $('logo').getBoundingClientRect();
+      var acciones = document.querySelector('.cabecera__acciones').getBoundingClientRect();
+      var justo = window.innerWidth > 760 && (m.left < logo.right + 16 || m.right > acciones.left - 8 || ul.scrollWidth > nav.clientWidth + 1);
+      raiz.classList.toggle('menu-justo', justo);
+      if (antes && !justo && window.innerWidth > 760) poner(false);
+    }
+    ajustarMenu = function () {
+      if (midiendo) return;
+      midiendo = true;
+      requestAnimationFrame(medir);
+    };
     var ancho = window.matchMedia('(min-width: 761px)');
-    var alCambiar = function () { if (ancho.matches) poner(false); };
+    var alCambiar = function () { if (ancho.matches && !raiz.classList.contains('menu-justo')) poner(false); };
     if (ancho.addEventListener) ancho.addEventListener('change', alCambiar); else if (ancho.addListener) ancho.addListener(alCambiar);
+    window.addEventListener('resize', ajustarMenu);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(ajustarMenu);
+    ajustarMenu();
   })();
 
   /* ---------- Cabecera y aparición suave de los bloques ---------- */
@@ -4326,12 +4933,14 @@
   /* ---------- Arranque ---------- */
   pintarTodo();
   api('GET', '/api/contenido').then(function (c) {
-    estado = { carta: c.carta, galeria: c.galeria, horario: c.horario, datos: c.datos, textos: c.textos, textosBase: c.textosBase };
+    estado = { carta: c.carta, galeria: c.galeria, horario: c.horario, datos: c.datos, textos: c.textos, textosBase: c.textosBase, mes: c.mes };
     cargado = true;
     pintarTodo();
     cargarResenas();
     // Con «#escribir-resena» en la dirección (por ejemplo, un QR en las mesas) se abre la ventana
     if (location.hash === '#escribir-resena') abrirResena();
+    // Con «#trabaja» (el enlace del pie, o un cartel con QR) se abre «Trabaja con nosotros»
+    if (location.hash === '#trabaja') irAEmpleo();
     // Si la carta va en su propia página, un enlace antiguo a «/#carta» lleva allí
     if (location.hash === '#carta' && cartaAparte() && !enPaginaCarta) location.replace('/carta');
   }).catch(function () {

@@ -87,7 +87,8 @@
       pedidos: d.paraLlevar !== false,
       domicilio: d.domicilio !== false,
       club: !(d.club && d.club.activo === false),
-      resenas: !(d.resenas && d.resenas.activo === false)
+      resenas: !(d.resenas && d.resenas.activo === false),
+      empleo: !(d.empleo && d.empleo.activo === false)
     };
   }
   function fichaTitular(conRegistro) {
@@ -124,6 +125,7 @@
     if (h.club) cosas.push('unirte al Club SOÑO');
     if (h.resenas) cosas.push('dejar una reseña');
     cosas.push('escribirnos');
+    if (h.empleo) cosas.push('mandarnos tu currículum');
     f.appendChild(p('Esta web presenta la cafetería SOÑO: la carta, el horario y dónde estamos. Desde ella puedes ' + unir(cosas) + '.'));
 
     f.appendChild(h2('Condiciones de uso'));
@@ -190,6 +192,13 @@
         tiempo: 'Los borramos cuando ya están atendidos y, como mucho, al año.'
       },
       {
+        titulo: 'Candidaturas de «Trabaja con nosotros»',
+        datos: 'Nombre, email, teléfono (si nos lo das), el puesto que te interesa, lo que nos cuentes y tu currículum, con los datos que pongas en él.',
+        para: 'Valorar tu candidatura y llamarte si encaja en este proceso de selección o en los siguientes.',
+        base: 'Tu consentimiento al mandarnos la candidatura (artículo 6.1.a del RGPD), que puedes retirar cuando quieras.',
+        tiempo: 'Un año como mucho desde que nos la mandas; después se borran solos, con el currículum. Si nos lo pides, la borramos antes.'
+      },
+      {
         titulo: 'Club SOÑO',
         datos: 'Nombre, email, teléfono (si nos lo das), tu contraseña (guardada cifrada: nadie puede leerla) y tus sellos y premios, con la fecha y el nombre de quien te atendió.',
         para: 'Llevar tu tarjeta de sellos.',
@@ -243,10 +252,10 @@
     f.appendChild(p('Si eres socio del club, también puedes darte de baja tú mismo desde tu tarjeta. Y si crees que no hemos atendido bien tu petición, puedes reclamar ante la Agencia Española de Protección de Datos en ', enlace('www.aepd.es', 'https://www.aepd.es', true), '.'));
 
     f.appendChild(h2('Menores'));
-    f.appendChild(p('Para unirte al club o dejar una reseña tienes que tener al menos 14 años.'));
+    f.appendChild(p('Para unirte al club o dejar una reseña tienes que tener al menos 14 años, y para mandarnos tu candidatura, al menos 16.'));
 
     f.appendChild(h2('Cómo cuidamos tus datos'));
-    f.appendChild(p('Las contraseñas del club se guardan cifradas, el panel de gestión de la web está protegido con usuario y contraseña, y solo el equipo de SOÑO puede ver tus datos.'));
+    f.appendChild(p('Las contraseñas del club se guardan cifradas, el panel de gestión de la web está protegido con usuario y contraseña, y solo el equipo de SOÑO puede ver tus datos. Los currículums no están a la vista en la web: solo se pueden abrir desde el panel.'));
     f.appendChild(p('Las cookies que usa la web se explican en la ', enlaceDoc('política de cookies', 'cookies'), '.'));
     return f;
   }

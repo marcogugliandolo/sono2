@@ -3,8 +3,9 @@
 /*
  * SOÑO · servidor web
  * Sin dependencias externas: solo Node.js 20 o superior.
- * Sirve la web, guarda la carta, fotos, horarios, reservas, mensajes, los socios del club
- * y las reseñas en la carpeta de datos, y protege el panel con usuario y contraseña.
+ * Sirve la web, guarda la carta, fotos, horarios, reservas, mensajes (y las candidaturas con su
+ * currículum), los socios del club y las reseñas en la carpeta de datos, y protege el panel
+ * con usuario y contraseña.
  */
 
 const http = require('node:http');
@@ -19,6 +20,7 @@ const textosWeb = require('./textos');
 const PUERTO = Number(process.env.PORT || 3000);
 const DIR_DATOS = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
 const DIR_FOTOS = path.join(DIR_DATOS, 'fotos');
+const DIR_CV = path.join(DIR_DATOS, 'cv');          // currículums de «Trabaja con nosotros» (no se sirven en público)
 const DIR_PUBLICO = path.join(__dirname, 'public');
 const ARCHIVO_INICIAL = path.join(__dirname, 'datos-iniciales.json');
 const ADMIN_USUARIO = normalizarUsuario(process.env.ADMIN_USER || 'soño');
@@ -33,6 +35,24 @@ const MAX_VIDEO = 30 * 1024 * 1024;   // vídeos cortos de los productos
 const MAX_RESERVAS = 3000;
 const MAX_MENSAJES = 1000;
 const MAX_PEDIDOS = 3000;
+/* Trabaja con nosotros: candidaturas con currículum (PDF, Word o foto) */
+const EMPLEO_INICIAL = { activo: true };
+const MAX_CV = 5 * 1024 * 1024;
+const MAX_JSON_CV = Math.ceil(MAX_CV * 4 / 3) + 64 * 1024;   // el archivo llega en base64 dentro del JSON
+const MAX_CANDIDATURAS = 300;
+const RE_CV = /^[a-f0-9]{32}\.(pdf|doc|docx|odt|jpg|png|webp)$/;
+const TIPOS_CV = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  odt: 'application/vnd.oasis.opendocument.text',
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp'
+};
+/* Lo mejor del mes: hasta 3 destacados (de la carta o escritos a mano) */
+const MES_INICIAL = { activo: true };
+const MAX_MES = 3;
 const MAX_VERSIONES_SECCION = 30;  // versiones que se guardan de cada parte de la web
 
 const MAX_GRUPOS = 12;
@@ -217,6 +237,7 @@ async function leerArchivo(nombre, porDefecto) {
 
 async function iniciarDatos() {
   await fsp.mkdir(DIR_FOTOS, { recursive: true });
+  await fsp.mkdir(DIR_CV, { recursive: true });
   contenido = await leerArchivo('contenido.json', null);
   if (!contenido) {
     const inicial = JSON.parse(await fsp.readFile(ARCHIVO_INICIAL, 'utf8'));
@@ -232,6 +253,7 @@ async function iniciarDatos() {
   await completarContenido();
   reservas = await leerArchivo('reservas.json', []);
   mensajes = await leerArchivo('mensajes.json', []);
+  await limpiarCvSueltos();
   pedidos = await leerArchivo('pedidos.json', []);
   socios = await leerArchivo('socios.json', []);
   resenas = await leerArchivo('resenas.json', []);
@@ -262,7 +284,8 @@ async function iniciarDatos() {
 }
 
 /* Borra lo que ya no hace falta, tal y como dice la política de privacidad:
-   pedidos de hace más de 30 días, reservas de hace más de 90 y mensajes de hace más de un año.
+   pedidos de hace más de 30 días, reservas de hace más de 90 y mensajes y candidaturas
+   (con su currículum) de hace más de un año.
    Se hace al arrancar y cada 6 horas. */
 async function limpiarAntiguos() {
   const limitePedidos = new Date(Date.now() - 30 * 86400000).toISOString();
@@ -274,9 +297,12 @@ async function limpiarAntiguos() {
   reservas = reservas.filter((r) => r.fecha >= limiteReservas);
   if (reservas.length !== nReservas) await guardarArchivo('reservas.json', reservas);
   const limiteMensajes = new Date(Date.now() - 365 * 86400000).toISOString();
-  const nMensajes = mensajes.length;
-  mensajes = mensajes.filter((m) => m.creado >= limiteMensajes);
-  if (mensajes.length !== nMensajes) await guardarArchivo('mensajes.json', mensajes);
+  const viejos = mensajes.filter((m) => m.creado < limiteMensajes);
+  if (viejos.length) {
+    mensajes = mensajes.filter((m) => m.creado >= limiteMensajes);
+    await guardarArchivo('mensajes.json', mensajes);
+    viejos.forEach(borrarCv);
+  }
 }
 
 /* Completa contenido guardado con versiones anteriores de la web:
@@ -307,6 +333,12 @@ async function completarContenido() {
   if (!contenido.datos.legal.actualizado) { contenido.datos.legal.actualizado = hoyISO(0); cambiado = true; }
   if (!contenido.textos || !Array.isArray(contenido.textos.menu)) { contenido.textos = textosWeb.textosIniciales(); cambiado = true; }
   if (!contenido.datos.asistente) { contenido.datos.asistente = Object.assign({}, ASISTENTE_INICIAL); cambiado = true; }
+  if (!contenido.datos.empleo) { contenido.datos.empleo = Object.assign({}, EMPLEO_INICIAL); cambiado = true; }
+  if (!contenido.datos.mes) { contenido.datos.mes = Object.assign({}, MES_INICIAL); cambiado = true; }
+  if (!contenido.mes || !Array.isArray(contenido.mes.items)) { contenido.mes = mesInicial(contenido.carta); cambiado = true; }
+  // Secciones nuevas del menú (por ejemplo «Del mes»): entran en su sitio en un menú ya guardado
+  const menuCompleto = textosWeb.completarMenu(contenido.textos.menu);
+  if (JSON.stringify(menuCompleto) !== JSON.stringify(contenido.textos.menu)) { contenido.textos = Object.assign({}, contenido.textos, { menu: menuCompleto }); cambiado = true; }
   if (cambiado) await guardarArchivo('contenido.json', contenido);
 }
 
@@ -437,6 +469,8 @@ function validarDatos(d) {
     club: validarClub(d.club),
     resenas: { activo: !(d.resenas && d.resenas.activo === false) },
     cartaAparte: d.cartaAparte === true,
+    empleo: { activo: !(d.empleo && d.empleo.activo === false) },
+    mes: { activo: !(d.mes && d.mes.activo === false) },
     asistente: {
       activo: !(d.asistente && d.asistente.activo === false),
       nombre: texto(d.asistente && d.asistente.nombre, 20) || ASISTENTE_INICIAL.nombre
@@ -463,12 +497,15 @@ function validarLegal(l) {
   };
 }
 
-/* Al guardar Ajustes o volver a una versión: el club, las reseñas y la carta aparte no cambian
+/* Al guardar Ajustes o volver a una versión: el club, las reseñas, la carta aparte,
+   «Trabaja con nosotros» y «Lo mejor del mes» no se encienden ni se apagan
    (eso se hace en sus pestañas) y la fecha de los textos legales se pone sola si cambian sus datos */
 function prepararDatos(limpio, antes) {
   limpio.club.activo = ajustesClub().activo !== false;
   limpio.resenas.activo = ajustesResenas().activo !== false;
   limpio.cartaAparte = contenido.datos.cartaAparte === true;
+  limpio.empleo.activo = ajustesEmpleo().activo !== false;
+  limpio.mes.activo = ajustesMes().activo !== false;
   const sinFecha = (l) => JSON.stringify(Object.assign({}, LEGAL_VACIO, l || {}, { actualizado: '' }));
   const previo = (antes && antes.legal) || {};
   limpio.legal.actualizado = sinFecha(previo) !== sinFecha(limpio.legal) ? hoyISO(0) : (previo.actualizado || hoyISO(0));
@@ -481,9 +518,74 @@ function validarClub(c) {
   return { activo: v.activo !== false, sellos, premio: texto(v.premio, 60) || CLUB_INICIAL.premio };
 }
 
+/* ---------- Lo mejor del mes ----------
+   Hasta 3 destacados. Cada uno es un producto de la carta (con su nombre, precio, foto y alérgenos)
+   o algo escrito a mano. La etiqueta («Café del mes», «Dulce del mes»…) y el texto son libres. */
+function ajustesMes() { return contenido.datos.mes || MES_INICIAL; }
+
+function mesInicial(carta) {
+  const lista = (carta && Array.isArray(carta.productos)) ? carta.productos : [];
+  const v60 = lista.find((p) => p.id === 'p11' && /origen/i.test(p.nombre));
+  const cafe = v60 || lista.find((p) => ['taza', 'vaso', 'vaso-alto', 'filtro', 'prensa', 'chemex', 'coldbrew'].includes(p.icono)) || lista[0];
+  return {
+    items: [{
+      id: 'm1',
+      etiqueta: 'Café del mes',
+      producto: cafe ? cafe.id : null,
+      nombre: cafe ? '' : 'Café del mes',
+      precio: '',
+      icono: 'taza',
+      desc: v60
+        ? 'Cada mes traemos un café de origen distinto y lo preparamos en V60, para que se noten todos sus matices. Pregúntanos de dónde viene el de este mes.'
+        : 'Nuestra recomendación de este mes. Pregúntanos por él en la barra.',
+      foto: null
+    }]
+  };
+}
+
+function validarMes(m) {
+  const lista = m && Array.isArray(m.items) ? m.items : null;
+  if (!lista) throw errorCliente('«Lo mejor del mes» no tiene el formato esperado.');
+  if (lista.length > MAX_MES) throw errorCliente('En «Lo mejor del mes» caben como mucho ' + MAX_MES + ' destacados.');
+  const vistos = new Set();
+  return {
+    items: lista.map((x, i) => {
+      if (!x || typeof x !== 'object') throw errorCliente('Hay un destacado del mes con un formato no válido.');
+      let id = String(x.id || '');
+      if (!RE_ID.test(id) || vistos.has(id)) id = 'm' + crypto.randomBytes(4).toString('hex');
+      vistos.add(id);
+      const producto = x.producto ? String(x.producto) : null;
+      if (producto && !contenido.carta.productos.some((p) => p.id === producto)) {
+        throw errorCliente('El destacado ' + (i + 1) + ' es un producto que ya no está en la carta. Elige otro o escríbelo a mano.');
+      }
+      const nombre = producto ? '' : texto(x.nombre, 80);
+      if (!producto && !nombre) throw errorCliente('El destacado ' + (i + 1) + ' no tiene nombre: elige un producto de la carta o escribe cuál es.');
+      const precio = producto ? '' : texto(x.precio, 10);
+      if (precio && !RE_PRECIO.test(precio)) throw errorCliente('Revisa el precio de «' + nombre + '»: escribe solo el número, por ejemplo 2,50.');
+      return {
+        id,
+        etiqueta: texto(x.etiqueta, 40) || 'Del mes',
+        producto,
+        nombre,
+        precio: precio ? normPrecio(precio) : '',
+        icono: ICONOS.includes(x.icono) ? x.icono : 'taza',
+        desc: textoLargo(x.desc, 320).replace(/\n{3,}/g, '\n\n'),
+        foto: validarFoto(x.foto, true)
+      };
+    })
+  };
+}
+
+/* Destacados que se pueden enseñar (un producto borrado de la carta y sin nombre no sale) */
+function mesVisible() {
+  if (!contenido || ajustesMes().activo === false || !contenido.mes) return false;
+  return (contenido.mes.items || []).some((x) => x.nombre || (x.producto && contenido.carta.productos.some((p) => p.id === x.producto)));
+}
+
 const VALIDADORES = {
   carta: validarCarta, galeria: validarGaleria, horario: validarHorario, datos: validarDatos,
-  textos: (v) => textosWeb.validarTextos(v, textosBase())
+  textos: (v) => textosWeb.validarTextos(v, textosBase()),
+  mes: validarMes
 };
 
 /* ---------- Respuestas ---------- */
@@ -536,10 +638,10 @@ function leerCuerpo(req, limite) {
   });
 }
 
-async function leerJSON(req) {
+async function leerJSON(req, limite) {
   const tipo = String(req.headers['content-type'] || '');
   if (!tipo.startsWith('application/json')) throw errorCliente('Formato de petición no válido.', 415);
-  const cuerpo = await leerCuerpo(req, MAX_JSON);
+  const cuerpo = await leerCuerpo(req, limite || MAX_JSON);
   try {
     const datos = JSON.parse(cuerpo.toString('utf8') || '{}');
     if (!datos || typeof datos !== 'object' || Array.isArray(datos)) throw new Error('no es un objeto');
@@ -664,6 +766,9 @@ function textosBase() {
 async function servirIndice(req, res, enCarta) {
   let html = await leerIndice();
   html = textosWeb.aplicarAlHtml(html, contenido && contenido.textos, indiceCache.base, contenido && contenido.datos);
+  // «Lo mejor del mes» y «Trabaja con nosotros» salen ya bien desde el servidor (así no aparecen ni desaparecen al cargar)
+  if (mesVisible()) html = html.replace(/ data-mes hidden/g, ' data-mes');
+  if (contenido && ajustesEmpleo().activo === false) html = html.replace(/ data-empleo(?=[ >])/g, ' data-empleo hidden');
   const aparte = !!(contenido && contenido.datos && contenido.datos.cartaAparte);
   if (enCarta) {
     html = html.replace('<html lang="es">', '<html lang="es" class="modo-carta">')
@@ -690,6 +795,47 @@ async function servirPublico(req, res, pathname) {
   const ext = path.extname(ruta).toLowerCase();
   const cache = ext === '.woff2' ? 'public, max-age=31536000, immutable' : 'no-cache';
   return servirArchivo(req, res, ruta, cache);
+}
+
+/* ---------- Trabaja con nosotros ----------
+   Las candidaturas llegan a «Mensajes» del panel con su currículum. El archivo se guarda
+   en la carpeta cv/ de los datos y solo se puede abrir con la sesión del panel. */
+function ajustesEmpleo() { return contenido.datos.empleo || EMPLEO_INICIAL; }
+
+/* Tipo del currículum mirando los primeros bytes (no el nombre del archivo) */
+function tipoCv(buf) {
+  if (buf.length > 5 && buf.toString('latin1', 0, 5) === '%PDF-') return 'pdf';
+  if (buf.length > 8 && buf.readUInt32BE(0) === 0xd0cf11e0 && buf.readUInt32BE(4) === 0xa1b11ae1) return 'doc';
+  if (buf.length > 30 && buf.readUInt32BE(0) === 0x504b0304) {
+    // Word (.docx) y OpenDocument (.odt) son ZIP: se reconocen por lo que llevan dentro
+    if (buf.indexOf('word/', 0, 'latin1') !== -1) return 'docx';
+    if (buf.indexOf('application/vnd.oasis.opendocument.text', 0, 'latin1') !== -1) return 'odt';
+    return null;
+  }
+  const img = tipoImagen(buf);
+  if (img === 'jpg' || img === 'png' || img === 'webp' || img === 'heic') return img;
+  return null;
+}
+
+function borrarCv(m) {
+  if (m && m.cv && RE_CV.test(String(m.cv.archivo || ''))) {
+    fsp.unlink(path.join(DIR_CV, m.cv.archivo)).catch(() => {});
+  }
+}
+
+/* Currículums que ya no son de ningún mensaje (por ejemplo, si se cortó la luz al guardar) */
+async function limpiarCvSueltos() {
+  let nombres = [];
+  try { nombres = await fsp.readdir(DIR_CV); } catch (e) { return; }
+  const usados = new Set(mensajes.filter((m) => m.cv).map((m) => m.cv.archivo));
+  await Promise.all(nombres.filter((n) => !usados.has(n)).map((n) => fsp.unlink(path.join(DIR_CV, n)).catch(() => {})));
+}
+
+/* Como mucho MAX_MENSAJES: los más antiguos salen (con su currículum) */
+function recortarMensajes() {
+  if (mensajes.length <= MAX_MENSAJES) return;
+  mensajes.slice(MAX_MENSAJES).forEach(borrarCv);
+  mensajes = mensajes.slice(0, MAX_MENSAJES);
 }
 
 /* ---------- Club SOÑO ---------- */
@@ -1157,7 +1303,7 @@ async function apiResenas(req, res, pathname, metodo, ip) {
    Cada vez que se guarda una parte de la web desde el panel (carta, fotos, horarios
    o ajustes) queda una copia con un resumen de lo que cambió. Volver a una versión
    la guarda como versión nueva, así que también se puede deshacer. */
-const NOMBRE_SECCION = { carta: 'Carta', galeria: 'Fotos', horario: 'Horarios', datos: 'Ajustes', textos: 'Textos' };
+const NOMBRE_SECCION = { carta: 'Carta', galeria: 'Fotos', horario: 'Horarios', datos: 'Ajustes', textos: 'Textos', mes: 'Lo mejor del mes' };
 const fVersion = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 function registrarVersion(seccion, datos, resumen) {
@@ -1183,6 +1329,25 @@ function resumenCambios(seccion, a, b) {
   if (seccion === 'textos') {
     const l = textosWeb.resumenTextos(a, b, textosBase()).slice(0, 8);
     return l.length ? l : ['Cambios guardados'];
+  }
+  if (seccion === 'mes') {
+    const nombreDe = (x) => x.nombre || ((contenido.carta.productos.find((p) => p.id === x.producto) || {}).nombre) || 'destacado';
+    const ia = new Map((a.items || []).map((x) => [x.id, x]));
+    const ib = new Map((b.items || []).map((x) => [x.id, x]));
+    ib.forEach((x, id) => {
+      const v = ia.get(id);
+      if (!v) { lineas.push('Nuevo: ' + x.etiqueta + ' · ' + nombreDe(x)); return; }
+      if (v.producto !== x.producto || v.nombre !== x.nombre) lineas.push(x.etiqueta + ': ahora es ' + nombreDe(x));
+      if (v.etiqueta !== x.etiqueta) lineas.push('«' + v.etiqueta + '» pasa a ser «' + x.etiqueta + '»');
+      if (v.desc !== x.desc) lineas.push('Texto de ' + nombreDe(x));
+      if (v.precio !== x.precio) lineas.push('Precio de ' + nombreDe(x) + ': ' + vacio(v.precio) + ' → ' + vacio(x.precio));
+      if (v.foto !== x.foto) lineas.push(x.foto ? 'Foto nueva de ' + nombreDe(x) : 'Foto quitada de ' + nombreDe(x));
+      if (v.icono !== x.icono && !x.producto) lineas.push('Dibujo de ' + nombreDe(x));
+    });
+    ia.forEach((x, id) => { if (!ib.has(id)) lineas.push('Quitado: ' + x.etiqueta + ' · ' + nombreDe(x)); });
+    const oa = (a.items || []).map((x) => x.id).filter((id) => ib.has(id));
+    const ob = (b.items || []).map((x) => x.id).filter((id) => ia.has(id));
+    if (!igual(oa, ob)) lineas.push('Orden de los destacados');
   }
   if (seccion === 'carta') {
     const gA = new Map((a.categorias || []).map((g) => [g.id, g]));
@@ -1214,7 +1379,8 @@ function resumenCambios(seccion, a, b) {
       if (v.cat !== x.cat) lineas.push(x.nombre + ' cambia de grupo');
     });
     pA.forEach((x, id) => { if (!pB.has(id)) lineas.push('Borrado: ' + x.nombre); });
-  } else if (seccion === 'galeria') {
+  }
+  if (seccion === 'galeria') {
     const fa = a.fotos || [], fb = b.fotos || [];
     for (let i = 0; i < Math.max(fa.length, fb.length); i++) {
       const x = fa[i] || {}, y = fb[i] || {};
@@ -1309,6 +1475,20 @@ async function api(req, res, pathname) {
     return enviarJSON(res, 200, { cartaAparte: datos.aparte });
   }
 
+  /* Interruptores que se guardan al momento: «Lo mejor del mes» y «Trabaja con nosotros» */
+  const mInterruptor = pathname.match(/^\/api\/(mes|empleo)\/activo$/);
+  if (mInterruptor && metodo === 'POST') {
+    exigirAdmin(req);
+    const datos = await leerJSON(req);
+    const cual = mInterruptor[1];
+    if (typeof datos.activo !== 'boolean') throw errorCliente('Indica si queda activo o no.');
+    const actual = cual === 'mes' ? ajustesMes() : ajustesEmpleo();
+    contenido.datos = Object.assign({}, contenido.datos, { [cual]: Object.assign({}, actual, { activo: datos.activo }) });
+    await guardarArchivo('contenido.json', contenido);
+    console.log('[soño] ' + (cual === 'mes' ? 'Lo mejor del mes' : 'Trabaja con nosotros') + (datos.activo ? ' activado' : ' desactivado'));
+    return enviarJSON(res, 200, { [cual]: contenido.datos[cual] });
+  }
+
   if (pathname === '/api/contenido' && metodo === 'GET') {
     return enviarJSON(res, 200, Object.assign({}, contenido, { textosBase: textosBase() }));
   }
@@ -1349,7 +1529,7 @@ async function api(req, res, pathname) {
     return enviarJSON(res, 200, { ok: true });
   }
 
-  const mContenido = pathname.match(/^\/api\/contenido\/(carta|galeria|horario|datos|textos)$/);
+  const mContenido = pathname.match(/^\/api\/contenido\/(carta|galeria|horario|datos|textos|mes)$/);
   if (mContenido && metodo === 'PUT') {
     exigirAdmin(req);
     const clave = mContenido[1];
@@ -1538,22 +1718,114 @@ async function api(req, res, pathname) {
     if (!nombre || !email || !mensaje) throw errorCliente('Rellena nombre, email y mensaje para continuar.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw errorCliente('Revisa el email: parece que le falta algo.');
     if (!permitirEnvio('mensaje', ip, 5, 3600000)) throw errorCliente('Has enviado muchos mensajes seguidos. Prueba más tarde.', 429);
-    mensajes.unshift({ id: crypto.randomBytes(8).toString('hex'), creado: new Date().toISOString(), nombre, email, mensaje });
-    if (mensajes.length > MAX_MENSAJES) mensajes = mensajes.slice(0, MAX_MENSAJES);
+    mensajes.unshift({ id: crypto.randomBytes(8).toString('hex'), tipo: 'consulta', creado: new Date().toISOString(), nombre, email, mensaje });
+    recortarMensajes();
     await guardarArchivo('mensajes.json', mensajes);
+    return enviarJSON(res, 201, { ok: true });
+  }
+
+  /* Trabaja con nosotros: la candidatura llega a «Mensajes» con el currículum */
+  if (pathname === '/api/candidaturas' && metodo === 'POST') {
+    if (!mismoOrigen(req)) throw errorCliente('Petición no permitida.', 403);
+    if (ajustesEmpleo().activo === false) throw errorCliente('Ahora mismo no estamos recibiendo candidaturas.', 409);
+    const datos = await leerJSON(req, MAX_JSON_CV);
+    if (texto(datos.web, 200)) return enviarJSON(res, 201, { ok: true });   // trampa para bots
+    const nombre = texto(datos.nombre, 80);
+    if (nombre.length < 2) throw errorCliente('Escribe tu nombre.');
+    const email = texto(datos.email, 120);
+    if (!RE_EMAIL.test(email)) throw errorCliente('Revisa el email: parece que le falta algo.');
+    const telefono = texto(datos.telefono, 25);
+    if (telefono && telefono.replace(/[^\d]/g, '').length < 9) throw errorCliente('Revisa el teléfono: necesita al menos 9 cifras (o déjalo vacío).');
+    const puesto = texto(datos.puesto, 80);
+    const mensaje = textoLargo(datos.mensaje, 1500).replace(/\n{3,}/g, '\n\n');
+    let buf = null;
+    let nombreArchivo = '';
+    if (datos.cv && typeof datos.cv === 'object' && typeof datos.cv.datos === 'string' && datos.cv.datos) {
+      const b64 = datos.cv.datos.replace(/^data:[^,]*,/, '');
+      if (!/^[A-Za-z0-9+/=\s]+$/.test(b64)) throw errorCliente('No se ha podido leer el currículum. Prueba a adjuntarlo otra vez.');
+      buf = Buffer.from(b64, 'base64');
+      nombreArchivo = texto(datos.cv.nombre, 120).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '');
+    }
+    if (!buf && mensaje.length < 20) throw errorCliente('Adjunta tu currículum o cuéntanos un poco de ti (al menos 20 caracteres).');
+    let ext = null;
+    if (buf) {
+      if (buf.length > MAX_CV) throw errorCliente('El currículum pesa demasiado (máximo 5 MB). Prueba a guardarlo en PDF.', 413);
+      if (buf.length < 64) throw errorCliente('El archivo del currículum está vacío. Prueba a adjuntarlo otra vez.');
+      ext = tipoCv(buf);
+      if (ext === 'heic') throw errorCliente('Esa foto está en formato HEIC y no la podemos abrir. Mejor sube el currículum en PDF, o una foto en JPG.', 415);
+      if (!ext) throw errorCliente('Ese formato no vale para el currículum. Usa PDF (mejor), Word o una foto.', 415);
+    }
+    if (datos.acepto !== true) throw errorCliente('Para enviarla tienes que aceptar que guardemos tu candidatura.');
+    if (!permitirEnvio('candidatura', ip, 3, 3600000)) throw errorCliente('Has enviado varias candidaturas seguidas. Prueba más tarde.', 429);
+    if (mensajes.filter((m) => m.tipo === 'empleo').length >= MAX_CANDIDATURAS) {
+      throw errorCliente('Ahora mismo no podemos recibir más candidaturas. Prueba en unos días o escríbenos.', 503);
+    }
+    const candidatura = {
+      id: crypto.randomBytes(8).toString('hex'),
+      tipo: 'empleo',
+      creado: new Date().toISOString(),
+      nombre,
+      email,
+      telefono,
+      puesto,
+      mensaje,
+      cv: null
+    };
+    if (buf) {
+      const archivo = crypto.randomBytes(16).toString('hex') + '.' + ext;
+      await fsp.writeFile(path.join(DIR_CV, archivo), buf);
+      let nombreCv = nombreArchivo || 'curriculum.' + ext;
+      if (!new RegExp('\\.' + (ext === 'jpg' ? 'jpe?g' : ext) + '$', 'i').test(nombreCv)) nombreCv = nombreCv.replace(/\.[a-z0-9]{1,5}$/i, '') + '.' + ext;
+      candidatura.cv = { archivo, nombre: nombreCv, tamano: buf.length, tipo: ext };
+    }
+    mensajes.unshift(candidatura);
+    recortarMensajes();
+    try {
+      await guardarArchivo('mensajes.json', mensajes);
+    } catch (e) {
+      mensajes = mensajes.filter((m) => m !== candidatura);
+      borrarCv(candidatura);
+      throw e;
+    }
+    console.log('[soño] Nueva candidatura' + (candidatura.cv ? ' con currículum (' + ext + ')' : ''));
     return enviarJSON(res, 201, { ok: true });
   }
 
   if (pathname === '/api/mensajes' && metodo === 'GET') {
     exigirAdmin(req);
-    return enviarJSON(res, 200, { mensajes });
+    return enviarJSON(res, 200, { mensajes, empleo: ajustesEmpleo() });
+  }
+
+  /* El currículum de una candidatura: solo con la sesión del panel. PDF y fotos se abren en el navegador */
+  const mCv = pathname.match(/^\/api\/mensajes\/([a-f0-9]{16})\/cv$/);
+  if (mCv && (metodo === 'GET' || metodo === 'HEAD')) {
+    if (!sesionValida(req)) throw errorCliente('Tu sesión ha caducado. Vuelve a entrar en el panel.', 401);
+    const m = mensajes.find((x) => x.id === mCv[1]);
+    if (!m || !m.cv || !RE_CV.test(String(m.cv.archivo || ''))) throw errorCliente('Ese currículum ya no está.', 404);
+    let buf;
+    try { buf = await fsp.readFile(path.join(DIR_CV, m.cv.archivo)); } catch (e) { throw errorCliente('Ese currículum ya no está.', 404); }
+    const ext = m.cv.archivo.split('.').pop();
+    const verAqui = ['pdf', 'jpg', 'png', 'webp'].includes(ext) && !new URL(req.url, 'http://x').searchParams.has('descargar');
+    const nombre = 'CV ' + m.nombre.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').slice(0, 60) + '.' + ext;
+    const ascii = nombre.normalize('NFD').replace(/[^\x20-\x7e]/g, '').replace(/["\\]/g, '') || 'curriculum.' + ext;
+    // El visor de PDF del navegador no arranca con la política de seguridad de la web (object-src 'none')
+    if (ext === 'pdf') res.removeHeader('Content-Security-Policy');
+    res.writeHead(200, {
+      'Content-Type': TIPOS_CV[ext],
+      'Content-Length': buf.length,
+      'Cache-Control': 'private, no-store',
+      'Content-Disposition': (verAqui ? 'inline' : 'attachment') + '; filename="' + ascii + '"; filename*=UTF-8\'\'' + encodeURIComponent(nombre).replace(/['()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase())
+    });
+    return res.end(metodo === 'HEAD' ? undefined : buf);
   }
 
   const mMensaje = pathname.match(/^\/api\/mensajes\/([a-f0-9]{16})$/);
   if (mMensaje && metodo === 'DELETE') {
     exigirAdmin(req);
-    mensajes = mensajes.filter((m) => m.id !== mMensaje[1]);
+    const borrado = mensajes.find((m) => m.id === mMensaje[1]);
+    mensajes = mensajes.filter((m) => m !== borrado);
     await guardarArchivo('mensajes.json', mensajes);
+    borrarCv(borrado);
     return enviarJSON(res, 200, { ok: true });
   }
 
