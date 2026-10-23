@@ -13,6 +13,7 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { crearWallet } = require('./wallet');
+const textosWeb = require('./textos');
 
 /* ---------- Configuración (variables de entorno) ---------- */
 const PUERTO = Number(process.env.PORT || 3000);
@@ -28,6 +29,7 @@ const COOKIE_SEGURA = (process.env.COOKIE_SECURE || 'auto').toLowerCase();
 const HORAS_SESION = 12;
 const MAX_JSON = 512 * 1024;
 const MAX_FOTO = 10 * 1024 * 1024;
+const MAX_VIDEO = 30 * 1024 * 1024;   // vídeos cortos de los productos
 const MAX_RESERVAS = 3000;
 const MAX_MENSAJES = 1000;
 const MAX_PEDIDOS = 3000;
@@ -63,7 +65,8 @@ const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sáb
 const ALERGENOS = ['gluten', 'crustaceos', 'huevos', 'pescado', 'cacahuetes', 'soja', 'lacteos', 'frutos', 'apio', 'mostaza', 'sesamo', 'sulfitos', 'altramuces', 'moluscos'];
 
 const RE_ID = /^[a-z0-9]{1,24}$/i;
-const RE_FOTO = /^[a-f0-9]{32}\.(jpg|png|webp)$/;
+const RE_FOTO = /^[a-f0-9]{32}\.(jpg|png|webp|gif|mp4|webm|mov)$/;
+const RE_VIDEO = /\.(mp4|webm|mov)$/;
 const RE_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 const RE_PRECIO = /^\d{1,3}([.,]\d{1,2})?$/;
 const RE_FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -77,6 +80,10 @@ const TIPOS = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/mp4',      // QuickTime con H.264: así también lo reproduce Chrome
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
@@ -89,6 +96,7 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self'",
   "img-src 'self' data: blob:",
+  "media-src 'self' blob:",
   "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -297,13 +305,15 @@ async function completarContenido() {
   if (!contenido.datos.resenas) { contenido.datos.resenas = Object.assign({}, RESENAS_INICIAL); cambiado = true; }
   if (!contenido.datos.legal) { contenido.datos.legal = Object.assign({}, LEGAL_VACIO); cambiado = true; }
   if (!contenido.datos.legal.actualizado) { contenido.datos.legal.actualizado = hoyISO(0); cambiado = true; }
+  if (!contenido.textos || !Array.isArray(contenido.textos.menu)) { contenido.textos = textosWeb.textosIniciales(); cambiado = true; }
   if (cambiado) await guardarArchivo('contenido.json', contenido);
 }
 
 /* ---------- Validación del contenido editable ---------- */
-function validarFoto(v) {
+function validarFoto(v, admiteVideo) {
   if (v === null || v === undefined || v === '') return null;
   if (typeof v !== 'string' || !RE_FOTO.test(v)) throw errorCliente('Hay una foto con un identificador no válido.');
+  if (!admiteVideo && RE_VIDEO.test(v)) throw errorCliente('En la galería solo van fotos (los vídeos, en los productos de la carta).');
   if (!fs.existsSync(path.join(DIR_FOTOS, v))) throw errorCliente('Una de las fotos ya no existe. Vuelve a subirla.');
   return v;
 }
@@ -356,7 +366,7 @@ function validarCarta(c) {
         icono: ICONOS.includes(p.icono) ? p.icono : iconoDe.get(cat),
         etiquetas,
         alergenos: ALERGENOS.filter((a) => Array.isArray(p.alergenos) && p.alergenos.includes(a)),
-        foto: validarFoto(p.foto)
+        foto: validarFoto(p.foto, true)
       };
     })
   };
@@ -464,7 +474,10 @@ function validarClub(c) {
   return { activo: v.activo !== false, sellos, premio: texto(v.premio, 60) || CLUB_INICIAL.premio };
 }
 
-const VALIDADORES = { carta: validarCarta, galeria: validarGaleria, horario: validarHorario, datos: validarDatos };
+const VALIDADORES = {
+  carta: validarCarta, galeria: validarGaleria, horario: validarHorario, datos: validarDatos,
+  textos: (v) => textosWeb.validarTextos(v, textosBase())
+};
 
 /* ---------- Respuestas ---------- */
 function cabecerasSeguridad(res) {
@@ -562,11 +575,23 @@ function exigirAdmin(req) {
 }
 
 /* ---------- Fotos ---------- */
+/* Fotos, GIF y vídeos: el tipo se mira en los primeros bytes, no en el nombre */
 function tipoImagen(buf) {
   if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg';
   if (buf.length > 8 && buf.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'png';
   if (buf.length > 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'webp';
+  if (buf.length > 6 && /^GIF8[79]a$/.test(buf.toString('ascii', 0, 6))) return 'gif';
+  if (buf.length > 4 && buf.readUInt32BE(0) === 0x1a45dfa3) return 'webm';
+  if (buf.length > 12 && buf.toString('ascii', 4, 8) === 'ftyp') {
+    const marca = buf.toString('ascii', 8, 12);
+    if (/^(heic|heix|hevc|hevx|mif1|msf1|avif|avis)$/.test(marca)) return 'heic';
+    return marca === 'qt  ' ? 'mov' : 'mp4';
+  }
   return null;
+}
+/* Vídeo en HEVC (lo normal en el iPhone): en muchos Android y en Chrome de Windows no se ve */
+function esHevc(buf) {
+  return buf.indexOf('hvc1', 0, 'ascii') !== -1 || buf.indexOf('hev1', 0, 'ascii') !== -1;
 }
 
 /* ---------- Archivos estáticos ---------- */
@@ -579,17 +604,31 @@ async function servirArchivo(req, res, ruta, cache) {
     return false;
   }
   const etag = 'W/"' + info.size.toString(16) + '-' + Math.floor(info.mtimeMs).toString(16) + '"';
+  const tipo = TIPOS[path.extname(ruta).toLowerCase()] || 'application/octet-stream';
   res.setHeader('ETag', etag);
   res.setHeader('Cache-Control', cache);
-  if (req.headers['if-none-match'] === etag) {
+  res.setHeader('Accept-Ranges', 'bytes');
+  if (req.headers['if-none-match'] === etag && !req.headers.range) {
     res.writeHead(304);
     res.end();
     return true;
   }
-  res.writeHead(200, {
-    'Content-Type': TIPOS[path.extname(ruta).toLowerCase()] || 'application/octet-stream',
-    'Content-Length': info.size
-  });
+  // Trozos («Range»): los vídeos se piden por partes (Safari no los reproduce sin esto)
+  const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || '').trim());
+  if (m && (m[1] || m[2])) {
+    let inicio = m[1] ? Number(m[1]) : Math.max(0, info.size - Number(m[2]));
+    let fin = m[1] && m[2] ? Math.min(Number(m[2]), info.size - 1) : info.size - 1;
+    if (inicio > fin || inicio >= info.size) {
+      res.writeHead(416, { 'Content-Range': 'bytes */' + info.size });
+      res.end();
+      return true;
+    }
+    res.writeHead(206, { 'Content-Type': tipo, 'Content-Length': fin - inicio + 1, 'Content-Range': 'bytes ' + inicio + '-' + fin + '/' + info.size });
+    if (req.method === 'HEAD') { res.end(); return true; }
+    fs.createReadStream(ruta, { start: inicio, end: fin }).pipe(res);
+    return true;
+  }
+  res.writeHead(200, { 'Content-Type': tipo, 'Content-Length': info.size });
   if (req.method === 'HEAD') { res.end(); return true; }
   fs.createReadStream(ruta).pipe(res);
   return true;
@@ -597,15 +636,27 @@ async function servirArchivo(req, res, ruta, cache) {
 
 /* La portada y la página de la carta salen del mismo index.html, ya preparado según el ajuste
    «carta en su propia página», para que no parpadee mientras carga el JavaScript */
-let indiceCache = { mtime: 0, html: '' };
+let indiceCache = { mtime: 0, html: '', base: {} };
 async function leerIndice() {
   const ruta = path.join(DIR_PUBLICO, 'index.html');
   const info = await fsp.stat(ruta);
-  if (info.mtimeMs !== indiceCache.mtime) indiceCache = { mtime: info.mtimeMs, html: await fsp.readFile(ruta, 'utf8') };
+  if (info.mtimeMs !== indiceCache.mtime) {
+    const html = await fsp.readFile(ruta, 'utf8');
+    indiceCache = { mtime: info.mtimeMs, html, base: textosWeb.textosOriginales(html) };
+  }
   return indiceCache.html;
+}
+/* Textos originales de la web (los del index.html): se leen al arrancar */
+function textosBase() {
+  if (!indiceCache.mtime) {
+    const html = fs.readFileSync(path.join(DIR_PUBLICO, 'index.html'), 'utf8');
+    indiceCache = { mtime: fs.statSync(path.join(DIR_PUBLICO, 'index.html')).mtimeMs, html, base: textosWeb.textosOriginales(html) };
+  }
+  return indiceCache.base;
 }
 async function servirIndice(req, res, enCarta) {
   let html = await leerIndice();
+  html = textosWeb.aplicarAlHtml(html, contenido && contenido.textos, indiceCache.base, contenido && contenido.datos);
   const aparte = !!(contenido && contenido.datos && contenido.datos.cartaAparte);
   if (enCarta) {
     html = html.replace('<html lang="es">', '<html lang="es" class="modo-carta">')
@@ -1079,7 +1130,7 @@ async function apiResenas(req, res, pathname, metodo, ip) {
    Cada vez que se guarda una parte de la web desde el panel (carta, fotos, horarios
    o ajustes) queda una copia con un resumen de lo que cambió. Volver a una versión
    la guarda como versión nueva, así que también se puede deshacer. */
-const NOMBRE_SECCION = { carta: 'Carta', galeria: 'Fotos', horario: 'Horarios', datos: 'Ajustes' };
+const NOMBRE_SECCION = { carta: 'Carta', galeria: 'Fotos', horario: 'Horarios', datos: 'Ajustes', textos: 'Textos' };
 const fVersion = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 function registrarVersion(seccion, datos, resumen) {
@@ -1102,6 +1153,10 @@ function resumenCambios(seccion, a, b) {
   const igual = (x, y) => JSON.stringify(x) === JSON.stringify(y);
   a = a || {};
   b = b || {};
+  if (seccion === 'textos') {
+    const l = textosWeb.resumenTextos(a, b, textosBase()).slice(0, 8);
+    return l.length ? l : ['Cambios guardados'];
+  }
   if (seccion === 'carta') {
     const gA = new Map((a.categorias || []).map((g) => [g.id, g]));
     const gB = new Map((b.categorias || []).map((g) => [g.id, g]));
@@ -1225,7 +1280,7 @@ async function api(req, res, pathname) {
   }
 
   if (pathname === '/api/contenido' && metodo === 'GET') {
-    return enviarJSON(res, 200, contenido);
+    return enviarJSON(res, 200, Object.assign({}, contenido, { textosBase: textosBase() }));
   }
 
   if (pathname === '/api/sesion' && metodo === 'GET') {
@@ -1264,7 +1319,7 @@ async function api(req, res, pathname) {
     return enviarJSON(res, 200, { ok: true });
   }
 
-  const mContenido = pathname.match(/^\/api\/contenido\/(carta|galeria|horario|datos)$/);
+  const mContenido = pathname.match(/^\/api\/contenido\/(carta|galeria|horario|datos|textos)$/);
   if (mContenido && metodo === 'PUT') {
     exigirAdmin(req);
     const clave = mContenido[1];
@@ -1275,6 +1330,8 @@ async function api(req, res, pathname) {
     await guardarArchivo('contenido.json', contenido);
     if (clave === 'datos') avisarCambioClub(antes, limpio);
     if (JSON.stringify(antes) !== JSON.stringify(limpio)) {
+      // La primera vez que se cambia una parte nueva (los textos), se guarda también cómo estaba
+      if (antes && !versiones.some((x) => x.seccion === clave)) registrarVersion(clave, antes, ['Cómo estaba antes del primer cambio']);
       registrarVersion(clave, limpio, resumenCambios(clave, antes, limpio));
       await guardarArchivo('versiones.json', versiones);
     }
@@ -1283,12 +1340,18 @@ async function api(req, res, pathname) {
 
   if (pathname === '/api/fotos' && metodo === 'POST') {
     exigirAdmin(req);
-    const buf = await leerCuerpo(req, MAX_FOTO);
+    const buf = await leerCuerpo(req, MAX_VIDEO);
     const ext = tipoImagen(buf);
-    if (!ext) throw errorCliente('Ese formato no vale. Usa una foto JPG, PNG o WebP.', 415);
+    if (ext === 'heic') throw errorCliente('Esa foto está en formato HEIC/AVIF y este navegador no la ha podido convertir. Ábrela desde el iPhone o el Mac (Safari) o guárdala antes como JPG.', 415);
+    if (!ext) throw errorCliente('Ese formato no vale. Usa una foto (JPG, PNG, WebP), un GIF o un vídeo MP4.', 415);
+    const video = ['mp4', 'webm', 'mov'].includes(ext);
+    if (!video && buf.length > MAX_FOTO) throw errorCliente('La foto pesa demasiado (máximo 10 MB).', 413);
     const id = crypto.randomBytes(16).toString('hex') + '.' + ext;
     await fsp.writeFile(path.join(DIR_FOTOS, id), buf);
-    return enviarJSON(res, 201, { id, url: '/fotos/' + id });
+    const aviso = video && esHevc(buf)
+      ? 'Ojo: este vídeo está en HEVC (el formato del iPhone) y en algunos Android no se verá. Si puedes, súbelo en MP4 «más compatible» (en el iPhone: Ajustes → Cámara → Formatos → Más compatible).'
+      : '';
+    return enviarJSON(res, 201, { id, url: '/fotos/' + id, video, aviso });
   }
 
   if (pathname === '/api/reservas' && metodo === 'POST') {
@@ -1482,7 +1545,7 @@ async function atender(req, res) {
 
   if (req.method !== 'GET' && req.method !== 'HEAD') return enviarTexto(res, 405, 'Método no permitido');
 
-  const mFoto = pathname.match(/^\/fotos\/([a-f0-9]{32}\.(?:jpg|png|webp))$/);
+  const mFoto = pathname.match(/^\/fotos\/([a-f0-9]{32}\.(?:jpg|png|webp|gif|mp4|webm|mov))$/);
   if (mFoto) {
     const ok = await servirArchivo(req, res, path.join(DIR_FOTOS, mFoto[1]), 'public, max-age=31536000, immutable');
     if (!ok) enviarTexto(res, 404, 'Foto no encontrada');
