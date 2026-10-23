@@ -14,7 +14,7 @@ Justo después de la portada hay una sección, «Así preparamos tu café». Al 
 
 ## Historial: volver a una versión anterior
 
-Cada vez que se guardan cambios desde el panel en la **carta**, las **fotos**, los **horarios** o los **ajustes**, queda una versión en la pestaña **Historial** con la fecha y un resumen de lo que cambió («Precio de Capuchino: 2,20 € → 2,50 €», «Borrado: Cold brew», «Dirección: …»). Se puede filtrar por parte de la web.
+Cada vez que se guardan cambios desde el panel en los **ajustes**, los **textos**, la **carta**, las **fotos** o los **horarios**, queda una versión en la pestaña **Historial** con la fecha y un resumen de lo que cambió («Precio de Capuchino: 2,20 € → 2,50 €», «Borrado: Cold brew», «Dirección: …»). Se puede filtrar por parte de la web.
 
 **Volver a esta versión** deja esa parte de la web como estaba en ese momento; el resto no se toca. La versión de antes de volver también se guarda, así que se puede deshacer. Se guardan las últimas 30 versiones de cada parte (en `versiones.json`). La primera vez que arranca, se guarda cómo estaba la web como punto de partida.
 
@@ -22,7 +22,7 @@ El historial es para lo que se cambia desde el panel. Las reservas, pedidos, men
 
 ## Club SOÑO: tarjeta de sellos
 
-Los clientes se hacen socios desde la web (sección «Club»): nombre, email, teléfono opcional y una contraseña. Al entrar se abre su tarjeta en una ventana con los sellos (una taza por desayuno), su código QR y los últimos movimientos. Mientras la tarjeta está abierta se actualiza sola, así ven el sello en cuanto se lo ponéis. Con `#tarjeta` al final de la dirección (por ejemplo `https://tu-dominio/#tarjeta`) se abre la tarjeta directamente; pueden guardarlo como acceso en el móvil.
+Los clientes se hacen socios desde la web (sección «Club»): nombre, email, teléfono opcional y una contraseña. Al entrar se abre su tarjeta en una ventana con los sellos (la Ñ del logo, una por desayuno), su código QR y los últimos movimientos. Mientras la tarjeta está abierta se actualiza sola, así ven el sello en cuanto se lo ponéis. Con `#tarjeta` al final de la dirección (por ejemplo `https://tu-dominio/#tarjeta`) se abre la tarjeta directamente; pueden guardarlo como acceso en el móvil.
 
 En el panel, pestaña **Club**:
 - **Club activo en la web**: interruptor arriba de la pestaña. Se guarda al momento. Desactivado, el club no sale en la web (ni la sección, ni el menú, ni la tarjeta) y nadie puede apuntarse ni entrar; los socios y sus sellos se conservan para cuando se vuelva a activar.
@@ -36,7 +36,7 @@ En **Ajustes → Club SOÑO** se elige cuántos sellos tiene la tarjeta (de 3 a 
 
 ### La tarjeta en la cartera del móvil (Apple Wallet y Google Wallet)
 
-En la ventana de la tarjeta del socio salen los botones **Añadir a Apple Wallet** (en el iPhone y en el ordenador) y **Añadir a Google Wallet** (en Android y en el ordenador). La tarjeta lleva el logo, los colores de SOÑO, las tazas selladas y el mismo QR que se escanea en la barra, y **se actualiza sola** cuando se pone un sello, se canjea el premio o se cambian los sellos o el premio en Ajustes (en el iPhone sale un aviso: «Nuevo sello en tu tarjeta de SOÑO»).
+En la ventana de la tarjeta del socio salen los botones **Añadir a Apple Wallet** (en el iPhone y en el ordenador) y **Añadir a Google Wallet** (en Android y en el ordenador). La tarjeta lleva el logo, los colores de SOÑO, los sellos con la Ñ del logo y el mismo QR que se escanea en la barra, y **se actualiza sola** cuando se pone un sello, se canjea el premio o se cambian los sellos o el premio en Ajustes (en el iPhone sale un aviso: «Nuevo sello en tu tarjeta de SOÑO»).
 
 Cada botón solo sale cuando está configurado. **Todo se configura desde el panel, también desde el móvil**: pestaña **Club** → *Tarjeta en el móvil (Wallet)*. Ahí se ve si Apple y Google están listos o qué falta, cuántos iPhone tienen la tarjeta y cuándo caduca el certificado de Apple, con los pasos numerados y los enlaces a cada web.
 
@@ -62,6 +62,21 @@ Las claves y certificados se guardan en `wallet/apple/` y `wallet/google/` dentr
 Los socios pueden darse de baja ellos mismos desde su tarjeta (se borran sus datos). Las contraseñas se guardan cifradas (scrypt) y la sesión del socio dura 120 días. Al recoger nombre, email y teléfono, conviene mencionarlo en la política de privacidad de la cafetería.
 
 Los datos del club están en `socios.json` y la clave que firma las sesiones en `secreto.json`, dentro del volumen de datos. Si se pierde `secreto.json`, los socios solo tienen que volver a entrar.
+
+## Textos y menú
+
+En el panel, pestaña **Textos**:
+
+- **Menú**: el nombre de cada enlace («Nosotros», «Carta», «Visítanos»…) y su orden con ↑ ↓. El orden es el mismo en la cabecera, en el menú del móvil y en el pie.
+- **Textos de cada parte de la web**: etiqueta, título y textos de la portada, «Así preparamos tu café», Nosotros, Carta, Para llevar, Club, Galería, Reseñas, Visítanos y el pie. Si un texto se deja vacío, vuelve el original. En el texto del club, `{premio}` y `{sellos}` se cambian solos por lo que haya en Ajustes.
+
+Se guarda con «Guardar cambios» y queda en el Historial. El servidor ya manda la página con los textos puestos, así que no parpadea al cargar. Los textos originales son los del propio `public/index.html` (cada uno lleva `data-texto="…"`).
+
+## Fotos, GIF y vídeos de la carta
+
+Cada producto puede llevar una **foto** (también las HEIC del iPhone: el navegador las pasa a JPG), un **GIF** animado o un **vídeo corto** (MP4, MOV o WebM, hasta 30 segundos y 30 MB). El vídeo se ve sin sonido y en bucle, como un GIF. Si un vídeo del iPhone está en HEVC, el panel avisa: en algunos Android no se ve, y conviene grabar en «Más compatible» (Ajustes → Cámara → Formatos). La galería solo admite fotos.
+
+Si la web va detrás de un proxy (por ejemplo Nginx Proxy Manager), sube su límite de subida para los vídeos (`client_max_body_size 32m;`).
 
 ## La carta en su propia página
 
@@ -112,6 +127,7 @@ public/                la web: index.html, styles.css, app.js, tipografías
 public/legal.html      página de aviso legal, privacidad y cookies (el texto está en legal.js)
 public/cookies.js      aviso de cookies (lo usan la web y la página legal)
 wallet.js              tarjeta del club para Apple Wallet y Google Wallet (sin dependencias)
+textos.js              textos y menú editables (los aplica a la página antes de enviarla)
 wallet/                logo, iconos y sellos con los que se dibuja la tarjeta de Wallet
 public/vendor/         librerías del QR del club (dibujarlo y leerlo con la cámara), con sus licencias
 stack-portainer.yml    stack para el «Web editor» de Portainer (descarga el código de GitHub)
@@ -187,7 +203,7 @@ docker run --rm -v sono2_sono2_datos:/datos -v "$PWD":/copia alpine \
 - El panel pide usuario y contraseña al servidor; la contraseña no está en el código de la web.
 - Tras 5 intentos fallidos desde la misma IP, el acceso se bloquea 15 minutos.
 - La sesión dura 12 horas y la cookie solo la puede leer el servidor.
-- Las fotos se comprueban (solo JPG, PNG o WebP, hasta 10 MB) y el navegador las reduce antes de subirlas.
+- Las fotos y vídeos se comprueban por su contenido, no por el nombre (JPG, PNG, WebP o GIF hasta 10 MB; MP4, MOV o WebM hasta 30 MB) y el navegador reduce las fotos antes de subirlas.
 - Las reservas, los pedidos y los mensajes tienen límite de envíos por IP y una trampa para bots.
 - El total de cada pedido lo calcula el servidor con los precios de la carta, no el navegador.
 - Usa una contraseña larga en `ADMIN_PASSWORD`, sobre todo si la web es pública.

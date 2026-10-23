@@ -37,7 +37,7 @@
   var MAX_ZONAS = 6;
   var DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   var PIES_GALERIA = ['El local', 'La barra', 'Latte art', 'Desayunos', 'Buenos ratos'];
-  var CLAVE_DE = { carta: 'carta', fotos: 'galeria', horarios: 'horario', datos: 'datos' };
+  var CLAVE_DE = { carta: 'carta', fotos: 'galeria', horarios: 'horario', datos: 'datos', textos: 'textos' };
   var RE_PRECIO = /^\d{1,3}([.,]\d{1,2})?$/;
   var RE_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
   var RE_NIF = /^([0-9]{8}[A-Z]|[XYZ][0-9]{7}[A-Z]|[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J])$/;
@@ -82,6 +82,25 @@
     return s;
   }
   function urlFoto(id) { return '/fotos/' + id; }
+  function esVideo(id) { return /\.(mp4|webm|mov)$/.test(String(id || '')); }
+  var sinMovimiento = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  /* Foto, GIF o vídeo corto de un producto. Los vídeos van sin sonido y en bucle, como un GIF */
+  function crearMedio(id, alt) {
+    if (esVideo(id)) {
+      var v = el('video');
+      v.muted = true; v.loop = true; v.playsInline = true;
+      v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
+      v.autoplay = !sinMovimiento;
+      v.preload = sinMovimiento ? 'metadata' : 'auto';
+      v.src = urlFoto(id);
+      if (alt) v.setAttribute('aria-label', alt); else v.setAttribute('aria-hidden', 'true');
+      return v;
+    }
+    var img = el('img');
+    img.src = urlFoto(id);
+    img.alt = alt || '';
+    return img;
+  }
   function pendiente(t) { return el('span', 'pendiente', t || 'Por confirmar'); }
   function clonar(o) { return JSON.parse(JSON.stringify(o)); }
   function texto(v) { return typeof v === 'string' ? v.trim() : ''; }
@@ -150,7 +169,63 @@
       });
   }
 
+  /* ---------- Textos y menú editables (pestaña «Textos» del panel) ----------
+     El servidor ya manda la página con los textos puestos; aquí se vuelven a poner al guardar en el panel. */
+  var MENU_INICIAL = [
+    { id: 'nosotros', texto: 'Nosotros' }, { id: 'carta', texto: 'Carta' }, { id: 'llevar', texto: 'Para llevar' },
+    { id: 'club', texto: 'Club' }, { id: 'galeria', texto: 'Galería' }, { id: 'resenas', texto: 'Reseñas' }, { id: 'contacto', texto: 'Visítanos' }
+  ];
+  function escaparHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function textoWeb(clave) {
+    var cambiados = estado.textos && estado.textos.textos;
+    return (cambiados && cambiados[clave]) || (estado.textosBase && estado.textosBase[clave]) || '';
+  }
+  /* {premio} y {sellos} solo se cambian en los textos del club (salen de Ajustes) */
+  function htmlTexto(clave, valor) {
+    var c = ajustesClub();
+    var h = escaparHtml(valor).replace(/\n/g, '<br>');
+    if (clave === 'club.texto') h = h.replace('{premio}', '<strong id="club-premio">' + escaparHtml(c.premio) + '</strong>');
+    if (clave === 'club.p3') h = h.replace('{sellos}', '<span id="club-n">' + escaparHtml(String(c.sellos)) + '</span>');
+    return h;
+  }
+  function menuActual() {
+    var m = estado.textos && estado.textos.menu;
+    return Array.isArray(m) && m.length ? m : MENU_INICIAL;
+  }
+  function nombreMenu(id) {
+    var m = menuActual().filter(function (x) { return x.id === id; })[0];
+    return (m && m.texto) || '';
+  }
+  function aplicarMenu() {
+    var orden = menuActual().map(function (m) { return m.id; });
+    document.querySelectorAll('[data-menu-lista]').forEach(function (ul) {
+      var items = Array.prototype.slice.call(ul.children).filter(function (li) { return li.hasAttribute('data-menu'); });
+      items.sort(function (a, b) { return orden.indexOf(a.getAttribute('data-menu')) - orden.indexOf(b.getAttribute('data-menu')); });
+      items.forEach(function (li) {
+        ul.appendChild(li);
+        var a = li.querySelector('a');
+        var id = li.getAttribute('data-menu');
+        if (a) a.textContent = id === 'club' && socio ? 'Mi tarjeta' : nombreMenu(id);
+      });
+    });
+  }
+  function aplicarTextos() {
+    if (!estado.textosBase) return;
+    var d = estado.datos || {};
+    document.querySelectorAll('[data-texto]').forEach(function (n) {
+      var clave = n.getAttribute('data-texto');
+      var valor = clave === 'llevar.texto' && d.domicilio === false ? textoWeb('llevar.textoRecoger') : textoWeb(clave);
+      if (!valor) return;
+      var html = htmlTexto(clave, valor);
+      if (n.innerHTML !== html) n.innerHTML = html;
+    });
+    aplicarMenu();
+  }
+
   function pintarTodo() {
+    aplicarTextos();
     pintarCarta();
     pintarGaleria();
     pintarHorario();
@@ -263,11 +338,8 @@
       var media = el('span', 'plato__media');
       var dibujo = svgUso(p.icono || 'taza');
       if (p.foto) {
-        var img = el('img');
-        img.src = urlFoto(p.foto);
-        img.alt = '';
-        img.loading = 'lazy';
-        img.decoding = 'async';
+        var img = crearMedio(p.foto, '');
+        if (img.tagName === 'IMG') { img.loading = 'lazy'; img.decoding = 'async'; }
         img.addEventListener('error', function () { img.replaceWith(dibujo); });
         media.appendChild(img);
       } else {
@@ -320,10 +392,16 @@
   var dibujo = $('producto-dibujo');
   var icono = $('producto-icono');
   var imgProducto = $('producto-img');
+  var videoProducto = $('producto-video');
   imgProducto.addEventListener('error', function () {
     imgProducto.hidden = true;
     visual.classList.remove('con-foto');
   });
+  videoProducto.addEventListener('error', function () {
+    videoProducto.hidden = true;
+    visual.classList.remove('con-foto');
+  });
+  modalProducto.addEventListener('close', function () { videoProducto.pause(); });
   function animarEntrada(nodo) {
     nodo.classList.remove('entra');
     void nodo.getBoundingClientRect();
@@ -355,7 +433,18 @@
     });
     icono.setAttribute('href', '#i-' + (p.icono || 'taza'));
     dibujo.setAttribute('aria-label', 'Ilustración: ' + (p.nombre || 'producto'));
-    if (p.foto) {
+    var video = p.foto && esVideo(p.foto);
+    if (!video) { videoProducto.pause(); videoProducto.hidden = true; videoProducto.removeAttribute('src'); }
+    if (p.foto && video) {
+      visual.classList.add('con-foto');
+      imgProducto.hidden = true;
+      imgProducto.removeAttribute('src');
+      videoProducto.hidden = false;
+      if (videoProducto.getAttribute('src') !== urlFoto(p.foto)) videoProducto.src = urlFoto(p.foto);
+      videoProducto.setAttribute('aria-label', p.nombre || '');
+      if (!sinMovimiento) { var juega = videoProducto.play(); if (juega && juega.catch) juega.catch(function () {}); }
+      animarEntrada(videoProducto);
+    } else if (p.foto) {
       visual.classList.add('con-foto');
       imgProducto.hidden = false;
       imgProducto.src = urlFoto(p.foto);
@@ -522,9 +611,9 @@
     document.querySelectorAll('[data-llevar]').forEach(function (n) { n.hidden = !hayLlevar; });
     document.querySelectorAll('[data-domicilio]').forEach(function (n) { n.hidden = !hayDomicilio; });
     if (!hayDomicilio && $('tipo-domicilio').checked) { $('tipo-recoger').checked = true; }
-    $('llevar-intro').textContent = hayDomicilio
-      ? 'Haz tu pedido aquí y pásate a recogerlo, o te lo llevamos a casa.'
-      : 'Haz tu pedido aquí y pásate a recogerlo cuando esté listo.';
+    $('llevar-intro').innerHTML = htmlTexto('llevar.texto', hayDomicilio
+      ? textoWeb('llevar.texto') || 'Haz tu pedido aquí y pásate a recogerlo, o te lo llevamos a casa.'
+      : textoWeb('llevar.textoRecoger') || 'Haz tu pedido aquí y pásate a recogerlo cuando esté listo.');
     actualizarTipo();
   }
 
@@ -958,7 +1047,7 @@
 
   /* ---------- Club SOÑO: tarjeta de sellos ----------
      El socio entra con su email y contraseña y ve su tarjeta en una ventana:
-     los sellos (tazas), su QR para enseñarlo en la barra y los últimos movimientos.
+     los sellos (la Ñ del logo), su QR para enseñarlo en la barra y los últimos movimientos.
      Mientras la tarjeta está abierta se actualiza sola, así el sello aparece al momento. */
   var socio = null;
   var modalClub = $('modal-club');
@@ -972,7 +1061,7 @@
   }
   function codigoBonito(c) { return c ? c.slice(0, 4) + '-' + c.slice(4) : ''; }
 
-  /* Tazas de la tarjeta: las selladas, rellenas y un poco giradas, como un sello de goma */
+  /* Sellos de la tarjeta: la Ñ del logo. Los puestos, rellenos y un poco girados, como un sello de goma */
   function pintarSellos(cont, puestos, necesarios, nuevoDesde) {
     cont.innerHTML = '';
     var columnas = necesarios <= 5 ? necesarios : necesarios <= 10 ? Math.ceil(necesarios / 2) : 5;
@@ -981,7 +1070,7 @@
       var hueco = el('span', 'sello' + (i < puestos ? ' sello--puesto' : ''));
       hueco.style.setProperty('--giro', ((i * 37) % 13 - 6) + 'deg');
       if (i < puestos && nuevoDesde !== undefined && i >= nuevoDesde) hueco.classList.add('sello--nuevo');
-      hueco.appendChild(svgUso('taza'));
+      hueco.appendChild(svgUso('ene'));
       cont.appendChild(hueco);
     }
   }
@@ -1071,8 +1160,9 @@
       if (modalTarjeta.open) cerrar(modalTarjeta);
       if (modalClub.open) cerrar(modalClub);
     }
-    $('club-premio').textContent = c.premio;
-    $('club-n').textContent = String(c.sellos);
+    // Si en «Textos» se quita {premio} o {sellos}, estos huecos no existen
+    if ($('club-premio')) $('club-premio').textContent = c.premio;
+    if ($('club-n')) $('club-n').textContent = String(c.sellos);
     pintarSellos($('club-muestra-sellos'), Math.min(4, c.sellos - 1), c.sellos);
     var pie = document.querySelector('.club__carton-pie');
     if (pie) {
@@ -1086,7 +1176,7 @@
       $('club-hola').textContent = 'Hola, ' + socio.nombre.split(' ')[0] + '. ' +
         (faltan <= 0 ? 'Tienes ' + socio.premio + ' esperándote.' : 'Llevas ' + socio.sellos + ' de ' + socio.necesarios + ' sellos.');
     }
-    document.querySelectorAll('[data-enlace-club]').forEach(function (a) { a.textContent = socio ? 'Mi tarjeta' : 'Club'; });
+    document.querySelectorAll('[data-enlace-club]').forEach(function (a) { a.textContent = socio ? 'Mi tarjeta' : nombreMenu('club'); });
   }
 
   /* Botones de Wallet: en el iPhone solo Apple, en Android solo Google y en el ordenador los dos
@@ -1541,9 +1631,14 @@
     if (k === 'carta') return { categorias: [], productos: [] };
     if (k === 'galeria') return { fotos: PIES_GALERIA.map(function (pie, i) { return { id: 'g' + (i + 1), pie: pie, foto: null }; }) };
     if (k === 'horario') return { dias: DIAS_SEMANA.map(function (dia) { return { dia: dia, texto: '' }; }), manana: [], tarde: [] };
+    if (k === 'textos') return { menu: clonar(MENU_INICIAL), textos: {} };
     return { direccion: '', email: '', telefono: '', instagram: '', whatsapp: '', abrimosPronto: true, paraLlevar: true, domicilio: true };
   }
   function normalizar(k, b) {
+    if (k === 'textos') {
+      if (!Array.isArray(b.menu) || !b.menu.length) b.menu = clonar(MENU_INICIAL);
+      if (!b.textos || typeof b.textos !== 'object') b.textos = {};
+    }
     if (k === 'carta' && !Array.isArray(b.productos)) b.productos = [];
     if (k === 'carta' && !Array.isArray(b.categorias)) b.categorias = [];
     if (k === 'galeria' && (!Array.isArray(b.fotos) || !b.fotos.length)) b.fotos = vacio('galeria').fotos;
@@ -1636,6 +1731,7 @@
     if (pestana === 'fotos') panelFotos();
     if (pestana === 'horarios') panelHorarios();
     if (pestana === 'datos') panelDatos();
+    if (pestana === 'textos') panelTextos();
     if (pestana === 'reservas') panelReservas();
     if (pestana === 'pedidos') panelPedidos();
     if (pestana === 'mensajes') panelMensajes();
@@ -1683,10 +1779,11 @@
     }, true);
     return b;
   }
-  function botonFoto(id, textoBoton, alElegir) {
+  function botonFoto(id, textoBoton, alElegir, conVideo) {
     var w = el('span');
     var i = el('input', 'oculto');
-    i.type = 'file'; i.id = id; i.accept = 'image/jpeg,image/png,image/webp';
+    // «image/*» deja elegir también las fotos HEIC del iPhone (el navegador las pasa a JPG)
+    i.type = 'file'; i.id = id; i.accept = conVideo ? 'image/*,video/mp4,video/quicktime,video/webm' : 'image/*';
     var l = el('label', 'boton boton--borde boton--mini', textoBoton);
     l.htmlFor = id;
     i.addEventListener('change', function () {
@@ -1696,6 +1793,100 @@
     });
     w.appendChild(i); w.appendChild(l);
     return w;
+  }
+
+  /* Pestaña: textos de la web y menú */
+  var GRUPOS_TEXTOS = [
+    ['Portada', [['portada.etiqueta', 'Frase de arriba (sale también en el menú del móvil)'], ['portada.aviso', 'Aviso «Abrimos pronto»'],
+      ['portada.titulo', 'Título'], ['portada.titulo2', 'Título: parte en cursiva'], ['portada.texto', 'Texto', true]]],
+    ['Así preparamos tu café', [['escena.etiqueta', 'Etiqueta'], ['escena.titulo', 'Título']]],
+    ['Nosotros', [['nosotros.etiqueta', 'Etiqueta'], ['nosotros.titulo', 'Título'], ['nosotros.texto', 'Texto', true],
+      ['nosotros.p1t', 'Punto 1: título'], ['nosotros.p1', 'Punto 1: texto', true], ['nosotros.p2t', 'Punto 2: título'], ['nosotros.p2', 'Punto 2: texto', true],
+      ['nosotros.p3t', 'Punto 3: título'], ['nosotros.p3', 'Punto 3: texto', true]]],
+    ['Carta', [['carta.etiqueta', 'Etiqueta'], ['carta.titulo', 'Título'], ['carta.texto', 'Texto', true]]],
+    ['Para llevar', [['llevar.etiqueta', 'Etiqueta'], ['llevar.titulo', 'Título'], ['llevar.texto', 'Texto (con envío a domicilio)', true],
+      ['llevar.textoRecoger', 'Texto (si solo se puede recoger)', true], ['llevar.nota1', 'Nota 1'], ['llevar.nota2', 'Nota 2']]],
+    ['Club', [['club.etiqueta', 'Etiqueta'], ['club.titulo', 'Título'], ['club.texto', 'Texto. {premio} se cambia por el premio de Ajustes', true],
+      ['club.p1t', 'Paso 1: título'], ['club.p1', 'Paso 1: texto', true], ['club.p2t', 'Paso 2: título'], ['club.p2', 'Paso 2: texto', true],
+      ['club.p3t', 'Paso 3: título'], ['club.p3', 'Paso 3: texto. {sellos} se cambia por el número de sellos', true]]],
+    ['Galería', [['galeria.etiqueta', 'Etiqueta'], ['galeria.titulo', 'Título'], ['galeria.texto', 'Texto', true]]],
+    ['Reseñas', [['resenas.etiqueta', 'Etiqueta'], ['resenas.titulo', 'Título']]],
+    ['Visítanos', [['contacto.etiqueta', 'Etiqueta'], ['contacto.titulo', 'Título'], ['contacto.texto', 'Texto', true],
+      ['escribenos.etiqueta', 'Escríbenos: etiqueta'], ['escribenos.titulo', 'Escríbenos: título'], ['escribenos.texto', 'Escríbenos: texto', true]]],
+    ['Pie de página', [['pie.lema', 'Frase del pie', true]]]
+  ];
+  var NOTA_MENU = { llevar: 'solo sale si «Para llevar» está activo en Ajustes', club: 'solo sale con el club activo', galeria: 'solo sale si hay fotos en la galería', resenas: 'solo sale con las reseñas activas' };
+
+  function panelTextos() {
+    var b = borrador('textos');
+    var base = estado.textosBase || {};
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'Cambia los nombres y el orden del menú, y los textos de cada parte de la web. Si dejas un texto vacío, vuelve el original. Los cambios se ven en la web al pulsar «Guardar cambios», y quedan en «Historial».'));
+
+    /* Menú: nombre y orden */
+    var gMenu = el('section', 'admin__grupo textos-admin__menu');
+    gMenu.appendChild(el('h3', null, 'Menú'));
+    gMenu.appendChild(el('p', 'admin__ayuda', 'El orden es el mismo arriba, en el menú del móvil y en el pie de la web.'));
+    var lista = el('ol', 'textos-admin__lista');
+    b.menu.forEach(function (m, n) {
+      var li = el('li', 'textos-admin__fila');
+      var campo = el('div', 'campo');
+      var original = (MENU_INICIAL.filter(function (x) { return x.id === m.id; })[0] || {}).texto || '';
+      var l = el('label', null, NOTA_MENU[m.id] ? original + ' (' + NOTA_MENU[m.id] + ')' : original);
+      l.htmlFor = 'adm-menu-' + m.id;
+      var i = el('input'); i.id = 'adm-menu-' + m.id; i.type = 'text'; i.value = m.texto || ''; i.maxLength = 30; i.placeholder = original;
+      i.addEventListener('input', function () { m.texto = i.value; marcar(); });
+      campo.appendChild(l); campo.appendChild(i);
+      li.appendChild(campo);
+      var acc = el('div', 'acciones-mini');
+      var subir = botonMini('↑', function () { moverMenu(n, -1); });
+      subir.disabled = n === 0; subir.setAttribute('aria-label', 'Subir «' + (m.texto || original) + '» en el menú');
+      var bajar = botonMini('↓', function () { moverMenu(n, 1); });
+      bajar.disabled = n === b.menu.length - 1; bajar.setAttribute('aria-label', 'Bajar «' + (m.texto || original) + '» en el menú');
+      acc.appendChild(subir); acc.appendChild(bajar);
+      li.appendChild(acc);
+      lista.appendChild(li);
+    });
+    function moverMenu(n, d) {
+      var j = n + d;
+      if (j < 0 || j >= b.menu.length) return;
+      var x = b.menu[n]; b.menu[n] = b.menu[j]; b.menu[j] = x;
+      marcar();
+      pintarPanel();
+      var boton = document.querySelector('#adm-menu-' + x.id);
+      if (boton) enfocarEnPanel(boton);
+    }
+    gMenu.appendChild(lista);
+    gMenu.appendChild(botonMini('Volver al menú original', function () { b.menu = clonar(MENU_INICIAL); marcar(); pintarPanel(); }));
+    cuerpo.appendChild(gMenu);
+
+    /* Textos de cada parte */
+    GRUPOS_TEXTOS.forEach(function (grupo) {
+      var g = el('section', 'admin__grupo textos-admin__grupo');
+      g.appendChild(el('h3', null, grupo[0]));
+      grupo[1].forEach(function (c) {
+        var clave = c[0];
+        var id = 'adm-texto-' + clave.replace(/\./g, '-');
+        var valor = b.textos[clave] || base[clave] || '';
+        var alCambiar = function (v) {
+          var limpio = String(v || '').replace(/\r\n?/g, '\n').trim();
+          if (!limpio || limpio === base[clave]) delete b.textos[clave]; else b.textos[clave] = limpio;
+        };
+        var campo = c[2] ? campoArea(id, c[1], valor, alCambiar) : campoTexto(id, c[1], valor, alCambiar, { maxlength: '200' });
+        var entrada = campo.querySelector('input, textarea');
+        if (base[clave]) entrada.placeholder = base[clave];
+        if (c[2]) entrada.maxLength = 600;
+        g.appendChild(campo);
+      });
+      var hayCambios = grupo[1].some(function (c) { return b.textos[c[0]]; });
+      if (hayCambios) {
+        g.appendChild(botonMini('Volver a los textos originales de «' + grupo[0] + '»', function () {
+          grupo[1].forEach(function (c) { delete b.textos[c[0]]; });
+          marcar();
+          pintarPanel();
+        }));
+      }
+      cuerpo.appendChild(g);
+    });
   }
 
   /* Pestaña: carta y precios */
@@ -1753,7 +1944,7 @@
   function panelCarta() {
     var b = borrador('carta');
     cuerpo.appendChild(bloqueCartaAparte());
-    cuerpo.appendChild(el('p', 'admin__ayuda', 'Organiza la carta en grupos (por ejemplo «Zumos» o «Repostería») y dentro de cada grupo cambia nombres, precios, descripciones, alérgenos y fotos. Los cambios se ven en la web en cuanto pulsas «Guardar cambios». Revisa bien los alérgenos de cada producto: es información que la ley obliga a dar. Para destacar un producto en las tarjetas de arriba de la carta, ponle la etiqueta «Favorito» (hasta 4).'));
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'Organiza la carta en grupos (por ejemplo «Zumos» o «Repostería») y dentro de cada grupo cambia nombres, precios, descripciones, alérgenos y fotos. Los cambios se ven en la web en cuanto pulsas «Guardar cambios». Revisa bien los alérgenos de cada producto: es información que la ley obliga a dar. Para destacar un producto en las tarjetas de arriba de la carta, ponle la etiqueta «Favorito» (hasta 4). Cada producto puede llevar una foto (también las del móvil), un GIF o un vídeo corto: hasta ' + MAX_VIDEO_SEG + ' segundos y ' + MAX_VIDEO_MB + ' MB, se ve sin sonido y en bucle.'));
     if (!b.categorias.length) cuerpo.appendChild(el('p', 'estado-vacio', 'La carta no tiene grupos. Crea el primero con «+ Añadir grupo».'));
     b.categorias.forEach(function (cat, n) {
       var grupo = el('section', 'admin__grupo grupo-carta');
@@ -1860,7 +2051,7 @@
   function tarjetaProducto(b, p) {
     var t = el('div', 'tarjeta-admin');
     var mini = el('div', 'tarjeta-admin__mini');
-    if (p.foto) { var im = el('img'); im.src = urlFoto(p.foto); im.alt = ''; mini.appendChild(im); }
+    if (p.foto) { var im = crearMedio(p.foto, ''); if (im.tagName === 'VIDEO') { im.autoplay = false; im.preload = 'metadata'; } mini.appendChild(im); }
     else mini.appendChild(svgUso(p.icono || 'taza'));
     t.appendChild(mini);
 
@@ -1914,10 +2105,10 @@
     campos.appendChild(grupoAl);
 
     var acc = el('div', 'acciones-mini');
-    acc.appendChild(botonFoto('adm-foto-' + p.id, p.foto ? 'Cambiar foto' : 'Subir foto', function (f) {
-      subirFoto(f, function (idFoto) { p.foto = idFoto; });
-    }));
-    if (p.foto) acc.appendChild(botonMini('Quitar foto', function () { p.foto = null; marcar(); pintarPanel(); }));
+    acc.appendChild(botonFoto('adm-foto-' + p.id, p.foto ? 'Cambiar foto o vídeo' : 'Subir foto o vídeo', function (f) {
+      subirFoto(f, function (idFoto) { p.foto = idFoto; }, true);
+    }, true));
+    if (p.foto) acc.appendChild(botonMini(esVideo(p.foto) ? 'Quitar vídeo' : 'Quitar foto', function () { p.foto = null; marcar(); pintarPanel(); }));
     acc.appendChild(botonBorrar('Eliminar producto', function () {
       b.productos = b.productos.filter(function (x) { return x !== p; });
       marcar();
@@ -3152,14 +3343,14 @@
      Volver a una versión cambia solo esa parte de la web y también se puede deshacer. */
   var historial = { filtro: '' };
   var fHistorial = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
-  var CLAVE_DE_SECCION = { carta: 'carta', galeria: 'galeria', horario: 'horario', datos: 'datos' };
+  var CLAVE_DE_SECCION = { carta: 'carta', galeria: 'galeria', horario: 'horario', datos: 'datos', textos: 'textos' };
 
   function panelHistorial() {
-    cuerpo.appendChild(el('p', 'admin__ayuda', 'Cada vez que guardas cambios en la carta, las fotos, los horarios o los ajustes queda aquí una versión con lo que cambió. Si algo no te convence, vuelve a una versión anterior: solo cambia esa parte de la web, y la versión de ahora también se guarda, así que puedes deshacerlo.'));
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'Cada vez que guardas cambios en los ajustes, los textos, la carta, las fotos o los horarios queda aquí una versión con lo que cambió. Si algo no te convence, vuelve a una versión anterior: solo cambia esa parte de la web, y la versión de ahora también se guarda, así que puedes deshacerlo.'));
     var filtros = el('div', 'historial__filtros');
     filtros.setAttribute('role', 'group');
     filtros.setAttribute('aria-label', 'Ver versiones de');
-    [['', 'Todo'], ['carta', 'Carta'], ['galeria', 'Fotos'], ['horario', 'Horarios'], ['datos', 'Ajustes']].forEach(function (f) {
+    [['', 'Todo'], ['datos', 'Ajustes'], ['textos', 'Textos'], ['carta', 'Carta'], ['galeria', 'Fotos'], ['horario', 'Horarios']].forEach(function (f) {
       var b = el('button', 'historial__filtro', f[1]);
       b.type = 'button';
       b.setAttribute('aria-pressed', historial.filtro === f[0] ? 'true' : 'false');
@@ -3367,10 +3558,13 @@
     mostrarEstado('Cambios descartados.');
   });
 
-  /* Fotos: reducir en el navegador y subir */
+  /* Fotos, GIF y vídeos: se preparan en el navegador y se suben */
+  var MAX_VIDEO_MB = 30;
+  var MAX_VIDEO_SEG = 30;
   function reducirImagen(file) {
     return new Promise(function (resolve) {
-      if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { resolve(file); return; }
+      // GIF (puede ser animado) tal cual; el resto se pasa a JPG más ligero si el navegador sabe abrirlo
+      if (file.type === 'image/gif' || file.type === 'image/svg+xml') { resolve(file); return; }
       var url = URL.createObjectURL(file);
       var img = new Image();
       img.onload = function () {
@@ -3383,7 +3577,8 @@
           c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
           c.toBlob(function (bl) {
             URL.revokeObjectURL(url);
-            resolve(bl && bl.size < file.size ? bl : file);
+            var nativo = /^image\/(jpeg|png|webp)$/.test(file.type);
+            resolve(bl && (!nativo || bl.size < file.size) ? bl : file);
           }, 'image/jpeg', 0.82);
         } catch (e) { URL.revokeObjectURL(url); resolve(file); }
       };
@@ -3391,15 +3586,75 @@
       img.src = url;
     });
   }
-  function subirFoto(file, alTerminar) {
-    mostrarEstado('Subiendo foto…');
-    reducirImagen(file).then(function (blob) {
-      return api('POST', '/api/fotos', blob, { binario: true });
+  function revisarVideo(file) {
+    return new Promise(function (resolve, reject) {
+      if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+        reject(new Error('El vídeo pesa ' + Math.round(file.size / 1048576) + ' MB y el máximo son ' + MAX_VIDEO_MB + ' MB. Recórtalo a unos segundos.'));
+        return;
+      }
+      var url = URL.createObjectURL(file);
+      var v = document.createElement('video');
+      var listo = function (dur) { URL.revokeObjectURL(url); clearTimeout(reloj); resolve(dur); };
+      var reloj = setTimeout(function () { listo(0); }, 6000);
+      v.preload = 'metadata';
+      v.muted = true;
+      v.onloadedmetadata = function () {
+        var d = v.duration;
+        if (isFinite(d) && d > MAX_VIDEO_SEG + 0.5) {
+          URL.revokeObjectURL(url); clearTimeout(reloj);
+          reject(new Error('El vídeo dura ' + Math.round(d) + ' segundos y el máximo son ' + MAX_VIDEO_SEG + '. Recórtalo antes de subirlo.'));
+          return;
+        }
+        listo(d);
+      };
+      // Si este navegador no sabe leerlo (por ejemplo HEVC en Chrome), se sube igual y el servidor avisa
+      v.onerror = function () { listo(0); };
+      v.src = url;
+    });
+  }
+  /* Subida con barra de progreso (los vídeos tardan) */
+  function enviarArchivo(blob, alAvanzar) {
+    return new Promise(function (resolve, reject) {
+      var x = new XMLHttpRequest();
+      x.open('POST', '/api/fotos');
+      x.setRequestHeader('X-Requested-With', 'sono');
+      x.setRequestHeader('Content-Type', blob.type || 'application/octet-stream');
+      x.withCredentials = true;
+      x.upload.onprogress = function (e) { if (e.lengthComputable) alAvanzar(e.loaded / e.total); };
+      x.onload = function () {
+        var j = {};
+        try { j = JSON.parse(x.responseText || '{}'); } catch (e) { j = {}; }
+        if (x.status >= 200 && x.status < 300) { resolve(j); return; }
+        var mensaje = j.error;
+        if (!mensaje && x.status === 413) mensaje = 'El archivo es demasiado grande para el servidor. Prueba con uno más ligero.';
+        var err = new Error(mensaje || 'No se ha podido subir (error ' + x.status + '). Inténtalo de nuevo.');
+        err.status = x.status;
+        reject(err);
+      };
+      x.onerror = function () {
+        var err = new Error('No hay conexión con el servidor. Revisa tu conexión e inténtalo de nuevo.');
+        err.status = 0;
+        reject(err);
+      };
+      x.send(blob);
+    });
+  }
+  function subirFoto(file, alTerminar, conVideo) {
+    var video = /^video\//.test(file.type) || /\.(mp4|mov|m4v|webm)$/i.test(file.name || '');
+    if (video && !conVideo) { mostrarEstado('Aquí solo van fotos. Los vídeos se ponen en los productos de la carta.', true); return; }
+    var nombre = video ? 'vídeo' : (file.type === 'image/gif' ? 'GIF' : 'foto');
+    mostrarEstado('Preparando ' + (nombre === 'foto' ? 'la foto' : 'el ' + nombre) + '…');
+    var aviso = '';
+    (video ? revisarVideo(file).then(function () { return file; }) : reducirImagen(file)).then(function (blob) {
+      return enviarArchivo(blob, function (k) { mostrarEstado('Subiendo ' + (nombre === 'foto' ? 'la foto' : 'el ' + nombre) + '… ' + Math.round(k * 100) + ' %'); });
     }).then(function (r) {
+      aviso = r.aviso || '';
       alTerminar(r.id);
       sucio[claveActual()] = true;
       pintarPanel();
       return guardar();
+    }).then(function (ok) {
+      if (ok && aviso) mostrarEstado(aviso, true);
     }).catch(function (err) {
       if (!sesionCaducada(err)) mostrarEstado(err.message, true);
     });
@@ -3649,7 +3904,7 @@
   /* ---------- Arranque ---------- */
   pintarTodo();
   api('GET', '/api/contenido').then(function (c) {
-    estado = { carta: c.carta, galeria: c.galeria, horario: c.horario, datos: c.datos };
+    estado = { carta: c.carta, galeria: c.galeria, horario: c.horario, datos: c.datos, textos: c.textos, textosBase: c.textosBase };
     cargado = true;
     pintarTodo();
     cargarResenas();

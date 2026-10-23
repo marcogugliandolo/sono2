@@ -543,6 +543,10 @@ function jwtRS256(carga, clave) {
   return cuerpo + '.' + base64url(crypto.sign('RSA-SHA256', Buffer.from(cuerpo), clave));
 }
 
+/* Cuando cambia el dibujo de la tarjeta (por ejemplo, los sellos), se sube este número:
+   al arrancar se avisa a todos los móviles para que bajen la tarjeta nueva */
+const DISENO = 2;   // 2: sellos con la Ñ del logo
+
 function crearWallet(op) {
   // op: { dirDatos, socios(), guardarSocios(), ajustesClub(), secreto (Buffer), urlPublica }
   const dirWallet = path.join(op.dirDatos, 'wallet');
@@ -571,12 +575,14 @@ function crearWallet(op) {
       const guardado = JSON.parse(fs.readFileSync(archivoRegistros, 'utf8'));
       registros = Array.isArray(guardado.registros) ? guardado.registros : [];
       globalActualizado = Number(guardado.global) || 0;
-    } catch (e) { registros = []; }
+      disenoGuardado = Number(guardado.diseno) || 1;
+    } catch (e) { registros = []; disenoGuardado = DISENO; }
   }
+  let disenoGuardado = DISENO;
 
   let colaRegistros = Promise.resolve();
   function guardarRegistros() {
-    const datos = JSON.stringify({ registros, global: globalActualizado }, null, 2);
+    const datos = JSON.stringify({ registros, global: globalActualizado, diseno: DISENO }, null, 2);
     colaRegistros = colaRegistros.then(async () => {
       const tmp = archivoRegistros + '.' + process.pid + '.tmp';
       await fsp.writeFile(tmp, datos);
@@ -944,7 +950,7 @@ function crearWallet(op) {
       },
       barcode: { type: 'QR_CODE', value: 'SONO:' + socio.codigo, alternateText: d.codigo },
       heroImage: {
-        sourceUri: { uri: base + '/wallet/tira/' + socio.id + '-' + d.puestos + '-' + d.necesarios + '.png?k=' + firmaTira(socio.id) },
+        sourceUri: { uri: base + '/wallet/tira/' + socio.id + '-' + d.puestos + '-' + d.necesarios + '.png?k=' + firmaTira(socio.id) + '&d=' + DISENO },
         contentDescription: { defaultValue: { language: 'es-ES', value: d.puestos + ' de ' + d.necesarios + ' sellos' } }
       },
       textModulesData: [
@@ -1163,6 +1169,10 @@ function crearWallet(op) {
   recargar();
   cargarRegistros();
   buscarIntermedio();
+  // Tarjeta con un dibujo nuevo: se avisa a todos (en un momento, cuando el resto ya está en marcha)
+  if (disenoGuardado !== DISENO) {
+    setTimeout(() => { log('dibujo de la tarjeta nuevo: se actualizan las tarjetas guardadas'); cambioClub(); }, 5000).unref();
+  }
   return {
     estado, disponible, baseDe, passApple, enlaceGoogle, cambioSocio, cambioClub, olvidar, atender, recargar,
     solicitudApple, subirCertificadoApple, guardarGoogle, comprobarGoogle, certificadoGoogle
