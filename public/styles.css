@@ -2025,7 +2025,9 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 .enlace-socio:active .enlace-socio__ene, .cabecera__socio:active .enlace-socio__ene { transform: scale(0.95); }
 .enlace-socio:focus-visible, .cabecera__socio:focus-visible { outline: none; }
 .enlace-socio:focus-visible .enlace-socio__ene, .cabecera__socio:focus-visible .enlace-socio__ene { outline: 2px solid var(--cafe); outline-offset: 2px; }
-.menu-movil__nav a.enlace-socio .enlace-socio__ene { height: 44px; padding: 0 18px; }
+.menu-movil__nav a.enlace-socio { justify-content: flex-start; align-items: center; gap: 14px; }
+.menu-movil__nav a.enlace-socio::after { margin-left: auto; }
+.menu-movil__nav a.enlace-socio .enlace-socio__ene { height: 44px; padding: 0 16px; }
 .menu-movil__nav a.enlace-socio .enlace-socio__ene svg { width: 28px; height: 28px; }
 .cabecera__socio { display: none; padding: 0; border: 0; background: none; cursor: pointer; color: var(--cafe); }
 @media (prefers-reduced-motion: no-preference) {

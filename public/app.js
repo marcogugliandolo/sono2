@@ -204,14 +204,15 @@
     var conIcono = !!socio && !a.closest('.pie');
     a.classList.toggle('enlace-socio', conIcono);
     if (conIcono) {
-      if (!a.querySelector('.enlace-socio__ene')) {
-        a.textContent = '';
-        var c = el('span', 'enlace-socio__ene');
-        c.setAttribute('aria-hidden', 'true');
-        c.appendChild(svgUso('ene'));
-        a.appendChild(c);
-      }
-      a.setAttribute('aria-label', 'Mi tarjeta del club');
+      // En el menú plegado del móvil, la Ñ va con el nombre («Club»); en el menú entero, sola
+      var conNombre = !!a.closest('.menu-movil__nav');
+      a.textContent = '';
+      var c = el('span', 'enlace-socio__ene');
+      c.setAttribute('aria-hidden', 'true');
+      c.appendChild(svgUso('ene'));
+      a.appendChild(c);
+      if (conNombre) a.appendChild(el('span', 'enlace-socio__nombre', nombreMenu('club')));
+      a.setAttribute('aria-label', conNombre ? nombreMenu('club') + ': mi tarjeta' : 'Mi tarjeta del club');
       a.title = 'Mi tarjeta del club';
     } else {
       a.textContent = nombreMenu('club');
