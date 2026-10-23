@@ -198,6 +198,27 @@
     var m = menuActual().filter(function (x) { return x.id === id; })[0];
     return (m && m.texto) || '';
   }
+  /* Enlace del club: con la sesión de socio, en la cabecera y en el menú del móvil sale la Ñ del logo
+     resaltada (abre su tarjeta); en el pie, el nombre del menú */
+  function pintarEnlaceClub(a) {
+    var conIcono = !!socio && !a.closest('.pie');
+    a.classList.toggle('enlace-socio', conIcono);
+    if (conIcono) {
+      if (!a.querySelector('.enlace-socio__ene')) {
+        a.textContent = '';
+        var c = el('span', 'enlace-socio__ene');
+        c.setAttribute('aria-hidden', 'true');
+        c.appendChild(svgUso('ene'));
+        a.appendChild(c);
+      }
+      a.setAttribute('aria-label', 'Mi tarjeta del club');
+      a.title = 'Mi tarjeta del club';
+    } else {
+      a.textContent = nombreMenu('club');
+      a.removeAttribute('aria-label');
+      a.removeAttribute('title');
+    }
+  }
   function aplicarMenu() {
     var orden = menuActual().map(function (m) { return m.id; });
     document.querySelectorAll('[data-menu-lista]').forEach(function (ul) {
@@ -207,7 +228,8 @@
         ul.appendChild(li);
         var a = li.querySelector('a');
         var id = li.getAttribute('data-menu');
-        if (a) a.textContent = id === 'club' && socio ? 'Mi tarjeta' : nombreMenu(id);
+        if (!a) return;
+        if (id === 'club') pintarEnlaceClub(a); else a.textContent = nombreMenu(id);
       });
     });
   }
@@ -224,6 +246,7 @@
     aplicarMenu();
   }
 
+  var mostrarAsistenteGlobal = function () {};
   function pintarTodo() {
     aplicarTextos();
     pintarCarta();
@@ -577,6 +600,7 @@
   function pintarDatos() {
     var d = estado.datos || {};
     aplicarCartaAparte();
+    mostrarAsistenteGlobal();
     pintarClub();
     pintarResenas();
     pintarZonas();
@@ -1176,7 +1200,8 @@
       $('club-hola').textContent = 'Hola, ' + socio.nombre.split(' ')[0] + '. ' +
         (faltan <= 0 ? 'Tienes ' + socio.premio + ' esperándote.' : 'Llevas ' + socio.sellos + ' de ' + socio.necesarios + ' sellos.');
     }
-    document.querySelectorAll('[data-enlace-club]').forEach(function (a) { a.textContent = socio ? 'Mi tarjeta' : nombreMenu('club'); });
+    document.querySelectorAll('[data-enlace-club]').forEach(pintarEnlaceClub);
+    document.querySelectorAll('[data-socio-boton]').forEach(function (b) { b.hidden = !socio; });
   }
 
   /* Botones de Wallet: en el iPhone solo Apple, en Android solo Google y en el ordenador los dos
@@ -1650,6 +1675,7 @@
       if (!Array.isArray(b.tarde)) b.tarde = [];
     }
     if (k === 'datos' && b.abrimosPronto === undefined) b.abrimosPronto = true;
+    if (k === 'datos' && (!b.asistente || typeof b.asistente !== 'object')) b.asistente = { activo: true, nombre: 'Soñito' };
     if (k === 'datos' && b.paraLlevar === undefined) b.paraLlevar = true;
     if (k === 'datos' && b.domicilio === undefined) b.domicilio = true;
     if (k === 'datos' && !Array.isArray(b.zonas)) b.zonas = clonar(ZONAS_INICIALES);
@@ -2198,6 +2224,20 @@
     campos.appendChild(casilla);
     cuerpo.appendChild(campos);
 
+    var ga = el('section', 'admin__grupo');
+    ga.appendChild(el('h3', null, 'Asistente de la web'));
+    ga.appendChild(el('p', 'admin__ayuda', 'Un botón abajo a la derecha con un ayudante que responde al momento con la información de la web: horario, dirección, carta, alérgenos, reservas, pedidos y club, y que deja llamaros o escribiros por WhatsApp. No usa IA ni guarda lo que escribe la gente.'));
+    var camposAs = el('div', 'admin__campos');
+    var casillaAs = el('label', 'casilla');
+    var checkAs = el('input'); checkAs.type = 'checkbox'; checkAs.id = 'adm-asistente'; checkAs.checked = b.asistente.activo !== false;
+    checkAs.addEventListener('change', function () { b.asistente.activo = checkAs.checked; marcar(); });
+    casillaAs.appendChild(checkAs);
+    casillaAs.appendChild(document.createTextNode('Mostrar el asistente en la web'));
+    camposAs.appendChild(casillaAs);
+    camposAs.appendChild(campoTexto('adm-asistente-nombre', 'Nombre del asistente', b.asistente.nombre, function (v) { b.asistente.nombre = v; }, { maxlength: '20', placeholder: 'Soñito' }));
+    ga.appendChild(camposAs);
+    cuerpo.appendChild(ga);
+
     var gz = el('section', 'admin__grupo');
     gz.appendChild(el('h3', null, 'Zonas para reservar'));
     gz.appendChild(el('p', 'admin__ayuda', 'Salen en un mini plano al reservar mesa. Las de tipo «Terraza» se dibujan fuera del local. Desmarca una zona para que no se pueda elegir.'));
@@ -2631,8 +2671,7 @@
         if (!sesionCaducada(err)) avisoClub(err.message, true);
       }).then(function () { ch.disabled = false; });
     });
-    cuerpo.appendChild(bloque);
-    cuerpo.appendChild(bloqueTarjetaClub());
+    var bloqueTarjeta = bloqueTarjetaClub();
 
     cuerpo.appendChild(el('p', 'admin__ayuda', 'Al escanear el QR de la tarjeta, el sello se pone solo. También puedes escribir el código que sale debajo del QR o buscar al socio en la lista y pulsar «+1 sello».'));
 
@@ -2685,6 +2724,10 @@
     ficha.id = 'club-ficha';
     ficha.hidden = true;
     cuerpo.appendChild(ficha);
+
+    // Debajo del escáner: el interruptor del club y el premio y los sellos
+    cuerpo.appendChild(bloque);
+    cuerpo.appendChild(bloqueTarjeta);
 
     var gLista = el('section', 'admin__grupo');
     var cab = el('div', 'club-admin__cabeza-lista');
@@ -3905,6 +3948,323 @@
     if (reducido.addEventListener) reducido.addEventListener('change', iniciar);
     else if (reducido.addListener) reducido.addListener(iniciar);
     iniciar();
+  })();
+
+  /* ---------- Soñito: el asistente de la web ----------
+     Responde al momento con la información que ya tiene la web (horario, dirección, carta, alérgenos,
+     reservas, pedidos y club). No usa IA ni servicios externos y no guarda lo que se escribe. */
+  (function () {
+    var caja = $('asistente');
+    if (!caja) return;
+    var boton = $('asistente-abrir');
+    var panel = $('asistente-panel');
+    var lista = $('asistente-mensajes');
+    var chips = $('asistente-chips');
+    var form = $('asistente-form');
+    var entrada = $('asistente-texto');
+    var empezado = false;
+    var tactil = window.matchMedia && window.matchMedia('(hover: none)').matches;
+
+    function ajustes() {
+      var a = (estado.datos && estado.datos.asistente) || {};
+      return { activo: a.activo !== false, nombre: texto(a.nombre) || 'Soñito' };
+    }
+    function norm(s) { return sinAcentos(s).replace(/[¿?¡!.,;:()«»"']/g, ' ').replace(/\s+/g, ' ').trim(); }
+
+    /* ---- Mensajes ---- */
+    function burbuja(quien, partes, acciones) {
+      var m = el('div', 'asistente__msg asistente__msg--' + quien);
+      var b = el('div', 'asistente__burbuja');
+      (Array.isArray(partes) ? partes : [partes]).forEach(function (p) {
+        if (!p) return;
+        b.appendChild(typeof p === 'string' ? el('p', null, p) : p);
+      });
+      m.appendChild(b);
+      if (acciones && acciones.length) {
+        var fila = el('div', 'asistente__acciones');
+        acciones.forEach(function (a) { if (a) fila.appendChild(a); });
+        m.appendChild(fila);
+      }
+      lista.appendChild(m);
+      lista.scrollTop = lista.scrollHeight;
+      return m;
+    }
+    function responder(r) {
+      if (sinMovimiento) { burbuja('bot', r.partes, r.acciones); return; }
+      var espera = burbuja('bot', [(function () { var e = el('span', 'asistente__escribiendo'); e.setAttribute('aria-label', 'Escribiendo'); e.appendChild(el('span')); e.appendChild(el('span')); e.appendChild(el('span')); return e; })()]);
+      setTimeout(function () { espera.remove(); burbuja('bot', r.partes, r.acciones); }, 420);
+    }
+    function accion(t, alPulsar) {
+      var b = el('button', 'asistente__accion', t);
+      b.type = 'button';
+      b.addEventListener('click', alPulsar);
+      return b;
+    }
+    function enlace(t, url, fuera) {
+      var a = el('a', 'asistente__accion', t);
+      a.href = url;
+      if (fuera) { a.target = '_blank'; a.rel = 'noopener'; }
+      return a;
+    }
+    function nota(t) { return el('p', 'asistente__nota', t); }
+    function listaHtml(items) {
+      var ul = el('ul');
+      items.forEach(function (i) { ul.appendChild(el('li', null, i)); });
+      return ul;
+    }
+    function irA(id) {
+      cerrarPanel();
+      var s = $(id);
+      if (s && !s.hidden && getComputedStyle(s).display !== 'none') s.scrollIntoView({ behavior: sinMovimiento ? 'auto' : 'smooth', block: 'start' });
+      else location.href = '/#' + id;
+    }
+
+    /* ---- Respuestas ---- */
+    function contacto(intro) {
+      var d = estado.datos || {};
+      var acc = enlacesRedes(d).filter(function (r) { return r.id !== 'instagram'; }).map(function (r) {
+        return enlace(r.id === 'llamar' ? 'Llamar' : r.nombre, r.url, !r.mismaVentana);
+      });
+      if (texto(d.email)) acc.push(enlace('Email', 'mailto:' + texto(d.email)));
+      acc.push(accion('Escribirnos aquí', function () { irA('contacto'); }));
+      return { partes: [intro || 'Claro, aquí tienes cómo hablar con nosotros:'], acciones: acc };
+    }
+    function horario() {
+      var h = estado.horario || {};
+      var dias = Array.isArray(h.dias) ? h.dias.filter(function (x) { return x && texto(x.texto); }) : [];
+      if (!dias.length) return contacto('Todavía no tenemos el horario publicado. Si quieres, pregúntanos directamente:');
+      var hoy = DIAS_SEMANA[(new Date().getDay() + 6) % 7];
+      var deHoy = dias.filter(function (x) { return x.dia === hoy; })[0];
+      return {
+        partes: [deHoy ? 'Hoy, ' + hoy.toLowerCase() + ': ' + texto(deHoy.texto) + '.' : 'Este es nuestro horario:',
+          listaHtml(dias.map(function (x) { return x.dia + ': ' + texto(x.texto); }))],
+        acciones: [accion('Reservar mesa', function () { cerrarPanel(); abrir(modalReserva); })]
+      };
+    }
+    function donde() {
+      var dir = texto((estado.datos || {}).direccion);
+      if (!dir) return contacto('La dirección está aún por confirmar. Mientras, puedes preguntarnos:');
+      return {
+        partes: ['Estamos en ' + dir + '. ¡Te esperamos!'],
+        acciones: [enlace('Cómo llegar', 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('SOÑO ' + dir), true)]
+      };
+    }
+    function reservar() {
+      return {
+        partes: ['Puedes reservar mesa aquí mismo: eliges el día, la hora y la zona, y listo. Sin reserva también eres bienvenido.'],
+        acciones: [accion('Reservar mesa', function () { cerrarPanel(); abrir(modalReserva); })]
+      };
+    }
+    function llevar() {
+      var d = estado.datos || {};
+      if (d.paraLlevar === false) return contacto('Ahora mismo no hacemos pedidos para llevar por la web. Si quieres, pregúntanos:');
+      return {
+        partes: [d.domicilio !== false
+          ? 'Haz tu pedido en la web y pásate a recogerlo, o te lo llevamos a casa. Se paga al recogerlo o al recibirlo.'
+          : 'Haz tu pedido en la web y pásate a recogerlo cuando esté listo. Se paga al recogerlo.'],
+        acciones: [accion('Hacer un pedido', function () { irA('llevar'); })]
+      };
+    }
+    function enlaceCarta() {
+      if (cartaAparte() && !enPaginaCarta) return enlace('Ver la carta', '/carta');
+      return accion('Ver la carta', function () { irA('carta'); });
+    }
+    function carta() {
+      var n = productos().length;
+      return {
+        partes: [n ? 'Tenemos ' + n + ' cosas ricas en la carta. Toca cualquier producto para ver la descripción y los alérgenos.' : 'La carta está en preparación.',
+          'También puedes preguntarme por uno: «¿cuánto cuesta el capuchino?»'],
+        acciones: [enlaceCarta()]
+      };
+    }
+    function verProducto(p) {
+      return accion('Ver ' + p.nombre, function () {
+        cerrarPanel();
+        var i = productos().indexOf(p);
+        if (i >= 0) { mostrarProducto(i); abrir(modalProducto); }
+      });
+    }
+    function nombresAlergenos(ids) {
+      return ALERGENOS.filter(function (a) { return ids.indexOf(a.id) !== -1; }).map(function (a) { return a.nombre.toLowerCase(); });
+    }
+    function producto(p, alergenos) {
+      var lleva = Array.isArray(p.alergenos) ? p.alergenos : [];
+      var partes = [p.nombre + ': ' + precioBonito(p.precio) + '.'];
+      if (texto(p.desc)) partes.push(texto(p.desc));
+      if (alergenos.length) {
+        var si = alergenos.filter(function (a) { return lleva.indexOf(a) !== -1; });
+        partes.push(si.length ? 'Ojo: lleva ' + nombresAlergenos(si).join(', ') + '.' : 'No lleva ' + nombresAlergenos(alergenos).join(' ni ') + ' según la carta.');
+      } else {
+        partes.push(lleva.length ? 'Alérgenos: ' + nombresAlergenos(lleva).join(', ') + '.' : 'No tiene alérgenos marcados en la carta.');
+      }
+      partes.push(nota('Si tienes una alergia, díselo también a quien te atienda.'));
+      return { partes: partes, acciones: [verProducto(p)] };
+    }
+    function sinAlergenos(ids) {
+      var nombres = nombresAlergenos(ids);
+      var aptos = productos().filter(function (p) {
+        var lleva = Array.isArray(p.alergenos) ? p.alergenos : [];
+        return !ids.some(function (a) { return lleva.indexOf(a) !== -1; });
+      });
+      if (!aptos.length) return contacto('Según la carta, ahora mismo todo lleva ' + nombres.join(' o ') + '. Pregúntanos y vemos qué podemos hacer:');
+      var muestra = aptos.slice(0, 8).map(function (p) { return p.nombre + ' · ' + precioBonito(p.precio); });
+      return {
+        partes: ['Sin ' + nombres.join(' ni ') + ' tienes:', listaHtml(muestra),
+          aptos.length > 8 ? 'Y ' + (aptos.length - 8) + ' más en la carta.' : '',
+          nota('Es lo que marca la carta. Si tienes una alergia, díselo también a quien te atienda.')],
+        acciones: [enlaceCarta()]
+      };
+    }
+    function alergenosGeneral() {
+      return {
+        partes: ['En la carta, cada producto lleva sus alérgenos: toca uno para verlos. Dime cuál te preocupa y te digo qué puedes tomar.'],
+        acciones: [accion('Sin gluten', function () { preguntar('Sin gluten'); }), accion('Sin lactosa', function () { preguntar('Sin lactosa'); }),
+          accion('Sin frutos secos', function () { preguntar('Sin frutos secos'); }), accion('Sin huevo', function () { preguntar('Sin huevo'); })]
+      };
+    }
+    function clubInfo() {
+      var c = ajustesClub();
+      if (!c.activo) return { partes: ['Ahora mismo el club de desayunos no está en marcha. ¡Muy pronto!'] };
+      return {
+        partes: ['Hazte socio gratis del Club SOÑO: cada desayuno es un sello y con ' + c.sellos + ' sellos te llevas ' + c.premio + '. Solo tienes que enseñar el QR de tu tarjeta al pedir.'],
+        acciones: [socio ? accion('Ver mi tarjeta', function () { cerrarPanel(); abrirTarjeta(); })
+          : accion('Unirme al club', function () { cerrarPanel(); abrirAccesoClub('alta'); })]
+      };
+    }
+    function ayuda(intro) {
+      return {
+        partes: [intro || 'Te puedo ayudar con el horario, dónde estamos, la carta y los alérgenos, las reservas, los pedidos para llevar y el club. ¿Qué necesitas?'],
+        acciones: [accion('Hablar con alguien', function () { preguntar('Hablar con alguien'); })]
+      };
+    }
+
+    /* ---- Entender la pregunta ---- */
+    var PALABRAS_ALERGENOS = [
+      ['gluten', /gluten|celiac|trigo|harina/], ['lacteos', /lactosa|lacteo|leche(?! de (avena|soja|almendra|coco|arroz))|queso|nata|mantequilla/],
+      ['huevos', /huevo/], ['frutos', /frutos secos|fruto seco|nuez|nueces|almendra|avellana|pistacho|anacardo/],
+      ['cacahuetes', /cacahuete|mani\b/], ['soja', /soja/], ['sesamo', /sesamo/], ['apio', /apio/], ['mostaza', /mostaza/],
+      ['sulfitos', /sulfito/], ['pescado', /pescado/], ['crustaceos', /crustaceo|marisco|gamba/], ['moluscos', /molusco/], ['altramuces', /altramuz/]
+    ];
+    function buscarProducto(q) {
+      var mejor = null;
+      var puntos = 0;
+      var empatados = [];
+      productos().forEach(function (p) {
+        var nombre = norm(p.nombre);
+        if (!nombre) return;
+        var n = 0;
+        if (q.indexOf(nombre) !== -1) n = 100 + nombre.length;
+        else {
+          nombre.split(' ').forEach(function (w) {
+            if (w.length < 4) return;
+            var raiz = w.replace(/(es|s)$/, '');
+            if (q.indexOf(w) !== -1 || (raiz.length >= 4 && q.indexOf(raiz) !== -1)) n += w.length;
+          });
+        }
+        if (n > puntos) { puntos = n; mejor = p; empatados = [p]; }
+        else if (n === puntos && n > 0) empatados.push(p);
+      });
+      if (puntos < 5) return null;
+      if (puntos < 100 && empatados.length > 1) return { varios: empatados };
+      return mejor;
+    }
+    function entender(original) {
+      var q = ' ' + norm(original) + ' ';
+      if (!q.trim()) return ayuda();
+      if (/ (hola|buenas|buenos dias|buenas tardes|hey|ey) /.test(q) && q.trim().split(' ').length <= 3) {
+        return ayuda('¡Hola! ☕ ¿En qué te ayudo? Pregúntame por el horario, la carta, los alérgenos, reservas o pedidos.');
+      }
+      if (/ (gracias|genial|perfecto|vale|ok|guay) /.test(q) && q.trim().split(' ').length <= 4) return { partes: ['¡A ti! Si necesitas algo más, aquí estoy ☕'] };
+      if (/(hablar con|persona|llamar|telefono|whatsapp|contact|email|correo|escribir)/.test(q)) return contacto();
+      var p = buscarProducto(q);
+      if (p && p.varios) {
+        return {
+          partes: ['Tenemos varios, ¿cuál te interesa?', listaHtml(p.varios.slice(0, 6).map(function (x) { return x.nombre + ' · ' + precioBonito(x.precio); }))],
+          acciones: p.varios.slice(0, 4).map(function (x) { return accion(x.nombre, function () { preguntar(x.nombre); }); })
+        };
+      }
+      var qSin = p ? q.replace(norm(p.nombre), ' ') : q;
+      var ids = PALABRAS_ALERGENOS.filter(function (x) { return x[1].test(qSin); }).map(function (x) { return x[0]; });
+      if (p) return producto(p, ids);
+      if (ids.length) return sinAlergenos(ids);
+      if (/(alerg|intoleran|celiac)/.test(q)) return alergenosGeneral();
+      if (/(vegan|vegetarian)/.test(q)) return contacto('Eso no lo tenemos marcado en la carta todavía. Pregúntanos y te decimos qué puedes tomar:');
+      if (/(horario|hora|abr(is|e|en|ir)|cerr|abierto|cuando)/.test(q)) return horario();
+      if (/(donde|direcci|ubica|llegar|calle|mapa|esta(is|n) )/.test(q)) return donde();
+      if (/(reserv|mesa)/.test(q)) return reservar();
+      if (/(llevar|pedido|pedir|domicilio|envi|recoger|delivery)/.test(q)) return llevar();
+      if (/(club|sello|socio|tarjeta|premio|puntos)/.test(q)) return clubInfo();
+      if (/(carta|menu|precio|cuesta|cuanto|vale|comer|desayun|beber|cafe)/.test(q)) return carta();
+      return contacto('Uy, eso no lo sé 😅. Pregúntame por el horario, la carta, los alérgenos, reservas o pedidos. O habla directamente con nosotros:');
+    }
+
+    /* ---- Panel ---- */
+    function preguntar(t) {
+      t = String(t || '').trim();
+      if (!t) return;
+      burbuja('yo', t);
+      responder(entender(t));
+    }
+    function pintarChips() {
+      chips.innerHTML = '';
+      var d = estado.datos || {};
+      [['¿Qué horario tenéis?', true], ['¿Dónde estáis?', true], ['Ver la carta', true], ['Alérgenos', true], ['Reservar mesa', true],
+        ['Pedir para llevar', d.paraLlevar !== false], ['El club de desayunos', ajustesClub().activo], ['Hablar con alguien', true]].forEach(function (c) {
+        if (!c[1]) return;
+        var b = el('button', 'asistente__chip', c[0]);
+        b.type = 'button';
+        b.addEventListener('click', function () { preguntar(c[0]); });
+        chips.appendChild(b);
+      });
+    }
+    function abrirPanel() {
+      var a = ajustes();
+      $('asistente-nombre').textContent = a.nombre;
+      panel.hidden = false;
+      caja.classList.add('abierto');
+      boton.setAttribute('aria-expanded', 'true');
+      boton.setAttribute('aria-label', 'Cerrar el asistente');
+      pintarChips();
+      if (!empezado) {
+        empezado = true;
+        burbuja('bot', ['¡Hola! Soy ' + a.nombre + ', el ayudante de SOÑO ☕', 'Pregúntame por el horario, la carta, los alérgenos, las reservas o los pedidos, o toca una de las preguntas de abajo.']);
+      }
+      if (!tactil) entrada.focus(); else $('asistente-cerrar').focus();
+    }
+    function cerrarPanel() {
+      panel.hidden = true;
+      caja.classList.remove('abierto');
+      boton.setAttribute('aria-expanded', 'false');
+      boton.removeAttribute('aria-label');
+    }
+    boton.addEventListener('click', function () {
+      if (panel.hidden) abrirPanel(); else { cerrarPanel(); }
+    });
+    $('asistente-cerrar').addEventListener('click', function () { cerrarPanel(); boton.focus(); });
+    panel.addEventListener('keydown', function (e) { if (e.key === 'Escape') { cerrarPanel(); boton.focus(); } });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var t = entrada.value;
+      entrada.value = '';
+      preguntar(t);
+    });
+
+    /* Se enseña cuando ya se ha elegido en el aviso de cookies (así no se tapan) y si está activo en Ajustes */
+    function cookiesElegidas() {
+      // cookies.js se carga después de este archivo: se mira cada vez
+      try { return !window.sonoCookies || !!window.sonoCookies.eleccion(); } catch (e) { return true; }
+    }
+    var cookiesListas = false;
+    document.addEventListener('sono:cookies', function () { cookiesListas = true; setTimeout(mostrarAsistente, 700); });   // cuando la galleta ya se ha ido
+    function mostrarAsistente() {
+      var a = ajustes();
+      var listas = cookiesListas || cookiesElegidas();
+      caja.hidden = !(a.activo && listas && cargado && !sinDatos);
+      if (caja.hidden) cerrarPanel();
+      $('asistente-etiqueta').textContent = '¿Te ayudo?';
+      boton.setAttribute('title', a.nombre);
+    }
+    mostrarAsistenteGlobal = mostrarAsistente;
   })();
 
   /* ---------- Menú del móvil ---------- */

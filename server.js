@@ -306,6 +306,7 @@ async function completarContenido() {
   if (!contenido.datos.legal) { contenido.datos.legal = Object.assign({}, LEGAL_VACIO); cambiado = true; }
   if (!contenido.datos.legal.actualizado) { contenido.datos.legal.actualizado = hoyISO(0); cambiado = true; }
   if (!contenido.textos || !Array.isArray(contenido.textos.menu)) { contenido.textos = textosWeb.textosIniciales(); cambiado = true; }
+  if (!contenido.datos.asistente) { contenido.datos.asistente = Object.assign({}, ASISTENTE_INICIAL); cambiado = true; }
   if (cambiado) await guardarArchivo('contenido.json', contenido);
 }
 
@@ -436,9 +437,15 @@ function validarDatos(d) {
     club: validarClub(d.club),
     resenas: { activo: !(d.resenas && d.resenas.activo === false) },
     cartaAparte: d.cartaAparte === true,
+    asistente: {
+      activo: !(d.asistente && d.asistente.activo === false),
+      nombre: texto(d.asistente && d.asistente.nombre, 20) || ASISTENTE_INICIAL.nombre
+    },
     legal: validarLegal(d.legal)
   };
 }
+
+const ASISTENTE_INICIAL = { activo: true, nombre: 'Soñito' };
 
 function validarLegal(l) {
   const v = l && typeof l === 'object' ? l : {};
@@ -1232,6 +1239,9 @@ function resumenCambios(seccion, a, b) {
     const ca = a.club || {}, cb = b.club || {};
     if (ca.sellos !== cb.sellos) lineas.push('Sellos de la tarjeta del club: ' + vacio(ca.sellos) + ' → ' + cb.sellos);
     if (ca.premio !== cb.premio) lineas.push('Premio del club: ' + cb.premio);
+    const aa = a.asistente || ASISTENTE_INICIAL, ab = b.asistente || ASISTENTE_INICIAL;
+    if (aa.activo !== ab.activo) lineas.push('Asistente de la web: ' + (ab.activo ? 'activado' : 'desactivado'));
+    if (aa.nombre !== ab.nombre) lineas.push('El asistente se llama ahora «' + ab.nombre + '»');
     const la = a.legal || {}, lb = b.legal || {};
     [['titular', 'Titular'], ['nif', 'NIF/CIF'], ['domicilio', 'Domicilio legal'], ['email', 'Email para privacidad'], ['registro', 'Datos del registro']].forEach((c) => {
       if ((la[c[0]] || '') !== (lb[c[0]] || '')) lineas.push(c[1] + ': ' + vacio(la[c[0]]) + ' → ' + vacio(lb[c[0]]));

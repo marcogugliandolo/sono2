@@ -178,6 +178,7 @@
       </ul>
     </nav>
     <div class="cabecera__acciones">
+      <button class="cabecera__socio" type="button" data-abrir-tarjeta data-socio-boton hidden aria-label="Mi tarjeta del club" title="Mi tarjeta del club"><span class="enlace-socio__ene" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="#i-ene"/></svg></span></button>
       <a class="boton boton--lleno boton--peque cabecera__reserva" href="#reservar" data-abrir-reserva>Reservar mesa</a>
       <button class="menu-boton" type="button" id="menu-boton" aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
         <span class="menu-boton__raya" aria-hidden="true"></span>
@@ -633,6 +634,32 @@
 </footer>
 
 <!-- Ventana: reservar mesa -->
+<!-- Asistente de la web: responde al momento con la información de la propia web (horario, carta, alérgenos…).
+     No usa servicios externos ni guarda lo que se escribe. Se activa o se quita en Ajustes. -->
+<div class="asistente" id="asistente" hidden>
+  <section class="asistente__panel" id="asistente-panel" role="dialog" aria-labelledby="asistente-nombre" hidden>
+    <header class="asistente__cabeza">
+      <span class="asistente__cara" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="#i-ene"/></svg></span>
+      <div class="asistente__quien">
+        <p class="asistente__nombre" id="asistente-nombre">Soñito</p>
+        <p class="asistente__sub">El ayudante de SOÑO · te responde al momento</p>
+      </div>
+      <button class="asistente__cerrar" type="button" id="asistente-cerrar" aria-label="Cerrar el asistente"><svg viewBox="0 0 20 20" aria-hidden="true"><use href="#i-cerrar"/></svg></button>
+    </header>
+    <div class="asistente__mensajes" id="asistente-mensajes" role="log" aria-live="polite" tabindex="0"></div>
+    <div class="asistente__chips" id="asistente-chips" role="group" aria-label="Preguntas rápidas"></div>
+    <form class="asistente__form" id="asistente-form" novalidate>
+      <label class="solo-lector" for="asistente-texto">Escribe tu pregunta</label>
+      <input id="asistente-texto" type="text" placeholder="Pregúntame algo…" autocomplete="off" maxlength="200" enterkeyhint="send">
+      <button class="asistente__enviar" type="submit" aria-label="Enviar pregunta"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </form>
+  </section>
+  <button class="asistente__boton" type="button" id="asistente-abrir" aria-expanded="false" aria-controls="asistente-panel">
+    <span class="asistente__cara" aria-hidden="true"><svg viewBox="0 0 100 100"><use href="#i-ene"/></svg></span>
+    <span class="asistente__etiqueta" id="asistente-etiqueta">¿Te ayudo?</span>
+  </button>
+</div>
+
 <dialog class="modal modal--reserva" id="modal-reserva" aria-labelledby="t-reserva">
   <div class="modal__barra">
     <div>
