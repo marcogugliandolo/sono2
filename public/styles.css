@@ -1807,3 +1807,10 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 .textos-admin__fila .acciones-mini { padding-bottom: 6px; }
 .textos-admin__grupo .campo, .textos-admin__menu > .admin__ayuda { max-width: 640px; }
 .textos-admin__grupo > .boton--mini, .textos-admin__menu > .boton--mini { justify-self: start; }
+/* Panel, pestaña Club: premio y sellos */
+.club-admin__tarjeta-form { display: grid; gap: 12px; max-width: 640px; }
+.club-admin__tarjeta-form .fila-2 { grid-template-columns: minmax(0, 1fr) 150px; }
+.club-admin__tarjeta-pie { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.club-admin__tarjeta-aviso { margin: 0; }
+.club-admin__tarjeta-aviso.es-ok { color: var(--cafe); font-weight: 500; }
+.club-admin__tarjeta-aviso.es-error { color: var(--alerta); font-weight: 500; }

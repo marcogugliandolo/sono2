@@ -32,11 +32,11 @@ En el panel, pestaña **Club**:
 - **Nueva contraseña** para quien la haya olvidado: se enseña una vez para dársela al socio y cierra sus sesiones abiertas.
 - **Borrar socio**, y una lista de socios con buscador por nombre, email, teléfono o código.
 
-En **Ajustes → Club SOÑO** se elige cuántos sellos tiene la tarjeta (de 3 a 20; por defecto 10) y cuál es el premio. Activarlo o desactivarlo solo se hace con el interruptor de la pestaña **Club**.
+En la pestaña **Club**, bajo el interruptor, está **Tarjeta de sellos**: cuántos sellos tiene la tarjeta (de 3 a 20; por defecto 10) y cuál es el premio, con su botón «Guardar premio y sellos». El cambio queda en el historial de Ajustes.
 
 ### La tarjeta en la cartera del móvil (Apple Wallet y Google Wallet)
 
-En la ventana de la tarjeta del socio salen los botones **Añadir a Apple Wallet** (en el iPhone y en el ordenador) y **Añadir a Google Wallet** (en Android y en el ordenador). La tarjeta lleva el logo, los colores de SOÑO, los sellos con la Ñ del logo y el mismo QR que se escanea en la barra, y **se actualiza sola** cuando se pone un sello, se canjea el premio o se cambian los sellos o el premio en Ajustes (en el iPhone sale un aviso: «Nuevo sello en tu tarjeta de SOÑO»).
+En la ventana de la tarjeta del socio salen los botones **Añadir a Apple Wallet** (en el iPhone y en el ordenador) y **Añadir a Google Wallet** (en Android y en el ordenador). La tarjeta lleva el logo, los colores de SOÑO, los sellos con la Ñ del logo y el mismo QR que se escanea en la barra, y **se actualiza sola** cuando se pone un sello, se canjea el premio o se cambian los sellos o el premio en la pestaña Club (en el iPhone sale un aviso: «Nuevo sello en tu tarjeta de SOÑO»).
 
 Cada botón solo sale cuando está configurado. **Todo se configura desde el panel, también desde el móvil**: pestaña **Club** → *Tarjeta en el móvil (Wallet)*. Ahí se ve si Apple y Google están listos o qué falta, cuántos iPhone tienen la tarjeta y cuándo caduca el certificado de Apple, con los pasos numerados y los enlaces a cada web.
 
@@ -68,7 +68,7 @@ Los datos del club están en `socios.json` y la clave que firma las sesiones en 
 En el panel, pestaña **Textos**:
 
 - **Menú**: el nombre de cada enlace («Nosotros», «Carta», «Visítanos»…) y su orden con ↑ ↓. El orden es el mismo en la cabecera, en el menú del móvil y en el pie.
-- **Textos de cada parte de la web**: etiqueta, título y textos de la portada, «Así preparamos tu café», Nosotros, Carta, Para llevar, Club, Galería, Reseñas, Visítanos y el pie. Si un texto se deja vacío, vuelve el original. En el texto del club, `{premio}` y `{sellos}` se cambian solos por lo que haya en Ajustes.
+- **Textos de cada parte de la web**: etiqueta, título y textos de la portada, «Así preparamos tu café», Nosotros, Carta, Para llevar, Club, Galería, Reseñas, Visítanos y el pie. Si un texto se deja vacío, vuelve el original. En el texto del club, `{premio}` y `{sellos}` se cambian solos por el premio y los sellos de la pestaña Club.
 
 Se guarda con «Guardar cambios» y queda en el Historial. El servidor ya manda la página con los textos puestos, así que no parpadea al cargar. Los textos originales son los del propio `public/index.html` (cada uno lleva `data-texto="…"`).
 
