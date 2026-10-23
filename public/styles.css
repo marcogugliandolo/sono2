@@ -1452,6 +1452,8 @@ input:focus-visible + .alergeno-chip { outline: 2px solid var(--cafe); outline-o
 }
 .plano__fuera .zona { border-radius: var(--r-chip); border: 1px solid var(--linea); }
 .zona svg { width: 100%; max-width: 128px; height: 52px; --grosor: 1.6; overflow: visible; }
+/* Rellenos suaves de los dibujos de las zonas (sirven igual con la zona elegida, en oscuro) */
+.trazo.zona__tono { stroke: none; fill: currentColor; fill-opacity: 0.16; }
 @media (hover: hover) { .zona:hover { background: var(--beige-suave); } }
 input:checked + .zona { background: var(--cafe); border-color: var(--cafe); color: var(--lienzo); }
 input:focus-visible + .zona { outline: 2px solid var(--cafe); outline-offset: -5px; }
