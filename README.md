@@ -122,10 +122,10 @@ Para evitar spam: hay una trampa para bots, cada IP puede enviar 3 reseñas por 
 
 Arriba de la carta, antes de los favoritos, sale un recuadro beige con **lo mejor del mes**: hasta 3 destacados (por ejemplo «Café del mes», «Dulce del mes» y «Desayuno del mes»). Con uno solo, la tarjeta va en grande; con dos o tres, en fila. Cada tarjeta lleva un sello redondo con el nombre del mes en curso, que cambia solo.
 
-Se gestiona en la pestaña **Del mes** del panel:
+Se gestiona arriba del todo en la pestaña **Carta** del panel, en el bloque «Lo mejor del mes»:
 - **«Lo mejor del mes» en la carta**: interruptor arriba, como el del club o las reseñas. Se guarda al momento. Apagado, el recuadro no sale y lo que haya preparado se guarda.
 - Cada destacado tiene una **etiqueta** libre y puede ser un **producto de la carta** (sale con su nombre, precio, foto y alérgenos, con los botones «Pedir para llevar» y «Ver detalles y alérgenos») o algo **escrito a mano** (nombre, precio opcional y un dibujo). En los dos casos se puede escribir por qué lo recomendáis y poner una foto, un GIF o un vídeo corto propios.
-- Se guarda con «Guardar cambios» y queda en **Historial**. Los títulos del recuadro se cambian en **Textos → Carta: lo mejor del mes**.
+- Se guarda con el mismo «Guardar cambios» de la carta y queda en **Historial** (filtro «Del mes»). Los títulos del recuadro se cambian en **Textos → Carta: lo mejor del mes**.
 - Si es un producto de la carta, no se repite en las tarjetas de favoritos de debajo.
 - Soñito lo sabe: a «¿qué me recomendáis?» responde con lo mejor del mes.
 

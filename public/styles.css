@@ -1908,6 +1908,9 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 .cv-admin__nombre { font-weight: 600; font-size: 0.9375rem; overflow-wrap: anywhere; }
 .cv-admin__peso { font-family: var(--f-mono); font-size: 0.75rem; color: var(--cafe-suave); }
 .fila-2--mes { grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); }
+.mes-admin__bloque { padding-bottom: clamp(24px, 3vw, 32px); border-bottom: 1px solid var(--linea); }
+.mes-admin__bloque .mes-admin { background: var(--superficie); }
+.carta-admin__titulo { font-family: var(--f-titulo); font-weight: 400; font-size: 1.9rem; line-height: 1.1; }
 .mes-admin .tarjeta-admin { margin-top: 4px; padding: 0; border: 0; background: none; }
 
 @media (max-width: 900px) {

@@ -37,7 +37,9 @@
   var MAX_ZONAS = 6;
   var DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   var PIES_GALERIA = ['El local', 'La barra', 'Latte art', 'Desayunos', 'Buenos ratos'];
-  var CLAVE_DE = { carta: 'carta', fotos: 'galeria', horarios: 'horario', datos: 'datos', textos: 'textos', mes: 'mes' };
+  var CLAVE_DE = { carta: 'carta', fotos: 'galeria', horarios: 'horario', datos: 'datos', textos: 'textos' };
+  /* La pestaña Carta guarda también «Lo mejor del mes», que va arriba de la carta */
+  var CLAVES_PESTANA = { carta: ['carta', 'mes'] };
   var RE_PRECIO = /^\d{1,3}([.,]\d{1,2})?$/;
   var RE_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
   var RE_NIF = /^([0-9]{8}[A-Z]|[XYZ][0-9]{7}[A-Z]|[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J])$/;
@@ -1977,10 +1979,12 @@
     return borradores[k];
   }
   function claveActual() { return CLAVE_DE[pestana] || null; }
+  function clavesActuales() { return CLAVES_PESTANA[pestana] || (CLAVE_DE[pestana] ? [CLAVE_DE[pestana]] : []); }
+  function haySucio() { return clavesActuales().some(function (k) { return sucio[k]; }); }
   function marcar() {
-    var k = claveActual();
-    if (!k) return;
-    sucio[k] = true;
+    var ks = clavesActuales();
+    if (!ks.length) return;
+    ks.forEach(function (k) { sucio[k] = true; });
     btnDescartar.disabled = false;
     mostrarEstado('Hay cambios sin guardar.');
   }
@@ -2041,7 +2045,6 @@
     btnDescartar.hidden = !k;
     if (k && !cargado) { cuerpo.appendChild(el('p', 'estado-vacio', 'Cargando…')); return; }
     if (pestana === 'carta') panelCarta();
-    if (pestana === 'mes') panelMes();
     if (pestana === 'fotos') panelFotos();
     if (pestana === 'horarios') panelHorarios();
     if (pestana === 'datos') panelDatos();
@@ -2053,8 +2056,8 @@
     if (pestana === 'resenas') panelResenas();
     if (pestana === 'historial') panelHistorial();
     cuerpo.scrollTop = mismaPestana ? posicion : 0;
-    if (!guardando) mostrarEstado(k && sucio[k] ? 'Hay cambios sin guardar.' : '');
-    btnDescartar.disabled = !(k && sucio[k]);
+    if (!guardando) mostrarEstado(k && haySucio() ? 'Hay cambios sin guardar.' : '');
+    btnDescartar.disabled = !(k && haySucio());
     btnGuardar.disabled = guardando;
   }
 
@@ -2260,6 +2263,8 @@
   function panelCarta() {
     var b = borrador('carta');
     cuerpo.appendChild(bloqueCartaAparte());
+    cuerpo.appendChild(bloqueMes());
+    cuerpo.appendChild(el('h3', 'carta-admin__titulo', 'Grupos y productos'));
     cuerpo.appendChild(el('p', 'admin__ayuda', 'Organiza la carta en grupos (por ejemplo «Zumos» o «Repostería») y dentro de cada grupo cambia nombres, precios, descripciones, alérgenos y fotos. Los cambios se ven en la web en cuanto pulsas «Guardar cambios». Revisa bien los alérgenos de cada producto: es información que la ley obliga a dar. Para destacar un producto en las tarjetas de arriba de la carta, ponle la etiqueta «Favorito» (hasta 4). Cada producto puede llevar una foto (también las del móvil), un GIF o un vídeo corto: hasta ' + MAX_VIDEO_SEG + ' segundos y ' + MAX_VIDEO_MB + ' MB, se ve sin sonido y en bucle.'));
     if (!b.categorias.length) cuerpo.appendChild(el('p', 'estado-vacio', 'La carta no tiene grupos. Crea el primero con «+ Añadir grupo».'));
     b.categorias.forEach(function (cat, n) {
@@ -2484,9 +2489,12 @@
   /* Pestaña: lo mejor del mes */
   var ETIQUETAS_MES = ['Café del mes', 'Dulce del mes', 'Desayuno del mes', 'Bebida del mes'];
   var MAX_MES = 3;
-  function panelMes() {
+  function bloqueMes() {
     var b = borrador('mes');
-    cuerpo.appendChild(interruptorAlMomento({
+    var g = el('section', 'admin__grupo mes-admin__bloque');
+    g.id = 'mes-admin';
+    g.appendChild(el('h3', null, 'Lo mejor del mes'));
+    g.appendChild(interruptorAlMomento({
       id: 'mes-activo',
       texto: '«Lo mejor del mes» en la carta',
       activo: mesActivo(),
@@ -2497,15 +2505,15 @@
           : 'No sale en la carta. Lo que tengas aquí se guarda para cuando lo vuelvas a activar.';
       },
       avisoOk: function (si) { return si ? 'Hecho: ya se ve en la web.' : 'Hecho: ya no sale en la web.'; },
-      alCambiar: function () { pintarMes(); }
+      alCambiar: function () { pintarMes(); pintarCarta(); }
     }));
-    cuerpo.appendChild(el('p', 'admin__ayuda', 'Elige hasta ' + MAX_MES + ' cosas para destacar este mes: un café, un dulce, un desayuno… Puede ser un producto de la carta (sale con su foto, su precio y sus alérgenos, y se puede pedir para llevar) o algo escrito a mano. El sello con el nombre del mes cambia solo. Los títulos de este bloque se cambian en «Textos».'));
+    g.appendChild(el('p', 'admin__ayuda', 'Elige hasta ' + MAX_MES + ' cosas para destacar este mes: un café, un dulce, un desayuno… Puede ser un producto de la carta (sale con su foto, su precio y sus alérgenos, y se puede pedir para llevar) o algo escrito a mano. El sello con el nombre del mes cambia solo. Los títulos de este bloque se cambian en «Textos».'));
     var sugerencias = el('datalist');
     sugerencias.id = 'mes-etiquetas';
     ETIQUETAS_MES.forEach(function (t) { var o = el('option'); o.value = t; sugerencias.appendChild(o); });
-    cuerpo.appendChild(sugerencias);
-    if (!b.items.length) cuerpo.appendChild(el('p', 'estado-vacio', 'No hay nada destacado. Añade el primero con «+ Añadir destacado».'));
-    b.items.forEach(function (x, n) { cuerpo.appendChild(tarjetaMesAdmin(b, x, n)); });
+    g.appendChild(sugerencias);
+    if (!b.items.length) g.appendChild(el('p', 'estado-vacio', 'No hay nada destacado. Añade el primero con «+ Añadir destacado».'));
+    b.items.forEach(function (x, n) { g.appendChild(tarjetaMesAdmin(b, x, n)); });
     var nuevo = el('div', 'grupo-carta__nuevo');
     var boton = el('button', 'boton boton--lleno boton--peque', '+ Añadir destacado');
     boton.type = 'button';
@@ -2522,7 +2530,8 @@
     });
     nuevo.appendChild(boton);
     nuevo.appendChild(el('p', 'admin__ayuda', b.items.length >= MAX_MES ? 'Has llegado al máximo de ' + MAX_MES + ' destacados.' : 'Con uno solo, sale en grande; con dos o tres, en fila.'));
-    cuerpo.appendChild(nuevo);
+    g.appendChild(nuevo);
+    return g;
   }
   function tarjetaMesAdmin(b, x, n) {
     var g = el('section', 'admin__grupo grupo-carta mes-admin');
@@ -2595,7 +2604,7 @@
 
     if (x.producto && !p) campos.appendChild(el('p', 'admin__alerta', 'Este producto ya no está en la carta. Elige otro o escríbelo a mano.'));
     if (p) {
-      campos.appendChild(el('p', 'admin__ayuda', 'Sale con el nombre, el precio' + (p.foto ? ', la foto' : '') + ' y los alérgenos de la carta. Para cambiarlos, ve a la pestaña «Carta».'));
+      campos.appendChild(el('p', 'admin__ayuda', 'Sale con el nombre, el precio' + (p.foto ? ', la foto' : '') + ' y los alérgenos de la carta. Para cambiarlos, edita el producto más abajo, en su grupo.'));
     } else if (!x.producto) {
       var fila2 = el('div', 'fila-2');
       fila2.appendChild(campoTexto('adm-mes-nombre-' + x.id, 'Nombre', x.nombre, function (v) { x.nombre = v; }, { maxlength: '80', placeholder: 'Tarta de queso de la abuela' }));
@@ -4158,9 +4167,11 @@
       }
     }
     if (k === 'mes') {
+      // Si también se guarda la carta, se mira contra la carta nueva (por si se ha borrado el producto)
+      var deCarta = sucio.carta && borradores.carta ? borradores.carta.productos : productos();
       for (var d = 0; d < b.items.length; d++) {
         var it = b.items[d];
-        if (it.producto && !productoPorId(it.producto)) return 'El destacado ' + (d + 1) + ' es un producto que ya no está en la carta. Elige otro o escríbelo a mano.';
+        if (it.producto && !deCarta.some(function (q) { return q.id === it.producto; })) return 'El destacado ' + (d + 1) + ' es un producto que ya no está en la carta. Elige otro o escríbelo a mano.';
         if (!it.producto && !texto(it.nombre)) return 'Escribe el nombre del destacado ' + (d + 1) + ' o elige un producto de la carta.';
         if (!it.producto && texto(it.precio) && !RE_PRECIO.test(texto(it.precio))) return 'Revisa el precio de «' + texto(it.nombre) + '»: escribe solo el número, por ejemplo 2,50.';
       }
@@ -4190,18 +4201,27 @@
   }
 
   function guardar() {
-    var k = claveActual();
-    if (!k) return Promise.resolve(false);
-    var b = borradores[k] || borrador(k);
-    var error = validar(k, b);
-    if (error) { mostrarEstado(error, true); return Promise.resolve(false); }
+    var ks = clavesActuales();
+    if (!ks.length) return Promise.resolve(false);
+    // Se guardan las partes con cambios (en la pestaña Carta, la carta y lo mejor del mes)
+    var aGuardar = ks.filter(function (k) { return sucio[k]; });
+    if (!aGuardar.length) aGuardar = [ks[0]];
+    for (var i = 0; i < aGuardar.length; i++) {
+      var error = validar(aGuardar[i], borradores[aGuardar[i]] || borrador(aGuardar[i]));
+      if (error) { mostrarEstado(error, true); return Promise.resolve(false); }
+    }
     guardando = true;
     btnGuardar.disabled = true;
     mostrarEstado('Guardando…');
-    return api('PUT', '/api/contenido/' + k, b).then(function (r) {
-      estado[k] = r[k];
-      borradores[k] = normalizar(k, clonar(r[k]));
-      sucio[k] = false;
+    return aGuardar.reduce(function (cadena, k) {
+      return cadena.then(function () {
+        return api('PUT', '/api/contenido/' + k, borradores[k] || borrador(k)).then(function (r) {
+          estado[k] = r[k];
+          borradores[k] = normalizar(k, clonar(r[k]));
+          sucio[k] = false;
+        });
+      });
+    }, Promise.resolve()).then(function () {
       guardando = false;
       var arriba = cuerpo.scrollTop;
       pintarPanel();
@@ -4218,10 +4238,9 @@
   }
   btnGuardar.addEventListener('click', guardar);
   btnDescartar.addEventListener('click', function () {
-    var k = claveActual();
-    if (!k) return;
-    sucio[k] = false;
-    borradores[k] = null;
+    var ks = clavesActuales();
+    if (!ks.length) return;
+    ks.forEach(function (k) { sucio[k] = false; borradores[k] = null; });
     pintarPanel();
     mostrarEstado('Cambios descartados.');
   });
@@ -4318,7 +4337,7 @@
     }).then(function (r) {
       aviso = r.aviso || '';
       alTerminar(r.id);
-      sucio[claveActual()] = true;
+      clavesActuales().forEach(function (k) { sucio[k] = true; });
       pintarPanel();
       return guardar();
     }).then(function (ok) {
