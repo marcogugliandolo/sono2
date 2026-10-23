@@ -26,7 +26,7 @@
   var MAX_GRUPOS = 12;
   /* Zonas del local para reservar */
   var TIPOS_ZONA = [
-    { id: 'mesas', nombre: 'Mesas' }, { id: 'terraza', nombre: 'Terraza (fuera)' },
+    { id: 'mesas', nombre: 'Interior (mesas)' }, { id: 'terraza', nombre: 'Terraza (fuera)' },
     { id: 'lectura', nombre: 'Zona de lectura' }, { id: 'barra', nombre: 'Barra' }
   ];
   var ZONAS_INICIALES = [
