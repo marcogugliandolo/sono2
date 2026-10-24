@@ -5,7 +5,7 @@ Segunda versión de la web de SOÑO. Tiene las mismas funciones que la primera (
 - **Diseño**: basado en la plantilla de Canva «Cafe Website in Cream Blue Orange Handdrawn Human-centric Style», en versión minimalista. Tiene portada centrada con un bodegón dibujado a línea, franja de «Nuestra historia», carta con tarjetas de favoritos y una caja por sección, bloques de dos tarjetas para «Para llevar» y «Visítanos», y pie en tarjeta.
 - **Marca**: el mismo logo SOÑO en vector (el café de la Ñ se mueve) y los colores oficiales: marrón rgb(86, 41, 18) · #562912 y beige rgb(243, 224, 166) · #F3E0A6. El fondo general es un beige muy aclarado (#FBF7EB).
 - **Tipografías**: Instrument Serif para los titulares, Geist para el texto y Geist Mono para etiquetas y precios.
-- **Panel**: se abre tocando el logo de la cabecera. Usa el mismo usuario y contraseña que la primera web: `ADMIN_USER` y `ADMIN_PASSWORD`.
+- **Panel**: se abre con **dos toques seguidos en el logo** de la cabecera (un toque solo lleva al inicio), o entrando en `tu-dominio/#panel`. Usa el mismo usuario y contraseña que la primera web: `ADMIN_USER` y `ADMIN_PASSWORD`.
 - **Servidor**: Node.js sin dependencias. Guarda todo en la carpeta de datos (un volumen de Docker).
 
 ## La taza que se llena

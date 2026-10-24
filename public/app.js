@@ -1893,11 +1893,38 @@
     setTimeout(function () { $('login-usuario').focus(); }, 50);
   }
 
-  $('logo').addEventListener('click', function () {
+  /* Logo de la cabecera: un toque lleva al inicio; dos toques seguidos abren el panel de administración.
+     También se entra con «#panel» al final de la dirección (por ejemplo gruposono.com/#panel). */
+  function entrarAlPanel() {
     api('GET', '/api/sesion').then(function (r) {
       if (r.admin) abrirPanel(); else abrirLogin();
     }).catch(function () { abrirLogin(); });
-  });
+  }
+  function irAlInicio() {
+    if (raiz.classList.contains('menu-abierto')) $('menu-boton').click();
+    if (enPaginaCarta) { location.href = '/'; return; }
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+    window.scrollTo({ top: 0, behavior: sinMovimiento ? 'auto' : 'smooth' });
+  }
+  (function () {
+    var ESPERA = 350;   // ms entre los dos toques
+    var ultimo = 0;
+    var pendiente = null;
+    $('logo').addEventListener('click', function () {
+      var ahora = Date.now();
+      if (ahora - ultimo < ESPERA) {
+        ultimo = 0;
+        clearTimeout(pendiente);
+        pendiente = null;
+        entrarAlPanel();
+        return;
+      }
+      ultimo = ahora;
+      // En la portada sube al momento; desde la página de la carta espera un poco por si llega el segundo toque
+      if (!enPaginaCarta) irAlInicio();
+      else pendiente = setTimeout(function () { pendiente = null; irAlInicio(); }, ESPERA);
+    });
+  })();
 
   $('form-login').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -4960,6 +4987,7 @@
     if (location.hash === '#escribir-resena') abrirResena();
     // Con «#trabaja» (el enlace del pie, o un cartel con QR) se abre «Trabaja con nosotros»
     if (location.hash === '#trabaja') irAEmpleo();
+    if (location.hash === '#panel') { history.replaceState(null, '', location.pathname + location.search); entrarAlPanel(); }
     // Si la carta va en su propia página, un enlace antiguo a «/#carta» lleva allí
     if (location.hash === '#carta' && cartaAparte() && !enPaginaCarta) location.replace('/carta');
   }).catch(function () {
