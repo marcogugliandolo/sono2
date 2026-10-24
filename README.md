@@ -139,7 +139,7 @@ Los currículums se guardan en la carpeta `cv/` de los datos, **no se pueden abr
 
 ## Códigos QR
 
-En la carpeta `qr/` están los QR de SOÑO con la Ñ del logo dibujada con los puntos del código: la web, la carta (para las mesas), las reseñas (para el ticket) y «Trabaja con nosotros». Cada uno va suelto (SVG y PNG) y en una tarjeta A6 lista para imprimir (PDF y PNG). Todo se explica en [`qr/README.md`](qr/README.md). Esta carpeta no entra en la imagen de Docker.
+En la carpeta `qr/` están los QR de SOÑO con el logo grande y el código en puntitos por encima (en `qr/` con el logo entero y en `qr/ene/` solo con la Ñ): la web, la carta (para las mesas), las reseñas (para el ticket) y «Trabaja con nosotros». Cada uno va suelto (SVG y PNG) y en una tarjeta A6 lista para imprimir (PDF y PNG). Todo se explica en [`qr/README.md`](qr/README.md). Esta carpeta no entra en la imagen de Docker.
 
 ## Novedad: favoritos
 
