@@ -137,6 +137,10 @@ Las candidaturas llegan a la pestaña **Mensajes** del panel, junto a las consul
 
 Los currículums se guardan en la carpeta `cv/` de los datos, **no se pueden abrir desde la web pública** (solo con la sesión del panel) y se comprueban por su contenido, no por el nombre. Se borran solos al año, como los mensajes. Cada IP puede mandar 3 candidaturas por hora y se guardan como mucho 300. La política de privacidad ya lo explica (qué datos, para qué, base legal y plazo).
 
+## Códigos QR
+
+En la carpeta `qr/` están los QR de SOÑO con la Ñ del logo dibujada con los puntos del código: la web, la carta (para las mesas), las reseñas (para el ticket) y «Trabaja con nosotros». Cada uno va suelto (SVG y PNG) y en una tarjeta A6 lista para imprimir (PDF y PNG). Todo se explica en [`qr/README.md`](qr/README.md). Esta carpeta no entra en la imagen de Docker.
+
 ## Novedad: favoritos
 
 Encima de las cajas de la carta salen 4 productos destacados en tarjetas. Para elegirlos, añade la etiqueta `Favorito` a los productos en el panel (pestaña **Carta**). Si hay menos de 4 marcados, el resto se completa solo con un producto de cada sección, primero los que tienen foto.
