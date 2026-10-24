@@ -46,10 +46,10 @@ El logo se saca de `public/index.html`, así que si cambia en la web, cambia aqu
 
 ```bash
 pip install segno opencv-python-headless pyzbar zxing-cpp pillow numpy playwright
-# QR_LIBRES=0 python3 generar_todos.py  → sin quitar puntos (se lee aún mejor, pero se ve menos el logo)
 cd qr/generar
 python3 generar_todos.py        # QR con el logo entero → qr/   (prueba las 8 máscaras y se queda con la que mejor se lee)
 python3 tarjetas.py             # sus tarjetas A6 en PDF y PNG
 python3 generar_todos.py ene    # QR solo con la Ñ → qr/ene/
 python3 tarjetas.py ene
+# QR_LIBRES=0 python3 generar_todos.py  → sin quitar puntos (se lee aún mejor, pero se ve menos el logo)
 ```
