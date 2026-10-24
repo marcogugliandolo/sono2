@@ -1,42 +1,34 @@
 {
   "web": {
     "url": "https://gruposono.com",
-    "mascara": 1,
-    "opencv": "12/14",
-    "zbar": "14/14",
-    "fallos": [
-      "opencv 110",
-      "opencv 110b"
-    ]
+    "mascara": 5,
+    "fotos_zxing": "28/30",
+    "fotos_zbar": "28/30",
+    "fotos_opencv": "0/30",
+    "tamanos_zbar": "13/14"
   },
   "carta": {
     "url": "https://gruposono.com/carta",
-    "mascara": 0,
-    "opencv": "12/14",
-    "zbar": "14/14",
-    "fallos": [
-      "opencv 110",
-      "opencv 110b"
-    ]
+    "mascara": 1,
+    "fotos_zxing": "27/30",
+    "fotos_zbar": "28/30",
+    "fotos_opencv": "0/30",
+    "tamanos_zbar": "13/14"
   },
   "resenas": {
     "url": "https://gruposono.com/#escribir-resena",
-    "mascara": 0,
-    "opencv": "12/14",
-    "zbar": "14/14",
-    "fallos": [
-      "opencv 110",
-      "opencv 110b"
-    ]
+    "mascara": 1,
+    "fotos_zxing": "28/30",
+    "fotos_zbar": "28/30",
+    "fotos_opencv": "0/30",
+    "tamanos_zbar": "12/14"
   },
   "trabaja": {
     "url": "https://gruposono.com/#trabaja",
-    "mascara": 0,
-    "opencv": "12/14",
-    "zbar": "14/14",
-    "fallos": [
-      "opencv 110",
-      "opencv 110b"
-    ]
+    "mascara": 4,
+    "fotos_zxing": "28/30",
+    "fotos_zbar": "27/30",
+    "fotos_opencv": "0/30",
+    "tamanos_zbar": "12/14"
   }
 }
