@@ -215,6 +215,10 @@ input:focus-visible + label.boton { outline: 2px solid var(--cafe); outline-offs
 }
 .marca {
   display: inline-flex;
+  touch-action: manipulation;          /* dos toques seguidos abren el panel: sin zoom en el móvil */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
   padding: 6px;
   margin-left: -6px;
   border: 0;
