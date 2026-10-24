@@ -1,0 +1,42 @@
+{
+  "web": {
+    "url": "https://gruposono.com",
+    "mascara": 1,
+    "opencv": "12/14",
+    "zbar": "14/14",
+    "fallos": [
+      "opencv 110",
+      "opencv 110b"
+    ]
+  },
+  "carta": {
+    "url": "https://gruposono.com/carta",
+    "mascara": 0,
+    "opencv": "12/14",
+    "zbar": "14/14",
+    "fallos": [
+      "opencv 110",
+      "opencv 110b"
+    ]
+  },
+  "resenas": {
+    "url": "https://gruposono.com/#escribir-resena",
+    "mascara": 0,
+    "opencv": "12/14",
+    "zbar": "14/14",
+    "fallos": [
+      "opencv 110",
+      "opencv 110b"
+    ]
+  },
+  "trabaja": {
+    "url": "https://gruposono.com/#trabaja",
+    "mascara": 0,
+    "opencv": "12/14",
+    "zbar": "14/14",
+    "fallos": [
+      "opencv 110",
+      "opencv 110b"
+    ]
+  }
+}
