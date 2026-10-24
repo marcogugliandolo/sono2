@@ -4,6 +4,11 @@ Dos juegos de QR, con la misma técnica: el dibujo va grande y macizo en marrón
 con puntitos (crema sobre el dibujo, marrón fuera). El móvil solo mira el centro de cada punto, así que
 se leen como un QR normal (corrección de errores alta, «H»).
 
+Para que el logo se vea más, a cada QR se le quitan los puntos de unos cuantos «codewords» (los trozos de 8
+bits en que se divide el código): en cada bloque, los 7 que más puntos quitan de encima del logo. El lector
+los lee mal y la corrección de errores los arregla (aguanta 11 por bloque, así que quedan 4 de margen).
+`generar/codewords.py` sabe qué módulos son de cada codeword, siguiendo el estándar.
+
 - **`qr/`**: con el logo entero (SO / ÑO).
 - **`qr/ene/`**: solo con la Ñ del logo (la taza con el café).
 
@@ -26,10 +31,11 @@ Archivos de cada uno (en las dos carpetas):
 
 Cada QR se ha probado con 30 fotos de móvil simuladas (de cerca y de lejos, torcidas, en perspectiva,
 algo movidas, con ruido, luz desigual y compresión JPG) y con dos lectores distintos: ZXing (el de Android
-y muchas apps) y zbar. Se leen en 27–29 de las 30; los fallos son fotos de muy lejos y borrosas. También se
-leen las tarjetas, tanto el PNG como el PDF impreso a 300 ppp.
+y muchas apps) y zbar. Se leen en 25–28 de las 30, y todos los fallos son de las fotos más lejanas y
+borrosas: de media distancia para arriba se leen siempre. También se leen las tarjetas, tanto el PNG como
+el PDF impreso a 300 ppp.
 
-Al imprimir: el QR, de **3,5 cm de lado como mínimo**, y sin recortar el borde crema que lo rodea.
+Al imprimir: el QR, de **4 cm de lado como mínimo**, y sin recortar el borde crema que lo rodea.
 El de reseñas solo abre la ventana si las reseñas están activas en el panel, y el de «Trabaja con
 nosotros», si está activo en la pestaña Mensajes.
 
@@ -40,6 +46,7 @@ El logo se saca de `public/index.html`, así que si cambia en la web, cambia aqu
 
 ```bash
 pip install segno opencv-python-headless pyzbar zxing-cpp pillow numpy playwright
+# QR_LIBRES=0 python3 generar_todos.py  → sin quitar puntos (se lee aún mejor, pero se ve menos el logo)
 cd qr/generar
 python3 generar_todos.py        # QR con el logo entero → qr/   (prueba las 8 máscaras y se queda con la que mejor se lee)
 python3 tarjetas.py             # sus tarjetas A6 en PDF y PNG

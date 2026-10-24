@@ -8,6 +8,7 @@ Los tres cuadrados de las esquinas van completos (y cuadrados: redondeados falla
 """
 import re, os
 import segno
+import codewords
 import cv2
 from PIL import Image
 from pyzbar import pyzbar
@@ -20,9 +21,12 @@ CAFE_LOGO = '#8A5A35'     # el café dentro de la Ñ
 FONDO = '#FFFDF7'         # crema: fondo y puntos claros sobre el logo
 MARGEN = 4                # la zona en blanco que exige el estándar, en módulos
 VERSION = 5               # 37 × 37 módulos
+LIBRES = int(os.environ.get('QR_LIBRES', 7))   # codewords por bloque que se dejan sin puntos (la corrección arregla 11: quedan 4 de margen)
 N = 17 + 4 * VERSION
 T = N + 2 * MARGEN
-PUNTO = 0.72              # diámetro de los puntos, en módulos (más grandes tapan el logo; más pequeños, se lee peor)
+# Diámetro de los puntos, en módulos: más grandes tapan el logo; más pequeños, se leen peor
+PUNTO_CLARO = float(os.environ.get('QR_PUNTO_CLARO', 0.72))     # los crema, encima del logo
+PUNTO_OSCURO = float(os.environ.get('QR_PUNTO_OSCURO', 0.72))   # los marrones, fuera del logo
 DIBUJO = os.environ.get('QR_DIBUJO', 'logo')   # 'logo' (SO/ÑO entero) o 'ene' (solo la Ñ)
 
 _html = open(INDEX, encoding='utf-8').read()
@@ -70,9 +74,9 @@ def mascara(pagina):
     """El logo en blanco y negro, a 32 px por módulo, para saber qué hay debajo de cada punto (se calcula una vez)."""
     global _mascara
     if _mascara is None:
-        renderizar(pagina, svg_entero(dibujo_logo('#000', '#000'), '#fff', 'mascara'), D + '_mascara-' + DIBUJO + '.png', T * PX)
-        _mascara = Image.open(D + '_mascara-' + DIBUJO + '.png').convert('L')
-        os.remove(D + '_mascara-' + DIBUJO + '.png')
+        renderizar(pagina, svg_entero(dibujo_logo('#000', '#000'), '#fff', 'mascara'), D + '_mascara-%s-%d.png' % (DIBUJO, os.getpid()), T * PX)
+        _mascara = Image.open(D + '_mascara-%s-%d.png' % (DIBUJO, os.getpid())).convert('L')
+        os.remove(D + '_mascara-%s-%d.png' % (DIBUJO, os.getpid()))
     return _mascara
 
 
@@ -81,7 +85,7 @@ def svg_qr(url, mask, pagina):
     m = [list(r) for r in qr.matrix]
     assert len(m) == N
     img = mascara(pagina)
-    r = PUNTO / 2
+    r = max(PUNTO_CLARO, PUNTO_OSCURO) / 2
 
     def en_logo(x, y):
         return img.getpixel((min(int(x * PX), T * PX - 1), min(int(y * PX), T * PX - 1))) < 128
@@ -89,7 +93,7 @@ def svg_qr(url, mask, pagina):
     def en_esquina(f, k):
         return (f < 8 and k < 8) or (f < 8 and k >= N - 8) or (f >= N - 8 and k < 8)
 
-    oscuros, claros = [], []
+    puntos = {}   # (fila, col) → 'oscuro' o 'claro'
     for f in range(N):
         for k in range(N):
             if en_esquina(f, k):
@@ -97,11 +101,36 @@ def svg_qr(url, mask, pagina):
             cx, cy = k + MARGEN + 0.5, f + MARGEN + 0.5
             # se mira el logo en 9 puntos del círculo: si el punto cae en el borde de una letra, se pinta igualmente
             muestras = [en_logo(cx + dx, cy + dy) for dx in (-r * 0.7, 0, r * 0.7) for dy in (-r * 0.7, 0, r * 0.7)]
-            punto = 'M%.3f %.3fa%.3f %.3f 0 1 0 %.3f 0a%.3f %.3f 0 1 0 -%.3f 0z' % (cx - r, cy, r, r, 2 * r, r, r, 2 * r)
             if m[f][k] and not all(muestras):
-                oscuros.append(punto)
+                puntos[(f, k)] = 'oscuro'
             elif not m[f][k] and any(muestras):
-                claros.append(punto)
+                puntos[(f, k)] = 'claro'
+
+    # Puntos que sobran: los bits de relleno no cuentan, y en cada bloque se eligen los LIBRES codewords que más
+    # puntos quitarían (pesan el doble los claros, que son los que rompen el logo). Esos se quedan sin puntos:
+    # el lector los leerá mal y la corrección de errores los arregla.
+    sitio = codewords.mapa(VERSION)
+    quitar = {p for p in puntos if p in sitio and sitio[p] is None}
+    if LIBRES:
+        ganancia = {}
+        for p, tipo in puntos.items():
+            cw = sitio.get(p)
+            if cw is not None:
+                ganancia[cw] = ganancia.get(cw, 0) + (2 if tipo == 'claro' else 1)
+        elegidos = set()
+        for b in range(len(codewords.BLOQUES[VERSION][1])):
+            del_bloque = sorted((g, cw) for cw, g in ganancia.items() if cw[0] == b)
+            elegidos.update(cw for g, cw in del_bloque[-LIBRES:])
+        quitar |= {p for p in puntos if sitio.get(p) in elegidos}
+
+    oscuros, claros = [], []
+    for (f, k), tipo in sorted(puntos.items()):
+        if (f, k) in quitar:
+            continue
+        cx, cy = k + MARGEN + 0.5, f + MARGEN + 0.5
+        r = (PUNTO_CLARO if tipo == 'claro' else PUNTO_OSCURO) / 2
+        punto = 'M%.3f %.3fa%.3f %.3f 0 1 0 %.3f 0a%.3f %.3f 0 1 0 -%.3f 0z' % (cx - r, cy, r, r, 2 * r, r, r, 2 * r)
+        (oscuros if tipo == 'oscuro' else claros).append(punto)
 
     def esquina(x, y):
         return ('<rect x="{a0}" y="{b0}" width="9" height="9" fill="{f}"/>'
