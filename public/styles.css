@@ -2237,6 +2237,8 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
   cursor: pointer;
 }
 @media (hover: hover) { .asistente__accion:hover { background: var(--beige); } }
+.asistente__accion:disabled { opacity: 0.45; cursor: default; }
+.asistente__burbuja .asistente__nota a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .asistente__escribiendo { display: inline-flex; gap: 4px; padding: 4px 2px; }
 .asistente__escribiendo span { width: 6px; height: 6px; border-radius: 50%; background: var(--cafe-suave); opacity: 0.5; }
 @media (prefers-reduced-motion: no-preference) {

@@ -4843,7 +4843,7 @@
       return {
         partes: [deHoy ? t('Hoy, {dia}: {horario}.', { dia: IDIOMA === 'en' ? tr(hoy) : tr(hoy).toLowerCase(), horario: texto(deHoy.texto) }) : 'Este es nuestro horario:',
           listaHtml(dias.map(function (x) { return tr(x.dia) + ': ' + texto(x.texto); }))],
-        acciones: [accion('Reservar mesa', function () { cerrarPanel(); abrir(modalReserva); })]
+        acciones: [accion('Reservar mesa', function () { preguntar('Reservar mesa'); })]
       };
     }
     function donde() {
@@ -4852,12 +4852,6 @@
       return {
         partes: [t('Estamos en {direccion}. ¡Te esperamos!', { direccion: dir })],
         acciones: [enlace('Cómo llegar', 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('SOÑO ' + dir), true)]
-      };
-    }
-    function reservar() {
-      return {
-        partes: ['Puedes reservar mesa aquí mismo: eliges el día, la hora y la zona, y listo. Sin reserva también eres bienvenido.'],
-        acciones: [accion('Reservar mesa', function () { cerrarPanel(); abrir(modalReserva); })]
       };
     }
     function llevar() {
@@ -4959,6 +4953,380 @@
       };
     }
 
+    /* ---- Reservar mesa hablando con Soñito ----
+       Pregunta lo que falta (personas, día, hora, zona, nombre y teléfono) y entiende frases como
+       «mesa para 4 mañana a las 10» en castellano, gallego o inglés. Antes de reservar enseña un
+       resumen y solo envía la reserva si se confirma, con la misma API que el formulario. */
+    var reserva = null;
+    var MAX_PERSONAS = 8;
+    var NUMEROS = {
+      un: 1, uno: 1, una: 1, unha: 1, one: 1, dos: 2, dous: 2, duas: 2, two: 2, tres: 3, three: 3, cuatro: 4, catro: 4, four: 4,
+      cinco: 5, five: 5, seis: 6, six: 6, siete: 7, sete: 7, seven: 7, ocho: 8, oito: 8, eight: 8, nueve: 9, nove: 9, nine: 9,
+      diez: 10, dez: 10, ten: 10, once: 11, eleven: 11, doce: 12, twelve: 12, trece: 13, catorce: 14, quince: 15, veinte: 20
+    };
+    var NUM = '(\\d{1,2}|' + Object.keys(NUMEROS).join('|') + ')';
+    function numero(x) { return /^\d+$/.test(x) ? Number(x) : NUMEROS[x]; }
+    var SEMANA = [/\b(domingo|sunday)\b/, /\b(lunes|luns|monday)\b/, /\b(martes|tuesday)\b/, /\b(miercoles|mercores|wednesday)\b/,
+      /\b(jueves|xoves|thursday)\b/, /\b(viernes|venres|friday)\b/, /\b(sabado|saturday)\b/];
+    var MESES = /\b(enero|xaneiro|january|febrero|febreiro|february|marzo|march|abril|april|mayo|maio|may|junio|xuno|june|julio|xullo|july|agosto|august|septiembre|setiembre|setembro|september|octubre|outubro|october|noviembre|novembro|november|diciembre|decembro|december)\b/;
+    var MES_NUM = { enero: 0, xaneiro: 0, january: 0, febrero: 1, febreiro: 1, february: 1, marzo: 2, march: 2, abril: 3, april: 3, mayo: 4, maio: 4, may: 4,
+      junio: 5, xuno: 5, june: 5, julio: 6, xullo: 6, july: 6, agosto: 7, august: 7, septiembre: 8, setiembre: 8, setembro: 8, september: 8,
+      octubre: 9, outubro: 9, october: 9, noviembre: 10, novembro: 10, november: 10, diciembre: 11, decembro: 11, december: 11 };
+
+    function plano(s) {
+      return ' ' + sinAcentos(s).replace(/(\d)[.h](\d\d)\b/g, '$1:$2').replace(/[¿?¡!.,;()«»"'“”‘’]/g, ' ').replace(/\s+/g, ' ').trim() + ' ';
+    }
+    function quitar(q, m) { return q.slice(0, m.index) + ' ' + q.slice(m.index + m[0].length); }
+    function fechaDe(i) { return new Date(fechas[i] + 'T12:00:00'); }
+    function mayuscula(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+    function etiquetaDia(i) {
+      if (i === 0) return mayuscula(t('hoy'));
+      if (i === 1) return mayuscula(t('mañana'));
+      var d = fechaDe(i);
+      return mayuscula(sinPunto(fCorto.format(d))) + ' ' + d.getDate();
+    }
+    function horasLibres(i) {
+      var h = estado.horario || {};
+      var todas = [].concat(Array.isArray(h.manana) ? h.manana : [], Array.isArray(h.tarde) ? h.tarde : [])
+        .filter(function (x, n, a) { return RE_HORA.test(x) && a.indexOf(x) === n; }).sort();
+      if (i === 0) {
+        var ahora = new Date();
+        var limite = ahora.getHours() * 60 + ahora.getMinutes() + 10;
+        todas = todas.filter(function (x) { return minutos(x) >= limite; });
+      }
+      return todas;
+    }
+    function deFranja(x, franja) {
+      var h = estado.horario || {};
+      var manana = Array.isArray(h.manana) ? h.manana : [];
+      return franja === 'manana' ? manana.indexOf(x) !== -1 : manana.indexOf(x) === -1;
+    }
+    /* Si en el horario ese día pone «Cerrado», no se puede reservar */
+    function diaCerrado(i) {
+      var nombre = DIAS_SEMANA[(fechaDe(i).getDay() + 6) % 7];
+      var d = ((estado.horario && estado.horario.dias) || []).filter(function (x) { return x.dia === nombre; })[0];
+      return d && /(cerrad|pechad|closed|descanso)/i.test(d.texto || '') ? nombre : '';
+    }
+
+    /* ---- Entender cada dato ---- */
+    function sacarFranja(q) {
+      var m = /\b(por la manana|de la manana|esta manana|pola mana|da mana|esta mana|in the morning|this morning|morning)\b/.exec(q);
+      if (m) return { valor: 'manana', hoy: /esta|this/.test(m[0]), resto: quitar(q, m) };
+      m = /\b(por la tarde|de la tarde|esta tarde|pola tarde|da tarde|in the afternoon|this afternoon|this evening|tonight|afternoon|evening)\b/.exec(q);
+      if (m) return { valor: 'tarde', hoy: /esta|this|tonight/.test(m[0]), resto: quitar(q, m) };
+      return null;
+    }
+    function sacarHora(q, esperada) {
+      var m;
+      var res = null;
+      if ((m = /\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/.exec(q))) res = { h: +m[1], m: +m[2], ampm: m[3] || '' };
+      else if ((m = new RegExp('\\bhalf past ' + NUM + '\\b').exec(q))) res = { h: numero(m[1]), m: 30, ampm: '' };
+      else if ((m = new RegExp('\\b(?:a las|a la|as|at|sobre las|hacia las|cara as|arredor das|around|about)\\s+' + NUM + '(?:\\s+(?:y|e|and)\\s+(media|cuarto|a half|half))?(?:\\s*(am|pm|h)\\b)?').exec(q))) {
+        res = { h: numero(m[1]), m: m[2] === 'cuarto' ? 15 : m[2] ? 30 : 0, ampm: m[3] === 'h' ? '' : (m[3] || '') };
+      } else if ((m = new RegExp('\\b' + NUM + '\\s*(am|pm|h)\\b').exec(q))) res = { h: numero(m[1]), m: 0, ampm: m[2] === 'h' ? '' : m[2] };
+      else if ((m = /\b(mediodia|medio dia|midday|noon)\b/.exec(q))) res = { h: 12, m: 0, ampm: '' };
+      else if (esperada && (m = new RegExp('^\\s*' + NUM + '(?:\\s+(?:y|e|and)\\s+(media|cuarto))?\\s*$').exec(q))) res = { h: numero(m[1]), m: m[2] === 'cuarto' ? 15 : m[2] ? 30 : 0, ampm: '' };
+      if (!res || res.h > 23 || res.m > 59) return null;
+      res.resto = quitar(q, m);
+      return res;
+    }
+    /* La hora pedida, entre las libres de ese día: «a las 5» puede ser las 17:00 */
+    function resolverHora(pedida, libres) {
+      var cand = [];
+      if (pedida.ampm === 'pm' && pedida.h < 12) cand = [pedida.h + 12];
+      else if (pedida.ampm === 'am') cand = [pedida.h === 12 ? 0 : pedida.h];
+      else cand = pedida.h < 12 ? [pedida.h, pedida.h + 12] : [pedida.h];
+      var textos = cand.map(function (h) { return dos(h) + ':' + dos(pedida.m); });
+      var bien = textos.filter(function (x) { return libres.indexOf(x) !== -1; })[0];
+      if (bien) return { hora: bien };
+      // La más parecida de las que hay (la que caiga dentro del horario)
+      var base = textos.map(minutos);
+      var cerca = libres.slice().sort(function (a, b) {
+        var da = Math.min.apply(null, base.map(function (x) { return Math.abs(minutos(a) - x); }));
+        var db = Math.min.apply(null, base.map(function (x) { return Math.abs(minutos(b) - x); }));
+        return da - db;
+      });
+      var pedidaTexto = textos.filter(function (x) { return minutos(x) >= 7 * 60 && minutos(x) <= 22 * 60; })[0] || textos[0];
+      return { noLibre: pedidaTexto, cerca: cerca.slice(0, 4).sort() };
+    }
+    function sacarDia(q, esperado) {
+      var m;
+      if ((m = /\b(pasado manana|pasado mana|day after tomorrow)\b/.exec(q))) return { valor: 2, resto: quitar(q, m) };
+      if ((m = /\b(hoy|hoxe|today|tonight)\b/.exec(q))) return { valor: 0, resto: quitar(q, m) };
+      if ((m = /\b(manana|mana|tomorrow)\b/.exec(q))) return { valor: 1, resto: quitar(q, m) };
+      for (var w = 0; w < 7; w++) {
+        if ((m = SEMANA[w].exec(q))) {
+          for (var i = 0; i < fechas.length; i++) if (fechaDe(i).getDay() === w) return { valor: i, resto: quitar(q, m) };
+        }
+      }
+      var n = null, mes = null;
+      if ((m = /\b(\d{1,2})\/(\d{1,2})\b/.exec(q))) { n = +m[1]; mes = +m[2] - 1; }
+      else if ((m = new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:de|of)\\s+' + MESES.source.slice(2, -2) + '\\b').exec(q))) { n = +m[1]; mes = MES_NUM[m[2]]; }
+      else if ((m = /\b(?:el dia|el|dia|o dia|on the|the)\s+(\d{1,2})(?:st|nd|rd|th)?\b/.exec(q))) n = +m[1];
+      else if (esperado && (m = /^\s*(\d{1,2})\s*$/.exec(q))) n = +m[1];
+      if (n === null) return null;
+      for (var j = 0; j < fechas.length; j++) {
+        var d = fechaDe(j);
+        if (d.getDate() === n && (mes === null || d.getMonth() === mes)) return { valor: j, resto: quitar(q, m) };
+      }
+      return { fuera: true, resto: quitar(q, m) };
+    }
+    function sacarPersonas(q, esperado) {
+      var m = new RegExp('\\b(?:para|somos|seremos|imos|vamos a ser|we are|we re|party of|table for|mesa para|for)\\s+' + NUM + '\\b').exec(q) ||
+        new RegExp('\\b' + NUM + '\\s+(?:personas?|persoas?|people|persons?|pax|adultos|comensales|of us)\\b').exec(q) ||
+        (esperado ? new RegExp('^\\s*' + NUM + '\\s*$').exec(q) : null);
+      if (!m) return null;
+      return { valor: numero(m[1]), resto: quitar(q, m) };
+    }
+    var TIPO_PALABRAS = {
+      terraza: /\b(terraza|terrace|fuera|fora|outside|outdoors?|exterior)\b/,
+      lectura: /\b(lectura|reading|libros|books|leer|ler)\b/,
+      barra: /\b(barra|bar|counter)\b/,
+      mesas: /\b(interior|dentro|inside|indoors?)\b/
+    };
+    function sacarZona(q) {
+      var zonas = zonasActivas();
+      if (!zonas.length) return null;
+      if (/\b(donde sea|donde haya sitio|onde haxa sitio|onde sexa|da igual|me da igual|igual me da|cualquiera|calquera|indiferente|anywhere|wherever|no preference|doesnt matter|does not matter|dont mind|don t mind|i don t mind)\b/.test(q)) return { valor: '' };
+      var porNombre = zonas.filter(function (z) { var n = plano(z.nombre).trim(); return n && q.indexOf(' ' + n + ' ') !== -1; })[0];
+      if (porNombre) return { valor: porNombre.id };
+      var tipo = Object.keys(TIPO_PALABRAS).filter(function (k) { return TIPO_PALABRAS[k].test(q); })[0];
+      var deTipo = tipo ? zonas.filter(function (z) { return z.tipo === tipo; }) : [];
+      return deTipo.length === 1 ? { valor: deTipo[0].id } : null;
+    }
+    /* Lo que diga el mensaje: personas, día, hora, zona. «esperado» es el dato que se acaba de preguntar
+       (así un «4» suelto son personas, una hora o un día según la pregunta) */
+    function rellenar(original, esperado) {
+      var r = reserva;
+      var q = plano(original);
+      var antes = JSON.stringify(r);
+      var x = sacarFranja(q);
+      if (x) { r.franja = x.valor; if (x.hoy) r.dia = 0; q = x.resto; }
+      x = sacarHora(q, esperado === 'hora');
+      if (x) { r.horaPedida = { h: x.h, m: x.m, ampm: x.ampm }; r.hora = undefined; q = x.resto; }
+      x = sacarDia(q, esperado === 'dia');
+      if (x) { if (x.fuera) r.diaFuera = true; else r.dia = x.valor; q = x.resto; }
+      x = sacarPersonas(q, esperado === 'personas');
+      if (x) { r.personas = x.valor; q = x.resto; }
+      x = sacarZona(q);
+      if (x) r.zona = x.valor;
+      return JSON.stringify(r) !== antes;
+    }
+
+    /* ---- Preguntar lo que falta ---- */
+    function ponerEntrada(paso) {
+      entrada.type = paso === 'telefono' ? 'tel' : 'text';
+      entrada.setAttribute('autocomplete', paso === 'nombre' ? 'name' : paso === 'telefono' ? 'tel' : 'off');
+      entrada.placeholder = paso === 'nombre' ? t('Tu nombre') : paso === 'telefono' ? t('Tu teléfono') : t('Pregúntame algo…');
+    }
+    /* Botón de respuesta: se ve como si la persona lo hubiera escrito y se desactiva su fila */
+    function opcion(etiqueta, alElegir) {
+      return accion(etiqueta, function (e) {
+        var b = e.currentTarget;
+        var fila = b.closest('.asistente__acciones');
+        if (fila) fila.querySelectorAll('button').forEach(function (x) { x.disabled = true; });
+        if (!reserva) return;
+        burbuja('yo', b.textContent);
+        responder(alElegir() || preguntaReserva());
+      });
+    }
+    function notaPrivacidad() {
+      var p = nota('Usamos tu nombre y tu teléfono solo para gestionar la reserva.');
+      p.appendChild(document.createTextNode(' '));
+      var a = el('a', null, 'Política de privacidad');
+      a.href = ruta('/privacidad'); a.target = '_blank'; a.rel = 'noopener';
+      p.appendChild(a);
+      return p;
+    }
+    function preguntaReserva(intro) {
+      var r = reserva;
+      var partes = intro ? [intro] : [];
+      function preguntar_(paso, texto, acciones, extra) {
+        r.paso = paso;
+        ponerEntrada(paso);
+        return { partes: partes.concat(texto, extra || []), acciones: acciones };
+      }
+      // Personas
+      if (r.personas > MAX_PERSONAS) {
+        reserva = null;
+        ponerEntrada();
+        return contacto(t('Para más de {n} personas, escríbenos y lo organizamos:', { n: MAX_PERSONAS }));
+      }
+      if (!(r.personas >= 1)) {
+        var nums = [];
+        for (var n = 1; n <= MAX_PERSONAS; n++) (function (n) { nums.push(opcion(String(n), function () { r.personas = n; })); })(n);
+        return preguntar_('personas', '¿Para cuántas personas?', nums, [nota('Para grupos de más de 8, escríbenos y lo organizamos.')]);
+      }
+      // Día
+      if (r.diaFuera) { r.diaFuera = false; partes.push('Solo puedo reservar para los próximos 7 días.'); }
+      if (r.dia !== undefined && diaCerrado(r.dia)) {
+        var nombreDia = tr(diaCerrado(r.dia));
+        partes.push(t('El {dia} cerramos. ¿Te va bien otro día?', { dia: IDIOMA === 'en' ? nombreDia : nombreDia.toLowerCase() }));
+        r.dia = undefined;
+      }
+      if (r.dia !== undefined && !horasLibres(r.dia).length) {
+        partes.push(r.dia === 0 ? 'Para hoy ya no quedan horas libres. ¿Otro día?' : 'Para ese día no quedan horas libres. ¿Otro día?');
+        r.dia = undefined;
+      }
+      if (r.dia === undefined) {
+        var botonesDias = [];
+        fechas.forEach(function (f, i) {
+          if (diaCerrado(i) || !horasLibres(i).length) return;
+          botonesDias.push(opcion(etiquetaDia(i), function () { r.dia = i; }));
+        });
+        if (!botonesDias.length) { reserva = null; ponerEntrada(); return contacto('Ahora mismo no se puede reservar desde la web. Si quieres, pregúntanos:'); }
+        var ultima = partes[partes.length - 1];
+        return preguntar_('dia', typeof ultima === 'string' && /\?\s*$/.test(ultima) ? '' : '¿Qué día?', botonesDias);
+      }
+      // Hora
+      var libres = horasLibres(r.dia);
+      if (r.hora && libres.indexOf(r.hora) === -1) { r.horaPedida = null; partes.push(t('A las {hora} no tenemos mesa ese día.', { hora: r.hora })); r.hora = undefined; }
+      if (r.horaPedida) {
+        var x = resolverHora(r.horaPedida, libres);
+        r.horaPedida = null;
+        if (x.hora) r.hora = x.hora;
+        else partes.push(t('A las {hora} no tenemos mesa ese día.', { hora: x.noLibre }));
+      }
+      if (!r.hora) {
+        var lista = r.franja ? libres.filter(function (h) { return deFranja(h, r.franja); }) : libres;
+        if (!lista.length) lista = libres;
+        return preguntar_('hora', '¿A qué hora? Estas son las horas libres:', lista.map(function (h) { return opcion(h, function () { r.hora = h; }); }));
+      }
+      // Zona (si el local tiene zonas para elegir)
+      var zonas = zonasActivas();
+      if (r.zona === undefined && zonas.length) {
+        return preguntar_('zona', '¿Dónde te gustaría sentarte?', zonas.map(function (z) { return opcion(z.nombre, function () { r.zona = z.id; }); })
+          .concat(opcion('Donde haya sitio', function () { r.zona = ''; })));
+      }
+      if (r.zona && !nombreZona(r.zona)) r.zona = '';
+      // Nombre y teléfono
+      if (!r.nombre) {
+        var sugerido = socio && socio.nombre ? [opcion(socio.nombre, function () { r.nombre = socio.nombre; if (!r.telefono && socio.telefono) r.telefono = socio.telefono; })] : [];
+        sugerido.forEach(function (b) { b.setAttribute('translate', 'no'); });
+        return preguntar_('nombre', '¿A nombre de quién la pongo?', sugerido);
+      }
+      if (!r.telefono) return preguntar_('telefono', '¿Y un teléfono por si tenemos que avisarte?', [], [notaPrivacidad()]);
+      // Resumen
+      r.paso = 'confirmar';
+      ponerEntrada();
+      var filas = [t('Mesa para {personas}', { personas: textoPersonas(r.personas) }), mayuscula(dias[r.dia]), t('A las {hora}', { hora: r.hora })];
+      if (zonas.length) filas.push(t('Zona: {zona}', { zona: r.zona ? nombreZona(r.zona) : t('Donde haya sitio') }));
+      filas.push(t('A nombre de {nombre}', { nombre: r.nombre }), t('Teléfono: {tel}', { tel: r.telefono }));
+      var resumen = listaHtml(filas);
+      resumen.setAttribute('translate', 'no');
+      return {
+        partes: partes.concat('Te lo resumo:', resumen, '¿La reservo?'),
+        acciones: [opcion('Sí, reservar', function () { return enviarReserva(); }), opcion('Cambiar algo', function () { return queCambiar(); }),
+          opcion('Cancelar', function () { return cancelarReserva(); })]
+      };
+    }
+    function queCambiar() {
+      var r = reserva;
+      r.paso = 'cambiar';
+      var acc = [
+        opcion('Personas', function () { r.personas = undefined; }),
+        opcion('Día', function () { r.dia = undefined; }),
+        opcion('Hora', function () { r.hora = undefined; r.horaPedida = null; })
+      ];
+      if (zonasActivas().length) acc.push(opcion('Zona', function () { r.zona = undefined; }));
+      acc.push(opcion('Nombre', function () { r.nombre = ''; }), opcion('Teléfono', function () { r.telefono = ''; }));
+      return { partes: ['¿Qué quieres cambiar?'], acciones: acc };
+    }
+    function cancelarReserva() {
+      reserva = null;
+      ponerEntrada();
+      return { partes: ['Vale, la dejo. Si quieres reservar más tarde, aquí estoy.'] };
+    }
+    function reservar(original) {
+      if (!horasLibres(0).length && !horasLibres(1).length && !horasLibres(2).length && !horasLibres(3).length) {
+        return contacto('Ahora mismo no se puede reservar desde la web. Si quieres, pregúntanos:');
+      }
+      reserva = { paso: null, personas: undefined, dia: undefined, hora: undefined, zona: undefined, nombre: '', telefono: '' };
+      if (socio && socio.nombre) { reserva.nombre = socio.nombre; if (socio.telefono) reserva.telefono = socio.telefono; }
+      if (original) rellenar(original);
+      var r = preguntaReserva('¡Claro! Te la reservo yo.');
+      if (reserva) r.acciones = (r.acciones || []).concat(accion('Prefiero el formulario', function () { reserva = null; ponerEntrada(); cerrarPanel(); abrir(modalReserva); }));
+      return r;
+    }
+    /* Lo que se escribe mientras se está reservando */
+    function pasoReserva(original) {
+      var r = reserva;
+      var q = plano(original);
+      if (/\b(cancelar|cancela|cancel|dejalo|deixao|deixalo|olvidalo|esquece|esqueceo|no quiero|non quero|forget it|never ?mind|stop)\b/.test(q)) return cancelarReserva();
+      var p = r.paso;
+      if (p === 'confirmar') {
+        if (/^ (si|vale|ok|okay|yes|yep|yeah|sure|claro|perfecto|correcto|confirmar|confirmo|confirm|reservar|reserva|reservala|adelante|dale|venga|de acordo|dacordo|go ahead|book it)\b/.test(q)) return enviarReserva();
+        if (rellenar(original)) return preguntaReserva('Hecho, lo cambio.');
+        if (/\b(no|non|cambiar|cambia|change|modificar|corregir|corrixir)\b/.test(q)) return queCambiar();
+      } else if (p === 'nombre' && original.indexOf('?') === -1) {
+        var tel = /\+?\d[\d\s-]{7,}\d/.exec(original);
+        if (tel && tel[0].replace(/\D/g, '').length >= 9) { r.telefono = tel[0].trim(); original = original.replace(tel[0], ' '); }
+        var nom = original.replace(/^\s*(me llamo|soy|a nombre de|mi nombre es|my name is|i am|i'm|it's|its|ch[aá]mome|son|o meu nome [eé]|a nome de|under the name|under)\s+/i, '')
+          .replace(/[,.;:]+\s*$/, '').replace(/\s+/g, ' ').trim().slice(0, 60);
+        if (nom.length >= 2) { r.nombre = nom; return preguntaReserva(); }
+      } else if (p === 'telefono') {
+        var digitos = original.replace(/\D/g, '');
+        if (digitos.length >= 9 && digitos.length <= 15) { r.telefono = original.replace(/[^\d+\s-]/g, '').trim(); return preguntaReserva(); }
+        if (/\d/.test(original)) return preguntaReserva('Revisa el teléfono: necesitamos al menos 9 cifras para avisarte.');
+      } else if (p === 'cambiar') {
+        if (rellenar(original)) return preguntaReserva('Hecho, lo cambio.');
+        var campos = [['personas', /\b(personas?|persoas?|people|gente|cuantos|cantos|how many)\b/], ['dia', /\b(dia|day|fecha|data|date)\b/],
+          ['hora', /\b(hora|time)\b/], ['zona', /\b(zona|area|sitio|mesa|table|seat)\b/], ['nombre', /\b(nombre|nome|name)\b/], ['telefono', /\b(telefono|phone|movil|mobil|number|numero)\b/]];
+        var campo = campos.filter(function (c) { return c[1].test(q); })[0];
+        if (campo) {
+          if (campo[0] === 'nombre' || campo[0] === 'telefono') r[campo[0]] = ''; else r[campo[0]] = undefined;
+          if (campo[0] === 'hora') r.horaPedida = null;
+          return preguntaReserva();
+        }
+        return queCambiar();
+      } else if (p === 'zona') {
+        var z = sacarZona(q);
+        if (z) { r.zona = z.valor; return preguntaReserva(); }
+        if (rellenar(original)) return preguntaReserva();
+      } else if (rellenar(original, p)) {
+        return preguntaReserva();
+      }
+      // No era un dato de la reserva: puede ser otra pregunta («¿qué horario tenéis?»)
+      var otra = entender(original, true);
+      if (otra && !otra.reserva && !otra.desconocida) {
+        otra.acciones = (otra.acciones || []).concat(accion('Seguir con la reserva', function () {
+          if (reserva) responder(preguntaReserva());
+        }));
+        return otra;
+      }
+      return preguntaReserva('No te he entendido.');
+    }
+    function enviarReserva() {
+      var r = reserva;
+      if (!r) return null;
+      r.paso = 'enviando';
+      var inicio = Date.now();
+      var datos = { fecha: fechas[r.dia], hora: r.hora, personas: r.personas, zona: r.zona || '', nombre: r.nombre, telefono: r.telefono, notas: '', web: '' };
+      api('POST', '/api/reservas', datos).then(function () {
+        var zona = r.zona ? nombreZona(r.zona) : '';
+        var hecho = zona
+          ? t('¡Reservado! Mesa para {personas}, {dia} a las {hora} ({zona}).', { personas: textoPersonas(r.personas), dia: dias[r.dia], hora: r.hora, zona: zona })
+          : t('¡Reservado! Mesa para {personas}, {dia} a las {hora}.', { personas: textoPersonas(r.personas), dia: dias[r.dia], hora: r.hora });
+        reserva = null;
+        ponerEntrada();
+        setTimeout(function () {
+          burbuja('bot', [hecho, t('Te esperamos, {nombre}.', { nombre: r.nombre.split(' ')[0] }), nota('Si surge cualquier problema, te llamaremos. Para cambiarla o cancelarla, escríbenos.')]);
+        }, Math.max(0, 900 - (Date.now() - inicio)));
+      }).catch(function (err) {
+        setTimeout(function () {
+          if (!reserva) return;
+          if (/hora|zona/i.test(err.message) && err.status === 400) {
+            if (/hora/i.test(err.message)) r.hora = undefined; else r.zona = undefined;
+            responder(preguntaReserva(err.message));
+            return;
+          }
+          r.paso = 'confirmar';
+          burbuja('bot', [err.message], [opcion('Intentarlo otra vez', function () { return enviarReserva(); }), opcion('Cancelar', function () { return cancelarReserva(); })]);
+        }, Math.max(0, 900 - (Date.now() - inicio)));
+      });
+      return { partes: ['Un momento, te la reservo…'] };
+    }
+
     /* ---- Entender la pregunta ---- */
     /* Palabras en castellano, gallego e inglés */
     var PALABRAS_ALERGENOS = [
@@ -4991,9 +5359,12 @@
       if (puntos < 100 && empatados.length > 1) return { varios: empatados };
       return mejor;
     }
-    function entender(original) {
+    function entender(original, enReserva) {
       var q = ' ' + norm(original) + ' ';
       if (!q.trim()) return ayuda();
+      // Quiere reservar: Soñito se la hace (con lo que ya diga el mensaje: personas, día, hora…)
+      var quiereReservar = /(reserv|\bbook|table for|mesa para|una mesa|unha mesa|a table|\d+ (personas|persoas|people)\b)/.test(q);
+      if (quiereReservar) return enReserva ? { reserva: true } : reservar(original);
       if (/ (hola|buenas|buenos dias|buenas tardes|ola|boas|bos dias|boas tardes|hello|hi|hey|ey|good morning|good afternoon) /.test(q) && q.trim().split(' ').length <= 3) {
         return ayuda('¡Hola! ☕ ¿En qué te ayudo? Pregúntame por el horario, la carta, los alérgenos, reservas o pedidos.');
       }
@@ -5017,11 +5388,13 @@
       if (/(vegan|vegetarian|vexetarian)/.test(q)) return contacto('Eso no lo tenemos marcado en la carta todavía. Pregúntanos y te decimos qué puedes tomar:');
       if (/(horario|hora|abr(is|e|en|ir)|cerr|abierto|aberto|pech|cuando|cando|opening|\bopen\b|close|hours|when)/.test(q)) return horario();
       if (/(donde|onde|where|direcci|enderezo|address|ubica|locat|llegar|chegar|get there|calle|\brua\b|street|mapa|\bmap\b|esta(is|n) )/.test(q)) return donde();
-      if (/(reserv|mesa|\bbook|table)/.test(q)) return reservar();
+      if (/(\bmesa\b|\btable\b)/.test(q)) return enReserva ? { reserva: true } : reservar(original);
       if (/(llevar|levar|pedido|pedir|\border|takeaway|take away|domicilio|envi|recoger|recoller|deliver|pick up)/.test(q)) return llevar();
       if (/(club|sello|selo|stamp|socio|member|tarjeta|tarxeta|\bcard|premio|reward|puntos|points)/.test(q)) return clubInfo();
       if (/(carta|menu|precio|prezo|price|cuesta|custa|\bcost|cuanto|canto|how much|vale|comer|\beat|desayun|almorz|breakfast|beber|drink|cafe|coffee)/.test(q)) return carta();
-      return contacto('Uy, eso no lo sé 😅. Pregúntame por el horario, la carta, los alérgenos, reservas o pedidos. O habla directamente con nosotros:');
+      var noSe = contacto('Uy, eso no lo sé 😅. Pregúntame por el horario, la carta, los alérgenos, reservas o pedidos. O habla directamente con nosotros:');
+      noSe.desconocida = true;
+      return noSe;
     }
 
     /* ---- Panel ---- */
@@ -5032,7 +5405,7 @@
       escrito = !!aMano;
       burbuja('yo', q);
       escrito = false;
-      responder(entender(q));
+      responder(reserva ? pasoReserva(q) : entender(q));
     }
     function pintarChips() {
       chips.innerHTML = '';
@@ -5056,7 +5429,7 @@
       pintarChips();
       if (!empezado) {
         empezado = true;
-        burbuja('bot', [t('¡Hola! Soy {nombre}, el ayudante de SOÑO ☕', { nombre: a.nombre }), 'Pregúntame por el horario, la carta, los alérgenos, las reservas o los pedidos, o toca una de las preguntas de abajo.']);
+        burbuja('bot', [t('¡Hola! Soy {nombre}, el ayudante de SOÑO ☕', { nombre: a.nombre }), 'Pregúntame por el horario, la carta o los alérgenos, o dime «reserva mesa para 2 mañana a las 10» y te la reservo. También puedes tocar una de las preguntas de abajo.']);
       }
       if (!tactil) entrada.focus(); else $('asistente-cerrar').focus();
     }
