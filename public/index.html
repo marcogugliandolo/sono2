@@ -27,6 +27,9 @@
     <symbol id="i-zona-terraza" viewBox="0 0 120 60"><path class="trazo zona__tono" d="M22 20 Q48 2 74 20 Q67.5 23 61 20 Q54.5 23 48 20 Q41.5 23 35 20 Q28.5 23 22 20 Z"/><path class="trazo" d="M22 20 Q48 2 74 20 Q67.5 23 61 20 Q54.5 23 48 20 Q41.5 23 35 20 Q28.5 23 22 20 Z"/><path class="trazo" d="M48 8 V55"/><path class="trazo" d="M36 38 H60 M40 38 L38 55 M56 38 L58 55"/><path class="trazo" d="M18 26 Q15 36 19 42 H30 M21 42 L19 55 M28 42 L30 55"/><path class="trazo" d="M78 26 Q81 36 77 42 H66 M75 42 L77 55 M68 42 L66 55"/><path class="trazo" d="M95 41 H111 L108 55 H98 Z"/><path class="trazo" d="M103 41 Q96 32 98 22 Q105 30 103 41 Q106 30 113 26 Q114 36 103 41"/><circle class="trazo" cx="104" cy="9" r="4.5"/><path class="trazo" d="M104 1 V2.5 M111.5 9 H113 M95 9 H96.5 M109.3 3.7 L110.4 2.6 M98.7 3.7 L97.6 2.6"/><path class="trazo" d="M4 56 H116"/></symbol>
     <symbol id="i-zona-lectura" viewBox="0 0 120 60"><path class="trazo" d="M12 52 V15 Q14 7 22 7"/><path class="trazo" d="M18 7 H30 L27 14 H21 Z"/><path class="trazo zona__tono" d="M22 15 L17 26 H31 L26 15 Z"/><path class="trazo" d="M7 54 H17"/><path class="trazo" d="M38 30 V18 Q38 12 44 12 H60 Q66 12 66 18 V30"/><path class="trazo" d="M33 29 Q38 27 40 32 V44 H64 V32 Q66 27 71 29 V48 H33 Z"/><path class="trazo zona__tono" d="M40 36 H64 V44 H40 Z"/><path class="trazo" d="M36 48 V54 M68 48 V54"/><path class="trazo" d="M82 9 H114 V55 H82 Z M82 24 H114 M82 39 H114"/><path class="trazo" d="M86 24 V13 M90 24 V15 M94 24 V12 M99 24 L104 15 M108 24 V14"/><path class="trazo" d="M86 39 V29 M91 39 V27 M95 39 V30 M101 39 V28 M106 39 V30 M110 39 V27"/><path class="trazo zona__tono" d="M86 55 V45 H96 V55 Z"/><path class="trazo" d="M100 49 H110"/><path class="trazo" d="M4 56 H116"/></symbol>
     <symbol id="i-zona-barra" viewBox="0 0 120 60"><path class="trazo" d="M6 28 H74 V32 H6 Z"/><path class="trazo" d="M9 32 V55 H71 V32"/><path class="trazo zona__tono" d="M9 32 H71 V37 H9 Z"/><path class="trazo" d="M15 28 V12 H37 V28"/><path class="trazo" d="M15 17 H37"/><path class="trazo" d="M22 17 V21 H30 V17"/><path class="trazo" d="M24 25 V28 H28 V25"/><path class="trazo" d="M46 28 V23 H52 V28 M50.5 24 Q54 24 53 26.5"/><path class="trazo" d="M58 28 V21 H64 V28"/><path class="trazo" d="M45 0 V6 M41 10 Q41 6 45 6 Q49 6 49 10 Z"/><path class="trazo" d="M82 34 H96 M89 34 V55 M84 55 H94 M85 46 H93"/><path class="trazo" d="M100 34 H114 M107 34 V55 M102 55 H112 M103 46 H111"/><path class="trazo" d="M4 56 H116"/></symbol>
+    <symbol id="bandera-es" viewBox="0 0 3 2"><rect width="3" height="2" fill="#AA151B"/><rect y="0.5" width="3" height="1" fill="#F1BF00"/></symbol>
+    <symbol id="bandera-gl" viewBox="0 0 3 2"><rect width="3" height="2" fill="#FFFFFF"/><path d="M-0.2 -0.13 L3.2 2.13" stroke="#0099CC" stroke-width="0.5"/></symbol>
+    <symbol id="bandera-en" viewBox="0 0 60 40" preserveAspectRatio="xMidYMid slice"><clipPath id="bandera-en-recorte"><path d="M30 20 h30 v20 z v20 h-30 z h-30 v-20 z v-20 h30 z"/></clipPath><rect x="-10" y="-5" width="80" height="50" fill="#012169"/><path d="M0 0 L60 40 M60 0 L0 40" stroke="#FFFFFF" stroke-width="8"/><path d="M0 0 L60 40 M60 0 L0 40" clip-path="url(#bandera-en-recorte)" stroke="#C8102E" stroke-width="5"/><path d="M30 0 v40 M0 20 h60" stroke="#FFFFFF" stroke-width="12"/><path d="M30 0 v40 M0 20 h60" stroke="#C8102E" stroke-width="7"/></symbol>
     <symbol id="i-grano" viewBox="0 0 40 40">
       <path class="trazo" d="M20 5 C30 5 35 14 33 23 C31 32 23 36 16 34 C8 32 5 24 7 16 C9 9 14 5 20 5 Z"/>
       <path class="trazo" d="M19 6 C26 13 13 22 21 34"/>
@@ -216,15 +219,16 @@
       <li data-menu="resenas" data-resenas><a href="#resenas">Reseñas</a></li>
       <li data-menu="contacto"><a href="#contacto">Visítanos</a></li>
     </ul>
+    <!-- Idioma: justo después del menú, con bandera y nombre -->
+    <div class="idioma-movil" translate="no" role="group" aria-label="Idioma · Lingua · Language">
+      <a data-idioma="es" href="#" lang="es"><svg class="bandera" aria-hidden="true"><use href="#bandera-es"/></svg>Castellano</a>
+      <a data-idioma="gl" href="#" lang="gl"><svg class="bandera" aria-hidden="true"><use href="#bandera-gl"/></svg>Galego</a>
+      <a data-idioma="en" href="#" lang="en"><svg class="bandera" aria-hidden="true"><use href="#bandera-en"/></svg>English</a>
+    </div>
   </nav>
   <div class="menu-movil__pie">
     <a class="boton boton--lleno boton--ancho" href="#reservar" data-abrir-reserva>Reservar mesa</a>
     <p class="meta" data-texto="portada.etiqueta">Café · Desayunos · Buenos ratos</p>
-    <div class="idioma-movil" translate="no" role="group" aria-label="Idioma · Lingua · Language">
-      <a data-idioma="es" href="#" lang="es">Castellano</a>
-      <a data-idioma="gl" href="#" lang="gl">Galego</a>
-      <a data-idioma="en" href="#" lang="en">English</a>
-    </div>
   </div>
 </div>
 

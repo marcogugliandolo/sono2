@@ -306,6 +306,7 @@ html.menu-abierto { overflow: hidden; }
   .menu-movil:not([hidden]) li:nth-child(7) { animation-delay: 0.24s; }
   .menu-movil:not([hidden]) li:nth-child(8) { animation-delay: 0.28s; }
   .menu-movil:not([hidden]) li:nth-child(9) { animation-delay: 0.32s; }
+  .menu-movil:not([hidden]) .idioma-movil { animation: subir 0.45s var(--suave) 0.3s both; }
   .menu-movil:not([hidden]) .menu-movil__pie { animation: subir 0.45s var(--suave) 0.18s both; }
 }
 .menu ul {
@@ -376,16 +377,39 @@ html.menu-abierto { overflow: hidden; }
 }
 .idioma__lista a:hover { background: var(--beige-suave); }
 .idioma__lista a[aria-current]::after { content: "✓"; font-size: 0.8rem; color: var(--cafe-suave); }
+/* Móvil: después del menú, tres botones con bandera y nombre; el elegido, en marrón */
 .idioma-movil {
   display: flex;
-  justify-content: center;
-  gap: 4px 18px;
   flex-wrap: wrap;
-  font-size: 0.85rem;
-  color: var(--cafe-suave);
+  gap: 8px;
+  margin-top: 20px;
 }
-.idioma-movil a { padding: 6px 2px; text-underline-offset: 4px; }
-.idioma-movil a[aria-current] { color: var(--cafe); font-weight: 600; text-decoration: underline; }
+.menu-movil__nav .idioma-movil a {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--linea-fuerte);
+  border-radius: var(--r-boton);
+  background: var(--superficie);
+  font-family: var(--f-cuerpo);
+  font-size: 0.875rem;
+  line-height: 1.2;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.menu-movil__nav .idioma-movil a::after { content: none; }
+.menu-movil__nav .idioma-movil a[aria-current] { background: var(--cafe); border-color: var(--cafe); color: var(--superficie); font-weight: 500; }
+.bandera { flex: none; width: 21px; height: 14px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(86, 41, 18, 0.18); overflow: hidden; }
+.idioma-movil a[aria-current] .bandera { box-shadow: 0 0 0 1px rgba(255, 253, 247, 0.5); }
+@media (max-width: 380px) {
+  .idioma-movil { gap: 6px; }
+  .menu-movil__nav .idioma-movil a { gap: 5px; padding-inline: 4px; font-size: 0.8125rem; }
+  .bandera { width: 18px; height: 12px; }
+}
 
 /* ---------- Portada ---------- */
 /* Portada centrada, como la plantilla: titular grande, botones y el dibujo debajo */
