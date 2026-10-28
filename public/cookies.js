@@ -110,7 +110,9 @@
   /* ---------- El aviso ---------- */
   var caja = null;
   var reducido = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var fCorta = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long' });
+  var I18N = window.sonoIdioma || null;   // en /gl y /en (idiomas.js se carga antes)
+  function t(x, v) { return I18N ? I18N.t(x, v) : String(x).replace(/\{(\w+)\}/g, function (m, k) { return v && k in v ? v[k] : m; }); }
+  var fCorta = I18N ? I18N.fecha({ day: 'numeric', month: 'long' }) : new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long' });
 
   function mostrar() {
     if (caja) return;
@@ -123,7 +125,7 @@
       '<div class="aviso-cookies__cuerpo">' +
         '<p class="aviso-cookies__titulo" id="aviso-cookies-titulo">Cookies, solo las justas</p>' +
         '<p class="aviso-cookies__texto">Usamos las técnicas, necesarias para que la web funcione. Las demás, solo si las aceptas. ' +
-          '<a class="aviso-cookies__enlace" href="/cookies">Más información</a></p>' +
+          '<a class="aviso-cookies__enlace" href="' + (I18N ? I18N.ruta('/cookies') : '/cookies') + '">Más información</a></p>' +
         (actual ? '<p class="aviso-cookies__actual"></p>' : '') +
         '<div class="aviso-cookies__acciones">' +
           '<button type="button" class="boton boton--lleno boton--mini aviso-cookies__boton" data-eleccion="aceptadas">Aceptar</button>' +
@@ -132,7 +134,7 @@
       '</div>';
     if (actual) {
       caja.querySelector('.aviso-cookies__actual').textContent =
-        'El ' + fCorta.format(new Date(actual.fecha)) + ' elegiste «' + (actual.eleccion === 'aceptadas' ? 'Aceptar' : 'Rechazar') + '».';
+        t(actual.eleccion === 'aceptadas' ? 'El {fecha} elegiste «Aceptar».' : 'El {fecha} elegiste «Rechazar».', { fecha: fCorta.format(new Date(actual.fecha)) });
     }
     caja.querySelectorAll('[data-eleccion]').forEach(function (b) {
       b.addEventListener('click', function () { elegir(b.getAttribute('data-eleccion')); });

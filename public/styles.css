@@ -320,6 +320,73 @@ html.menu-abierto { overflow: hidden; }
 }
 .menu a { display: inline-block; padding-block: 10px; white-space: nowrap; }
 
+/* ---------- Idioma ----------
+   En el ordenador, un botón pequeño al final del menú (globo + ES/GL/EN) que despliega los tres;
+   en el móvil, una fila discreta al pie del menú */
+.menu { display: flex; align-items: center; gap: 22px; }
+.idioma { position: relative; }
+.idioma__boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 4px;
+  list-style: none;
+  font-family: var(--f-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--cafe-suave);
+  cursor: pointer;
+  border-radius: var(--r-boton);
+  user-select: none;
+  transition: color 0.2s ease;
+}
+.idioma__boton::-webkit-details-marker { display: none; }
+.idioma__boton:hover, .idioma[open] .idioma__boton { color: var(--cafe); }
+.idioma__boton:focus-visible { outline: 2px solid var(--cafe); outline-offset: 2px; }
+.idioma__icono { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.4; }
+.idioma__lista, .menu .idioma__lista {
+  display: block;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 150px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-tarjeta);
+  box-shadow: 0 14px 30px -18px rgba(86, 41, 18, 0.45);
+  transform-origin: top right;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .idioma[open] .idioma__lista { animation: idioma-abre 0.18s var(--salida); }
+}
+@keyframes idioma-abre { from { opacity: 0; transform: scale(0.96) translateY(-4px); } }
+.idioma__lista a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--r-chip);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.idioma__lista a:hover { background: var(--beige-suave); }
+.idioma__lista a[aria-current]::after { content: "✓"; font-size: 0.8rem; color: var(--cafe-suave); }
+.idioma-movil {
+  display: flex;
+  justify-content: center;
+  gap: 4px 18px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: var(--cafe-suave);
+}
+.idioma-movil a { padding: 6px 2px; text-underline-offset: 4px; }
+.idioma-movil a[aria-current] { color: var(--cafe); font-weight: 600; text-decoration: underline; }
+
 /* ---------- Portada ---------- */
 /* Portada centrada, como la plantilla: titular grande, botones y el dibujo debajo */
 .portada { padding-block: clamp(48px, 8vw, 112px) clamp(56px, 8vw, 104px); }
@@ -2004,6 +2071,20 @@ input:checked:focus-visible + .zona { outline-color: var(--lienzo); }
 .textos-admin__fila { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
 .textos-admin__fila .acciones-mini { padding-bottom: 6px; }
 .textos-admin__grupo .campo, .textos-admin__menu > .admin__ayuda { max-width: 640px; }
+
+/* Panel · Idiomas: el texto en castellano y, debajo, gallego e inglés */
+.idiomas-admin__barra { flex-wrap: wrap; align-items: center; gap: 8px; }
+.idiomas-admin__barra [aria-pressed="true"] { background: var(--cafe); border-color: var(--cafe); color: var(--superficie); }
+.idiomas-admin__ver { margin-left: auto; font-size: 0.85rem; color: var(--cafe-suave); }
+.idiomas-admin__ver a { text-decoration: underline; text-underline-offset: 3px; }
+.idiomas-admin__grupo { gap: 0; }
+.idiomas-admin__grupo h3 { margin-bottom: 6px; }
+.idiomas-admin__fila { display: grid; gap: 10px; padding-block: 14px; border-top: 1px solid var(--linea); }
+.idiomas-admin__es p { margin: 2px 0 0; white-space: pre-line; }
+.idiomas-admin__que { font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--cafe-suave); }
+.idiomas-admin__campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 16px; }
+.idiomas-admin__campos textarea { min-height: 76px; }
+.idiomas-admin__falta label::after { content: " · sin traducir"; color: var(--alerta); font-weight: 400; }
 .textos-admin__grupo > .boton--mini, .textos-admin__menu > .boton--mini { justify-self: start; }
 /* Panel, pestaña Club: premio y sellos */
 .club-admin__tarjeta-form { display: grid; gap: 12px; max-width: 640px; }

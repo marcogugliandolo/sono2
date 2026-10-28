@@ -10,7 +10,7 @@ RUN apk add --no-cache tzdata
 
 WORKDIR /app
 
-COPY --chown=node:node package.json server.js wallet.js textos.js datos-iniciales.json ./
+COPY --chown=node:node package.json server.js wallet.js textos.js traducir.js datos-iniciales.json ./
 COPY --chown=node:node public ./public
 COPY --chown=node:node wallet ./wallet
 

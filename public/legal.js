@@ -13,10 +13,16 @@
     cookies: { titulo: 'Política de cookies', ruta: '/cookies' }
   };
   var RUTAS = { '/legal': 'aviso-legal', '/aviso-legal': 'aviso-legal', '/privacidad': 'privacidad', '/cookies': 'cookies' };
-  var fLarga = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  /* En gallego (/gl/…) e inglés (/en/…), idiomas.js traduce los textos; t() es para las frases con datos */
+  var I18N = window.sonoIdioma || null;
+  function t(x, v) { return I18N ? I18N.t(x, v) : String(x).replace(/\{(\w+)\}/g, function (m, k) { return v && k in v ? v[k] : m; }); }
+  function tr(x) { return I18N ? I18N.traducir(x) : x; }
+  function ruta(r) { return I18N ? I18N.ruta(r) : r; }
+  function pagina() { return RUTAS[location.pathname.replace(/^\/(gl|en)(?=\/)/, '').replace(/(.)\/$/, '$1')] || 'aviso-legal'; }
+  var fLarga = I18N ? I18N.fecha({ day: 'numeric', month: 'long', year: 'numeric' }) : new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 
   var d = {};                                          // datos de la web (Ajustes)
-  var actual = RUTAS[location.pathname] || 'aviso-legal';
+  var actual = pagina();
   var caja = document.getElementById('legal-texto');
   var titulo = document.getElementById('legal-titulo');
 
@@ -45,14 +51,14 @@
     return a;
   }
   function enlaceDoc(t, doc) {
-    var a = enlace(t, DOCS[doc].ruta);
+    var a = enlace(t, ruta(DOCS[doc].ruta));
     a.setAttribute('data-doc', doc);
     return a;
   }
   function falta() { return el('span', 'pendiente', 'Por completar'); }
   function dato(v) { return v ? document.createTextNode(v) : falta(); }
   function unir(cosas) {
-    return cosas.length < 2 ? cosas.join('') : cosas.slice(0, -1).join(', ') + ' y ' + cosas[cosas.length - 1];
+    return cosas.length < 2 ? cosas.join('') : cosas.slice(0, -1).join(', ') + t(' y ') + cosas[cosas.length - 1];
   }
   function tabla(filas) {
     var envoltorio = el('div', 'legal__tabla');
@@ -126,15 +132,15 @@
     if (h.resenas) cosas.push('dejar una reseña');
     cosas.push('escribirnos');
     if (h.empleo) cosas.push('mandarnos tu currículum');
-    f.appendChild(p('Esta web presenta la cafetería SOÑO: la carta, el horario y dónde estamos. Desde ella puedes ' + unir(cosas) + '.'));
+    f.appendChild(p(t('Esta web presenta la cafetería SOÑO: la carta, el horario y dónde estamos. Desde ella puedes {cosas}.', { cosas: unir(cosas.map(tr)) })));
 
     f.appendChild(h2('Condiciones de uso'));
     var condiciones = [
       'Úsala de buena fe: no envíes datos falsos ni datos de otras personas sin su permiso.',
-      (h.pedidos ? 'Las reservas y los pedidos dependen de que haya sitio y producto.' : 'Las reservas dependen de que haya sitio.') +
-        ' Si hay algún problema, te avisamos al teléfono que nos dejes.'
+      h.pedidos ? 'Las reservas y los pedidos dependen de que haya sitio y producto. Si hay algún problema, te avisamos al teléfono que nos dejes.'
+        : 'Las reservas dependen de que haya sitio. Si hay algún problema, te avisamos al teléfono que nos dejes.'
     ];
-    if (h.pedidos) condiciones.push('Los pedidos se pagan al recogerlos' + (h.domicilio ? ' o al recibirlos' : '') + '. La web no cobra nada ni pide datos de pago.');
+    if (h.pedidos) condiciones.push(h.domicilio ? 'Los pedidos se pagan al recogerlos o al recibirlos. La web no cobra nada ni pide datos de pago.' : 'Los pedidos se pagan al recogerlos. La web no cobra nada ni pide datos de pago.');
     condiciones.push('La carta, los precios y el horario pueden cambiar. Intentamos que la web esté siempre al día.');
     condiciones.push('La información de alérgenos de la carta es orientativa. Si tienes alguna alergia o intolerancia, pregúntanos antes de pedir.');
     if (h.club) condiciones.push('El Club SOÑO es gratis. Las condiciones de la tarjeta (cuántos sellos hacen falta y cuál es el premio) son las que se ven en la web en cada momento; si cambian, conservas los sellos que ya tengas.');
@@ -269,9 +275,10 @@
     f.appendChild(tabla([
       ['Nombre', 'Para qué sirve', 'Duración'],
       ['sono2_socio', 'Mantener abierta tu tarjeta del Club SOÑO después de entrar.', '120 días, o hasta que cierres la sesión'],
-      ['sono2_sesion', 'Mantener abierta la sesión del panel de gestión. Solo la tiene el equipo de SOÑO.', '12 horas']
+      ['sono2_sesion', 'Mantener abierta la sesión del panel de gestión. Solo la tiene el equipo de SOÑO.', '12 horas'],
+      ['sono2_idioma', 'Recordar el idioma que eliges en el menú (castellano, gallego o inglés). Solo se guarda si lo cambias.', 'Un año']
     ]));
-    f.appendChild(p('Las dos son propias (las pone esta web, no otra empresa) y técnicas.'));
+    f.appendChild(p('Las tres son propias (las pone esta web, no otra empresa) y técnicas: solo sirven para lo que tú mismo pides.'));
 
     f.appendChild(h2('Otros datos que guarda tu navegador'));
     f.appendChild(p('La web también guarda un par de datos en el almacenamiento local de tu navegador, que funciona de forma parecida:'));
@@ -326,11 +333,11 @@
   function mostrar(doc, soloCabecera) {
     actual = DOCS[doc] ? doc : 'aviso-legal';
     var info = DOCS[actual];
-    document.title = info.titulo + ' · SOÑO';
+    document.title = t('{titulo} · SOÑO', { titulo: tr(info.titulo) });
     titulo.textContent = info.titulo;
     var act = legal().actualizado;
     document.getElementById('legal-fecha').textContent = act
-      ? 'Última actualización: ' + fLarga.format(new Date(act + 'T12:00:00'))
+      ? t('Última actualización: {fecha}', { fecha: fLarga.format(new Date(act + 'T12:00:00')) })
       : '';
     document.querySelectorAll('.legal__nav a').forEach(function (a) {
       if (a.getAttribute('data-doc') === actual) a.setAttribute('aria-current', 'page');
@@ -338,6 +345,8 @@
     });
     if (soloCabecera) return;
     caja.innerHTML = '';
+    // En gallego e inglés, un aviso: la versión que vale es la de castellano
+    if (I18N) caja.appendChild(el('p', 'legal__aviso-idioma', 'Esta traducción es orientativa. Si hay alguna diferencia, vale la versión en castellano.'));
     caja.appendChild(CONSTRUIR[actual]());
   }
 
@@ -347,14 +356,14 @@
     e.preventDefault();
     var doc = a.getAttribute('data-doc');
     if (doc !== actual) {
-      history.pushState({ doc: doc }, '', DOCS[doc].ruta);
+      history.pushState({ doc: doc }, '', ruta(DOCS[doc].ruta));
       mostrar(doc);
     }
     window.scrollTo(0, 0);
     titulo.setAttribute('tabindex', '-1');
     titulo.focus({ preventScroll: true });
   });
-  window.addEventListener('popstate', function () { mostrar(RUTAS[location.pathname] || 'aviso-legal'); });
+  window.addEventListener('popstate', function () { mostrar(pagina()); });
 
   function irAlAncla() {
     if (!location.hash) return;

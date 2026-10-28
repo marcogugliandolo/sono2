@@ -15,6 +15,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { crearWallet } = require('./wallet');
 const textosWeb = require('./textos');
+const idiomas = require('./traducir');
 
 /* ---------- Configuración (variables de entorno) ---------- */
 const PUERTO = Number(process.env.PORT || 3000);
@@ -336,6 +337,7 @@ async function completarContenido() {
   if (!contenido.datos.empleo) { contenido.datos.empleo = Object.assign({}, EMPLEO_INICIAL); cambiado = true; }
   if (!contenido.datos.mes) { contenido.datos.mes = Object.assign({}, MES_INICIAL); cambiado = true; }
   if (!contenido.mes || !Array.isArray(contenido.mes.items)) { contenido.mes = mesInicial(contenido.carta); cambiado = true; }
+  if (!contenido.traducciones || typeof contenido.traducciones !== 'object') { contenido.traducciones = { gl: {}, en: {} }; cambiado = true; }
   // Secciones nuevas del menú (por ejemplo «Del mes»): entran en su sitio en un menú ya guardado
   const menuCompleto = textosWeb.completarMenu(contenido.textos.menu);
   if (JSON.stringify(menuCompleto) !== JSON.stringify(contenido.textos.menu)) { contenido.textos = Object.assign({}, contenido.textos, { menu: menuCompleto }); cambiado = true; }
@@ -582,10 +584,30 @@ function mesVisible() {
   return (contenido.mes.items || []).some((x) => x.nombre || (x.producto && contenido.carta.productos.some((p) => p.id === x.producto)));
 }
 
+/* ---------- Traducciones (pestaña «Idiomas» del panel) ----------
+   Por idioma, texto en castellano → traducción. Aquí solo van las que se escriben en el panel:
+   las que ya trae la web (public/idiomas/) no hace falta guardarlas. */
+const MAX_TRADUCCIONES = 3000;
+function validarTraducciones(v) {
+  const x = v && typeof v === 'object' ? v : {};
+  const limpio = {};
+  idiomas.OTROS.forEach((i) => {
+    const entrada = x[i] && typeof x[i] === 'object' ? x[i] : {};
+    const salida = {};
+    Object.keys(entrada).slice(0, MAX_TRADUCCIONES).forEach((es) => {
+      const valor = textoLargo(entrada[es], 1200);
+      if (es.trim() && es.length <= 1200 && valor) salida[es] = valor;
+    });
+    limpio[i] = salida;
+  });
+  return limpio;
+}
+
 const VALIDADORES = {
   carta: validarCarta, galeria: validarGaleria, horario: validarHorario, datos: validarDatos,
   textos: (v) => textosWeb.validarTextos(v, textosBase()),
-  mes: validarMes
+  mes: validarMes,
+  traducciones: validarTraducciones
 };
 
 /* ---------- Respuestas ---------- */
@@ -763,9 +785,52 @@ function textosBase() {
   }
   return indiceCache.base;
 }
-async function servirIndice(req, res, enCarta) {
+/* Traducciones escritas en el panel (pestaña «Idiomas») para un idioma */
+function traduccionesDe(idioma) {
+  const t = contenido && contenido.traducciones;
+  return (t && t[idioma]) || {};
+}
+
+/* La página en su idioma: <html lang>, los scripts de traducción, los enlaces con /gl o /en,
+   el selector de idioma del menú y las direcciones de las otras versiones para los buscadores */
+function prepararIdioma(req, html, idioma, resto) {
+  const propias = traduccionesDe(idioma);
+  if (idioma !== 'es') {
+    html = idiomas.traducirHtml(html, idioma, propias);
+    html = idiomas.prefijarEnlaces(html, idioma);
+    html = html.replace(/<html lang="es"/, '<html lang="' + idioma + '"')
+      .replace(/(<script src="\/(?:app|legal)\.js" defer><\/script>)/, '<script src="/idiomas/' + idioma + '.js" defer></script>\n<script src="/idiomas.js" defer></script>\n$1');
+  }
+  // Selector del menú: cada idioma apunta a esta misma página en ese idioma
+  html = html.replace(/(<a\b[^>]*\sdata-idioma=")(es|gl|en)("[^>]*?)\shref="[^"]*"/g, (t, a, cual, b) => {
+    return a + cual + b + ' href="' + idiomas.conIdioma(cual, resto) + '"' + (cual === idioma ? ' aria-current="true"' : '');
+  });
+  html = html.replace(/(<[^>]*\sdata-idioma-actual[^>]*>)[^<]*/g, '$1' + idiomas.CORTOS[idioma]);
+  const host = String(req.headers.host || '').replace(/[^\w.:-]/g, '');
+  if (host) {
+    const origen = (esHttps(req) ? 'https' : 'http') + '://' + host;
+    const alternativas = idiomas.IDIOMAS.map((i) => '<link rel="alternate" hreflang="' + i + '" href="' + origen + idiomas.conIdioma(i, resto) + '">')
+      .concat('<link rel="alternate" hreflang="x-default" href="' + origen + idiomas.conIdioma('es', resto) + '">');
+    html = html.replace('</head>', alternativas.join('\n') + '\n</head>');
+  }
+  return html;
+}
+function enviarHtml(req, res, html) {
+  const cuerpo = Buffer.from(html, 'utf8');
+  const etag = 'W/"' + crypto.createHash('sha1').update(cuerpo).digest('hex').slice(0, 20) + '"';
+  res.setHeader('ETag', etag);
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Vary', 'Cookie');
+  if (req.headers['if-none-match'] === etag) { res.writeHead(304); return res.end(); }
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': cuerpo.length });
+  res.end(req.method === 'HEAD' ? undefined : cuerpo);
+}
+
+async function servirIndice(req, res, enCarta, idioma) {
+  idioma = idioma || 'es';
   let html = await leerIndice();
-  html = textosWeb.aplicarAlHtml(html, contenido && contenido.textos, indiceCache.base, contenido && contenido.datos);
+  const tr = idioma === 'es' ? null : (s) => idiomas.traducir(idioma, s, traduccionesDe(idioma));
+  html = textosWeb.aplicarAlHtml(html, contenido && contenido.textos, indiceCache.base, contenido && contenido.datos, tr);
   // «Lo mejor del mes» y «Trabaja con nosotros» salen ya bien desde el servidor (así no aparecen ni desaparecen al cargar)
   if (mesVisible()) html = html.replace(/ data-mes hidden/g, ' data-mes');
   if (contenido && ajustesEmpleo().activo === false) html = html.replace(/ data-empleo(?=[ >])/g, ' data-empleo hidden');
@@ -777,13 +842,13 @@ async function servirIndice(req, res, enCarta) {
     html = html.replace('<html lang="es">', '<html lang="es" class="carta-aparte">')
       .replace(/href="#carta" data-enlace-carta/g, 'href="/carta" data-enlace-carta');
   }
-  const cuerpo = Buffer.from(html, 'utf8');
-  const etag = 'W/"' + crypto.createHash('sha1').update(cuerpo).digest('hex').slice(0, 20) + '"';
-  res.setHeader('ETag', etag);
-  res.setHeader('Cache-Control', 'no-cache');
-  if (req.headers['if-none-match'] === etag) { res.writeHead(304); return res.end(); }
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': cuerpo.length });
-  res.end(req.method === 'HEAD' ? undefined : cuerpo);
+  return enviarHtml(req, res, prepararIdioma(req, html, idioma, enCarta ? '/carta' : '/'));
+}
+
+/* Los textos legales (una página con tres pestañas), también en gallego e inglés */
+async function servirLegal(req, res, idioma, resto) {
+  const html = await fsp.readFile(path.join(DIR_PUBLICO, 'legal.html'), 'utf8');
+  return enviarHtml(req, res, prepararIdioma(req, html, idioma, resto));
 }
 
 async function servirPublico(req, res, pathname) {
@@ -1303,7 +1368,7 @@ async function apiResenas(req, res, pathname, metodo, ip) {
    Cada vez que se guarda una parte de la web desde el panel (carta, fotos, horarios
    o ajustes) queda una copia con un resumen de lo que cambió. Volver a una versión
    la guarda como versión nueva, así que también se puede deshacer. */
-const NOMBRE_SECCION = { carta: 'Carta', galeria: 'Fotos', horario: 'Horarios', datos: 'Ajustes', textos: 'Textos', mes: 'Lo mejor del mes' };
+const NOMBRE_SECCION = { carta: 'Carta', galeria: 'Fotos', horario: 'Horarios', datos: 'Ajustes', textos: 'Textos', mes: 'Lo mejor del mes', traducciones: 'Idiomas' };
 const fVersion = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 function registrarVersion(seccion, datos, resumen) {
@@ -1329,6 +1394,17 @@ function resumenCambios(seccion, a, b) {
   if (seccion === 'textos') {
     const l = textosWeb.resumenTextos(a, b, textosBase()).slice(0, 8);
     return l.length ? l : ['Cambios guardados'];
+  }
+  if (seccion === 'traducciones') {
+    idiomas.OTROS.forEach((i) => {
+      const ta = a[i] || {};
+      const tb = b[i] || {};
+      const n = new Set(Object.keys(ta).concat(Object.keys(tb)));
+      let cambios = 0;
+      n.forEach((k) => { if ((ta[k] || '') !== (tb[k] || '')) cambios++; });
+      if (cambios) lineas.push((i === 'gl' ? 'Gallego' : 'Inglés') + ': ' + (cambios === 1 ? '1 traducción' : cambios + ' traducciones'));
+    });
+    return lineas.length ? lineas : ['Cambios guardados'];
   }
   if (seccion === 'mes') {
     const nombreDe = (x) => x.nombre || ((contenido.carta.productos.find((p) => p.id === x.producto) || {}).nombre) || 'destacado';
@@ -1490,7 +1566,18 @@ async function api(req, res, pathname) {
   }
 
   if (pathname === '/api/contenido' && metodo === 'GET') {
-    return enviarJSON(res, 200, Object.assign({}, contenido, { textosBase: textosBase() }));
+    // Con ?idioma=gl o ?idioma=en, los textos de la carta, los destacados, las fotos, el horario…
+    // van ya traducidos (el panel lo pide siempre sin idioma, en castellano)
+    const idioma = new URL(req.url, 'http://localhost').searchParams.get('idioma');
+    const todo = Object.assign({}, contenido, { textosBase: textosBase() });
+    if (idiomas.OTROS.includes(idioma)) return enviarJSON(res, 200, idiomas.traducirContenido(todo, idioma, traduccionesDe(idioma)));
+    return enviarJSON(res, 200, todo);
+  }
+
+  /* Las traducciones de los archivos, para la pestaña «Idiomas» del panel */
+  if (pathname === '/api/idiomas' && metodo === 'GET') {
+    exigirAdmin(req);
+    return enviarJSON(res, 200, { gl: idiomas.diccionario('gl'), en: idiomas.diccionario('en') });
   }
 
   if (pathname === '/api/sesion' && metodo === 'GET') {
@@ -1529,7 +1616,7 @@ async function api(req, res, pathname) {
     return enviarJSON(res, 200, { ok: true });
   }
 
-  const mContenido = pathname.match(/^\/api\/contenido\/(carta|galeria|horario|datos|textos|mes)$/);
+  const mContenido = pathname.match(/^\/api\/contenido\/(carta|galeria|horario|datos|textos|mes|traducciones)$/);
   if (mContenido && metodo === 'PUT') {
     exigirAdmin(req);
     const clave = mContenido[1];
@@ -1857,17 +1944,26 @@ async function atender(req, res) {
     return;
   }
 
-  if (PAGINAS_LEGALES.includes(pathname)) {
-    if (await servirArchivo(req, res, path.join(DIR_PUBLICO, 'legal.html'), 'no-cache')) return;
+  /* Páginas en gallego (/gl…) e inglés (/en…). Quien eligió uno de esos idiomas en el menú
+     y entra por una dirección en castellano va a la suya */
+  const ruta = idiomas.deRuta(pathname);
+  const resto = ruta.resto === '/index.html' ? '/' : ruta.resto.replace(/(.)\/$/, '$1');
+  const pagina = resto === '/' ? 'portada' : resto === '/carta' ? 'carta' : PAGINAS_LEGALES.includes(resto) ? 'legal' : null;
+  if (pagina && !ruta.conPrefijo) {
+    const elegido = leerCookies(req).sono2_idioma;
+    if (elegido === 'gl' || elegido === 'en') {
+      res.writeHead(302, { Location: idiomas.conIdioma(elegido, resto) + url.search, 'Cache-Control': 'no-store', Vary: 'Cookie' });
+      return res.end();
+    }
   }
+  if (pagina === 'legal') return servirLegal(req, res, ruta.idioma, resto);
+  if (pagina === 'portada') return servirIndice(req, res, false, ruta.idioma);
+  if (pagina === 'carta') return servirIndice(req, res, true, ruta.idioma);
 
-  if (pathname === '/' || pathname === '/index.html') return servirIndice(req, res, false);
-  if (pathname === '/carta' || pathname === '/carta/') return servirIndice(req, res, true);
-
-  if (await servirPublico(req, res, pathname)) return;
+  if (!ruta.conPrefijo && await servirPublico(req, res, pathname)) return;
 
   /* Cualquier otra ruta muestra la portada, sin cambiar de URL */
-  if (!path.extname(pathname)) return servirIndice(req, res, false);
+  if (!path.extname(pathname)) return servirIndice(req, res, false, ruta.idioma);
   enviarTexto(res, 404, 'No encontrado');
 }
 

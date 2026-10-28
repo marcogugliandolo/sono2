@@ -110,17 +110,21 @@ function textosIniciales() {
   return { menu: MENU.map((m) => Object.assign({}, m)), textos: {} };
 }
 
-/* Prepara el index.html con los textos y el menú guardados (así no parpadea al cargar) */
-function aplicarAlHtml(html, guardado, base, datos) {
+/* Prepara el index.html con los textos y el menú guardados (así no parpadea al cargar).
+   «tr» traduce cada texto cuando la página va en otro idioma (en castellano no se pasa) */
+function aplicarAlHtml(html, guardado, base, datos, tr) {
   const g = guardado || textosIniciales();
   const cambiados = g.textos || {};
-  const club = (datos && datos.club) || {};
+  const traduce = typeof tr === 'function';
+  let club = (datos && datos.club) || {};
+  if (traduce && club.premio) club = Object.assign({}, club, { premio: tr(club.premio) });
   const sinDomicilio = datos && datos.domicilio === false;
   RE_ELEMENTO.lastIndex = 0;
   html = html.replace(RE_ELEMENTO, (todo, etiqueta, antes, clave, despues, dentro) => {
     let valor = cambiados[clave];
     if (clave === 'llevar.texto' && sinDomicilio) valor = cambiados['llevar.textoRecoger'] || base['llevar.textoRecoger'];
     if (clave === 'club.texto' || clave === 'club.p3') valor = valor || base[clave];   // con el premio y los sellos de verdad
+    if (traduce) valor = tr(valor || base[clave] || '');
     if (!valor) return todo;
     return '<' + etiqueta + antes + ' data-texto="' + clave + '"' + despues + '>' + aHtml(clave, valor, club) + '</' + etiqueta + '>';
   });
@@ -134,7 +138,8 @@ function aplicarAlHtml(html, guardado, base, datos) {
     items.forEach((li) => {
       const m = /data-menu="([a-z]+)"/.exec(li);
       if (!m) { fijos.push(li); return; }
-      delMenu.push({ id: m[1], li: li.replace(/(<a\b[^>]*>)[\s\S]*?(<\/a>)/, (t, a, b) => a + escapar(nombre.get(m[1]) || '') + b) });
+      const texto = nombre.get(m[1]) || '';
+      delMenu.push({ id: m[1], li: li.replace(/(<a\b[^>]*>)[\s\S]*?(<\/a>)/, (t, a, b) => a + escapar(traduce ? tr(texto) : texto) + b) });
     });
     delMenu.sort((a, b) => orden.indexOf(a.id) - orden.indexOf(b.id));
     return abre + fijos.concat(delMenu.map((x) => x.li)).join('') + cierra;

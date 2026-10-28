@@ -15,6 +15,39 @@
     });
   })();
 
+  /* ---------- Idioma ----------
+     La web va en castellano, gallego (/gl) o inglés (/en). En gallego e inglés, idiomas.js traduce
+     lo que se pinta aquí; t() sirve para las frases que llevan datos dentro («Mesa para {n}»).
+     El panel de administración va siempre en castellano. */
+  var I18N = window.sonoIdioma || null;
+  var IDIOMA = I18N ? I18N.idioma : 'es';
+  function t(plantilla, valores) {
+    if (I18N) return I18N.t(plantilla, valores);
+    return String(plantilla).replace(/\{(\w+)\}/g, function (x, k) { return valores && Object.prototype.hasOwnProperty.call(valores, k) ? valores[k] : x; });
+  }
+  function tr(s) { return I18N ? I18N.traducir(s) : s; }       // un dato suelto: un día, un alérgeno…
+  function formatoFecha(o) { return I18N ? I18N.fecha(o) : new Intl.DateTimeFormat('es-ES', o); }
+  function ruta(r) { return I18N ? I18N.ruta(r) : r; }          // /carta → /gl/carta
+  function recordarIdioma(cual) {
+    document.cookie = 'sono2_idioma=' + cual + '; Path=/; Max-Age=31536000; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
+  }
+  /* Selector del menú: se recuerda la elección y se sigue en la misma parte de la página */
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[data-idioma]');
+    if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    recordarIdioma(a.getAttribute('data-idioma'));
+    location.href = a.getAttribute('href') + (location.hash && location.hash !== '#panel' ? location.hash : '');
+  });
+  /* El desplegable del idioma (cabecera) se cierra al tocar fuera o con Escape */
+  document.addEventListener('click', function (e) {
+    document.querySelectorAll('details.idioma[open]').forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute('open'); });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    document.querySelectorAll('details.idioma[open]').forEach(function (d) { d.removeAttribute('open'); d.querySelector('summary').focus(); });
+  });
+
   /* ---------- Constantes ---------- */
   /* Dibujos que se pueden elegir para cada grupo de la carta */
   var ICONOS = [
@@ -37,7 +70,7 @@
   var MAX_ZONAS = 6;
   var DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
   var PIES_GALERIA = ['El local', 'La barra', 'Latte art', 'Desayunos', 'Buenos ratos'];
-  var CLAVE_DE = { carta: 'carta', fotos: 'galeria', horarios: 'horario', datos: 'datos', textos: 'textos' };
+  var CLAVE_DE = { carta: 'carta', fotos: 'galeria', horarios: 'horario', datos: 'datos', textos: 'textos', idiomas: 'traducciones' };
   /* La pestaña Carta guarda también «Lo mejor del mes», que va arriba de la carta */
   var CLAVES_PESTANA = { carta: ['carta', 'mes'] };
   var RE_PRECIO = /^\d{1,3}([.,]\d{1,2})?$/;
@@ -214,7 +247,7 @@
       c.appendChild(svgUso('ene'));
       a.appendChild(c);
       if (conNombre) a.appendChild(el('span', 'enlace-socio__nombre', nombreMenu('club')));
-      a.setAttribute('aria-label', conNombre ? nombreMenu('club') + ': mi tarjeta' : 'Mi tarjeta del club');
+      a.setAttribute('aria-label', conNombre ? t('{club}: mi tarjeta', { club: nombreMenu('club') }) : 'Mi tarjeta del club');
       a.title = 'Mi tarjeta del club';
     } else {
       a.textContent = nombreMenu('club');
@@ -297,7 +330,7 @@
   });
 
   /* ---------- La carta en su propia página (/carta) ---------- */
-  var enPaginaCarta = /^\/carta\/?$/.test(location.pathname);
+  var enPaginaCarta = /^\/((gl|en)\/)?carta\/?$/.test(location.pathname);
   if (enPaginaCarta) {
     document.documentElement.classList.add('modo-carta');
     document.title = 'Carta · SOÑO';
@@ -305,14 +338,14 @@
     document.querySelectorAll('a[href^="#"]').forEach(function (a) {
       var id = a.getAttribute('href').slice(1);
       var destino = id && document.getElementById(id);
-      if (destino && destino.closest('main') && id !== 'carta' && id !== 'llevar' && id !== 'contenido') a.setAttribute('href', '/#' + id);
+      if (destino && destino.closest('main') && id !== 'carta' && id !== 'llevar' && id !== 'contenido') a.setAttribute('href', ruta('/#' + id));
     });
   }
   function cartaAparte() { return !!(estado.datos && estado.datos.cartaAparte); }
   function aplicarCartaAparte() {
     var fuera = cartaAparte() && !enPaginaCarta;
     document.documentElement.classList.toggle('carta-aparte', fuera);
-    document.querySelectorAll('[data-enlace-carta]').forEach(function (a) { a.setAttribute('href', fuera ? '/carta' : '#carta'); });
+    document.querySelectorAll('[data-enlace-carta]').forEach(function (a) { a.setAttribute('href', fuera ? ruta('/carta') : '#carta'); });
   }
 
   /* ---------- Carta pública ---------- */
@@ -325,7 +358,8 @@
     var delMes = cargado && mesActivo() ? destacadosMes().filter(function (d) { return d.producto; }).map(function (d) { return d.producto.id; }) : [];
     lista = lista.filter(function (p) { return delMes.indexOf(p.id) === -1; });
     var marcados = lista.filter(function (p) {
-      return (Array.isArray(p.etiquetas) ? p.etiquetas : []).some(function (t) { return /^favorit/i.test(texto(t)); });
+      // En gallego e inglés las etiquetas llegan traducidas: se mira la original
+      return (Array.isArray(p.etiquetasOrig) ? p.etiquetasOrig : Array.isArray(p.etiquetas) ? p.etiquetas : []).some(function (x) { return /^favorit/i.test(texto(x)); });
     });
     var porGrupo = categorias().map(function (c) { return lista.filter(function (p) { return p.cat === c.id; }); });
     var ronda = [];
@@ -341,7 +375,7 @@
     return marcados.concat(resto).slice(0, MAX_FAVORITOS);
   }
   function abrirProducto(i) { mostrarProducto(i); abrir(modalProducto); }
-  function etiquetaProducto(p) { return (p.nombre || 'Producto') + ', ' + precioBonito(p.precio) + '. Ver detalles'; }
+  function etiquetaProducto(p) { return t('{nombre}, {precio}. Ver detalles', { nombre: p.nombre || t('Producto'), precio: precioBonito(p.precio) }); }
   function animarLista(nodo) {
     nodo.classList.remove('entra');
     void nodo.offsetWidth;
@@ -448,7 +482,7 @@
     $('producto-nombre').textContent = p.nombre || 'Producto';
     $('producto-precio').textContent = precioBonito(p.precio);
     $('producto-desc').textContent = p.desc || '';
-    $('producto-cuenta').textContent = (actual + 1) + ' de ' + lista.length;
+    $('producto-cuenta').textContent = t('{n} de {m}', { n: actual + 1, m: lista.length });
     var ul = $('producto-etiquetas');
     ul.innerHTML = '';
     (Array.isArray(p.etiquetas) ? p.etiquetas : []).forEach(function (t) { ul.appendChild(el('li', null, t)); });
@@ -464,7 +498,7 @@
       ulAl.appendChild(li);
     });
     icono.setAttribute('href', '#i-' + (p.icono || 'taza'));
-    dibujo.setAttribute('aria-label', 'Ilustración: ' + (p.nombre || 'producto'));
+    dibujo.setAttribute('aria-label', t('Ilustración: {nombre}', { nombre: p.nombre || t('producto') }));
     var video = p.foto && esVideo(p.foto);
     if (!video) { videoProducto.pause(); videoProducto.hidden = true; videoProducto.removeAttribute('src'); }
     if (p.foto && video) {
@@ -496,7 +530,7 @@
     cerrar(modalProducto);
     var seccion = $('llevar');
     if (seccion && !seccion.hidden) seccion.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    avisoPedido.textContent = '«' + p.nombre + '» añadido a tu pedido.';
+    avisoPedido.textContent = t('«{nombre}» añadido a tu pedido.', { nombre: p.nombre });
   });
   $('producto-anterior').addEventListener('click', function () { mostrarProducto(actual - 1); });
   $('producto-siguiente').addEventListener('click', function () { mostrarProducto(actual + 1); });
@@ -509,7 +543,7 @@
      Hasta 3 destacados: un producto de la carta (con su foto, su precio y sus alérgenos) o algo
      escrito a mano. Con uno solo, la tarjeta va en grande; con dos o tres, en fila. El sello lleva
      el nombre del mes en curso, así nunca se queda viejo. */
-  var fNombreMes = new Intl.DateTimeFormat('es-ES', { month: 'long' });
+  var fNombreMes = formatoFecha({ month: 'long' });
   function mesActivo() {
     var m = estado.datos && estado.datos.mes;
     return !(m && m.activo === false);
@@ -589,7 +623,7 @@
             agregarAlPedido(d.producto.id);
             var seccion = $('llevar');
             if (seccion && !seccion.hidden) seccion.scrollIntoView({ behavior: sinMovimiento ? 'auto' : 'smooth', block: 'start' });
-            avisoPedido.textContent = '«' + d.producto.nombre + '» añadido a tu pedido.';
+            avisoPedido.textContent = t('«{nombre}» añadido a tu pedido.', { nombre: d.producto.nombre });
           });
           acc.appendChild(pedir);
         }
@@ -690,18 +724,18 @@
     if (ig) lista.push({ id: 'instagram', nombre: 'Instagram', texto: '@' + ig, url: 'https://www.instagram.com/' + encodeURIComponent(ig) + '/' });
     var wa = texto(d.whatsapp).replace(/[^\d]/g, '');
     if (wa.length === 9) wa = '34' + wa;   // número español sin prefijo
-    if (wa.length >= 9) lista.push({ id: 'whatsapp', nombre: 'WhatsApp', etiqueta: 'Escribir por WhatsApp a SOÑO', texto: texto(d.whatsapp), url: 'https://wa.me/' + wa });
+    if (wa.length >= 9) lista.push({ id: 'whatsapp', nombre: 'WhatsApp', etiqueta: t('Escribir por WhatsApp a SOÑO'), texto: texto(d.whatsapp), url: 'https://wa.me/' + wa });
     // Llamar: usa el teléfono de contacto
     var tel = texto(d.telefono).replace(/[^\d+]/g, '');
     if (/^\d{9}$/.test(tel)) tel = '+34' + tel;
-    if (tel.replace(/\D/g, '').length >= 9) lista.push({ id: 'llamar', nombre: 'Llamar', etiqueta: 'Llamar a SOÑO: ' + texto(d.telefono), texto: texto(d.telefono), url: 'tel:' + tel, mismaVentana: true });
+    if (tel.replace(/\D/g, '').length >= 9) lista.push({ id: 'llamar', nombre: t('Llamar'), etiqueta: t('Llamar a SOÑO: {tel}', { tel: texto(d.telefono) }), texto: texto(d.telefono), url: 'tel:' + tel, mismaVentana: true });
     return lista;
   }
   function enlaceRed(red) {
     var a = el('a', 'enlace-red');
     a.href = red.url;
     if (!red.mismaVentana) { a.target = '_blank'; a.rel = 'noopener'; }
-    a.setAttribute('aria-label', red.etiqueta || red.nombre + ' de SOÑO');
+    a.setAttribute('aria-label', red.etiqueta || t('{red} de SOÑO', { red: red.nombre }));
     a.title = red.nombre;
     var icono = el('span', 'icono-red icono-red--' + red.id);
     icono.setAttribute('aria-hidden', 'true');
@@ -772,18 +806,18 @@
   var fechas = [];
 
   function sinPunto(s) { return s.replace('.', ''); }
-  var fCorto = new Intl.DateTimeFormat('es-ES', { weekday: 'short' });
-  var fMes = new Intl.DateTimeFormat('es-ES', { month: 'short' });
-  var fLargo = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  var fCorto = formatoFecha({ weekday: 'short' });
+  var fMes = formatoFecha({ month: 'short' });
+  var fLargo = formatoFecha({ weekday: 'long', day: 'numeric', month: 'long' });
 
   var hoy = new Date();
   hoy.setHours(12, 0, 0, 0);
   for (var i = 0; i < 7; i++) {
     var d = new Date(hoy);
     d.setDate(hoy.getDate() + i);
-    var arriba = i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : sinPunto(fCorto.format(d));
+    var arriba = i === 0 ? t('hoy') : i === 1 ? t('mañana') : sinPunto(fCorto.format(d));
     var largo = fLargo.format(d).replace(',', '');
-    dias.push(i === 0 ? 'hoy, ' + largo : i === 1 ? 'mañana, ' + largo : largo);
+    dias.push(i === 0 ? t('hoy, {fecha}', { fecha: largo }) : i === 1 ? t('mañana, {fecha}', { fecha: largo }) : largo);
     fechas.push(d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()));
 
     var input = el('input', 'oculto');
@@ -861,7 +895,7 @@
     var e = formReserva.querySelector('input[name="' + nombre + '"]:checked');
     return e ? e.value : null;
   }
-  function textoPersonas(n) { return n === 1 ? '1 persona' : n + ' personas'; }
+  function textoPersonas(n) { return n === 1 ? t('1 persona') : t('{n} personas', { n: n }); }
 
   function actualizarResumen() {
     personasEl.textContent = personas;
@@ -869,9 +903,9 @@
     mas.disabled = personas >= MAX;
     var dia = seleccion('dia');
     var hora = seleccion('hora');
-    var partes = ['Mesa para ' + personas];
-    partes.push(dia !== null ? dias[+dia] : 'elige día');
-    partes.push(hora ? 'a las ' + hora : 'elige hora');
+    var partes = [t('Mesa para {n}', { n: personas })];
+    partes.push(dia !== null ? dias[+dia] : t('elige día'));
+    partes.push(hora ? t('a las {hora}', { hora: hora }) : t('elige hora'));
     var zona = seleccion('zona');
     if (zona) partes.push(nombreZona(zona));
     resumen.textContent = partes.join(' · ');
@@ -906,8 +940,9 @@
     }).then(function () {
       avisoReserva.textContent = '';
       var zonaElegida = nombreZona(seleccion('zona') || '');
-      detalle.textContent = 'Mesa para ' + textoPersonas(personas) + ', ' + dias[+dia] + ' a las ' + hora +
-        (zonaElegida ? ', zona ' + zonaElegida : '') + ', a nombre de ' + nombre + '.';
+      detalle.textContent = zonaElegida
+        ? t('Mesa para {personas}, {dia} a las {hora}, zona {zona}, a nombre de {nombre}.', { personas: textoPersonas(personas), dia: dias[+dia], hora: hora, zona: zonaElegida, nombre: nombre })
+        : t('Mesa para {personas}, {dia} a las {hora}, a nombre de {nombre}.', { personas: textoPersonas(personas), dia: dias[+dia], hora: hora, nombre: nombre });
       formReserva.hidden = true;
       confirmacion.hidden = false;
       modalReserva.scrollTop = 0;
@@ -966,18 +1001,18 @@
       var fila = el('div', 'linea');
       var idSel = 'pedido-producto-' + i;
       var idCant = 'pedido-cantidad-' + i;
-      var lab = el('label', 'solo-lector', 'Producto ' + (i + 1)); lab.htmlFor = idSel;
+      var lab = el('label', 'solo-lector', t('Producto {n}', { n: i + 1 })); lab.htmlFor = idSel;
       var sel = el('select'); sel.id = idSel;
       opcionesProductos(sel, l.id);
       sel.addEventListener('change', function () { l.id = sel.value; avisoPedido.textContent = ''; actualizarTotal(); });
-      var labC = el('label', 'solo-lector', 'Cantidad del producto ' + (i + 1)); labC.htmlFor = idCant;
+      var labC = el('label', 'solo-lector', t('Cantidad del producto {n}', { n: i + 1 })); labC.htmlFor = idCant;
       var cant = el('select'); cant.id = idCant;
       for (var n = 1; n <= 10; n++) { var o = el('option', null, '× ' + n); o.value = String(n); cant.appendChild(o); }
       cant.value = String(l.cantidad);
       cant.addEventListener('change', function () { l.cantidad = Number(cant.value); actualizarTotal(); });
       var quitar = el('button', 'linea__quitar', '×');
       quitar.type = 'button';
-      quitar.setAttribute('aria-label', 'Quitar el producto ' + (i + 1));
+      quitar.setAttribute('aria-label', t('Quitar el producto {n}', { n: i + 1 }));
       quitar.hidden = lineas.length === 1 && !l.id;
       quitar.addEventListener('click', function () { lineas.splice(i, 1); pintarLineas(); });
       fila.appendChild(lab); fila.appendChild(sel); fila.appendChild(labC); fila.appendChild(cant); fila.appendChild(quitar);
@@ -992,8 +1027,8 @@
       if (p) { total += precioNum(p.precio) * l.cantidad; unidades += l.cantidad; }
     });
     totalPedido.textContent = unidades
-      ? euros(total) + ' · ' + (unidades === 1 ? '1 producto' : unidades + ' productos')
-      : 'Elige al menos un producto';
+      ? euros(total) + ' · ' + (unidades === 1 ? t('1 producto') : t('{n} productos', { n: unidades }))
+      : t('Elige al menos un producto');
   }
   function agregarAlPedido(id) {
     var existente = lineas.filter(function (l) { return l.id === id; })[0];
@@ -1029,9 +1064,9 @@
     return todas;
   }
   function textoDia(i) {
-    if (i === 0) return 'hoy';
-    if (i === 1) return 'mañana';
-    return 'el ' + fLargo.format(new Date(fechas[i] + 'T12:00:00')).replace(',', '');
+    if (i === 0) return t('hoy');
+    if (i === 1) return t('mañana');
+    return t('el {fecha}', { fecha: fLargo.format(new Date(fechas[i] + 'T12:00:00')).replace(',', '') });
   }
   function pintarRecogida() {
     var diasEl = $('recogida-dias');
@@ -1064,7 +1099,7 @@
       input.checked = i === recogida.dia;
       var label = el('label', 'chip chip--dia');
       label.htmlFor = input.id;
-      label.appendChild(el('span', 'arriba', i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : sinPunto(fCorto.format(d))));
+      label.appendChild(el('span', 'arriba', i === 0 ? t('hoy') : i === 1 ? t('mañana') : sinPunto(fCorto.format(d))));
       label.appendChild(el('span', 'numero', String(d.getDate())));
       label.appendChild(el('span', 'abajo', sinPunto(fMes.format(d))));
       diasEl.appendChild(input);
@@ -1132,11 +1167,12 @@
       web: formPedido.web.value
     }).then(function (r) {
       avisoPedido.textContent = '';
-      var resumenLineas = r.lineas.map(function (l) { return l.cantidad + ' × ' + l.nombre; }).join(', ');
-      $('confirmacion-pedido-detalle').textContent = resumenLineas + '. Total: ' + r.total + ' €. ' +
-        (tipo === 'domicilio' ? 'Te lo llevamos a ' + direccion + '.'
-          : r.recogida ? 'Te esperamos en SOÑO ' + textoDia(diaElegido) + ' a las ' + r.recogida.hora + '.'
-          : 'Te esperamos en SOÑO para recogerlo.');
+      // Los nombres, como salen en la carta (en gallego o inglés, traducidos)
+      var resumenLineas = (r.lineas || []).map(function (l) { var p = productoPorId(l.id); return l.cantidad + ' × ' + (p ? p.nombre : l.nombre); }).join(', ');
+      $('confirmacion-pedido-detalle').textContent = t('{lineas}. Total: {total}.', { lineas: resumenLineas, total: r.total + '\u00a0€' }) + ' ' +
+        (tipo === 'domicilio' ? t('Te lo llevamos a {direccion}.', { direccion: direccion })
+          : r.recogida ? t('Te esperamos en SOÑO {dia} a las {hora}.', { dia: textoDia(diaElegido), hora: r.recogida.hora })
+          : t('Te esperamos en SOÑO para recogerlo.'));
       formPedido.hidden = true;
       confPedido.hidden = false;
     }).catch(function (err) {
@@ -1216,7 +1252,7 @@
   });
   function irAEmpleo() {
     if (!empleoActivo()) return;
-    if (enPaginaCarta) { location.href = '/#trabaja'; return; }
+    if (enPaginaCarta) { location.href = ruta('/#trabaja'); return; }
     tipoEscribenos('empleo');
     var bloque = $('escribenos');
     bloque.scrollIntoView({ behavior: sinMovimiento ? 'auto' : 'smooth', block: 'start' });
@@ -1250,7 +1286,7 @@
     (esImagen ? reducirImagen(file) : Promise.resolve(file)).then(function (blob) {
       avisoEmpleo.textContent = '';
       if (blob.size > MAX_CV_MB * 1048576) {
-        avisoEmpleo.textContent = 'El archivo pesa ' + pesoBonito(blob.size) + ' y el máximo son ' + MAX_CV_MB + ' MB. Prueba a guardarlo en PDF.';
+        avisoEmpleo.textContent = t('El archivo pesa {peso} y el máximo son {n} MB. Prueba a guardarlo en PDF.', { peso: pesoBonito(blob.size), n: MAX_CV_MB });
         return;
       }
       if (blob !== file && blob.type === 'image/jpeg') nombre = nombre.replace(/\.[a-z0-9]{1,5}$/i, '') + '.jpg';
@@ -1306,7 +1342,7 @@
         if (x.status >= 200 && x.status < 300) { resolve(j); return; }
         var mensaje = j.error;
         if (!mensaje && x.status === 413) mensaje = 'El archivo es demasiado grande. Prueba a guardarlo en PDF.';
-        reject(new Error(mensaje || 'No se ha podido enviar (error ' + x.status + '). Inténtalo de nuevo.'));
+        reject(new Error(mensaje || t('No se ha podido enviar (error {n}). Inténtalo de nuevo.', { n: x.status })));
       };
       x.onerror = function () { reject(new Error('No hay conexión con el servidor. Revisa tu conexión e inténtalo de nuevo.')); };
       x.send(JSON.stringify(datos));
@@ -1334,13 +1370,13 @@
       return enviarConProgreso('/api/candidaturas', {
         nombre: nombre, email: email, telefono: tel, puesto: f.puesto.value, mensaje: mensaje,
         cv: b64 ? { nombre: cvElegido.nombre, datos: b64 } : null, acepto: true, web: f.web.value
-      }, function (k) { if (cvElegido) avisoEmpleo.textContent = 'Enviando tu candidatura… ' + Math.round(k * 100) + ' %'; });
+      }, function (k) { if (cvElegido) avisoEmpleo.textContent = t('Enviando tu candidatura… {n} %', { n: Math.round(k * 100) }); });
     }).then(function () {
       f.reset();
       cvElegido = null;
       pintarCv();
       avisoEmpleo.textContent = '';
-      $('confirmacion-empleo-detalle').textContent = 'Gracias, ' + nombre.split(' ')[0] + '. Ya tenemos tu candidatura' + (conCv ? ' y tu currículum.' : '.');
+      $('confirmacion-empleo-detalle').textContent = t(conCv ? 'Gracias, {nombre}. Ya tenemos tu candidatura y tu currículum.' : 'Gracias, {nombre}. Ya tenemos tu candidatura.', { nombre: nombre.split(' ')[0] });
       formEmpleo.hidden = true;
       confEmpleo.hidden = false;
       $('otra-candidatura').focus({ preventScroll: true });
@@ -1361,8 +1397,8 @@
   var socio = null;
   var modalClub = $('modal-club');
   var modalTarjeta = $('modal-tarjeta');
-  var fCorta = new Intl.DateTimeFormat('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  var fMesAnio = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' });
+  var fCorta = formatoFecha({ day: '2-digit', month: '2-digit', year: 'numeric' });
+  var fMesAnio = formatoFecha({ month: 'long', year: 'numeric' });
 
   function ajustesClub() {
     var c = (estado.datos && estado.datos.club) || {};
@@ -1388,7 +1424,7 @@
   function pintarQR(cont, codigo) {
     cont.innerHTML = '';
     if (typeof window.qrcode !== 'function' || !codigo) {
-      cont.appendChild(el('p', 'estado-vacio', 'Enseña este código en la barra: ' + codigoBonito(codigo)));
+      cont.appendChild(el('p', 'estado-vacio', t('Enseña este código en la barra: {codigo}', { codigo: codigoBonito(codigo) })));
       return;
     }
     var qr = window.qrcode(0, 'M');
@@ -1414,11 +1450,11 @@
   }
 
   function textoMovimiento(m) {
-    var quien = m.por ? ' por ' + m.por : '';
-    if (m.tipo === 'sello') return { texto: (m.n > 1 ? m.n + ' sellos añadidos' : 'Sello añadido') + quien, valor: '+' + m.n };
-    if (m.tipo === 'quitar') return { texto: (m.n > 1 ? m.n + ' sellos corregidos' : 'Sello corregido') + quien, valor: '−' + m.n };
-    if (m.tipo === 'canje') return { texto: 'Desayuno gratis canjeado' + quien, valor: 'Premio' };
-    return { texto: 'Te uniste al club', valor: '' };
+    function con(x) { return m.por ? t('{que} por {quien}', { que: x, quien: m.por }) : x; }
+    if (m.tipo === 'sello') return { texto: con(m.n > 1 ? t('{n} sellos añadidos', { n: m.n }) : t('Sello añadido')), valor: '+' + m.n };
+    if (m.tipo === 'quitar') return { texto: con(m.n > 1 ? t('{n} sellos corregidos', { n: m.n }) : t('Sello corregido')), valor: '−' + m.n };
+    if (m.tipo === 'canje') return { texto: con(t('Desayuno gratis canjeado')), valor: t('Premio') };
+    return { texto: t('Te uniste al club'), valor: '' };
   }
   function pintarMovimientos(ul, historial, vacio) {
     ul.innerHTML = '';
@@ -1441,25 +1477,28 @@
     var necesarios = socio.necesarios;
     var completa = socio.sellos >= necesarios;
     var puestos = Math.min(socio.sellos, necesarios);
-    $('tarjeta-nombre').textContent = 'Hola, ' + socio.nombre.split(' ')[0];
+    var premio = ajustesClub().premio || socio.premio;   // el del contenido, que llega traducido
+    $('tarjeta-nombre').textContent = t('Hola, {nombre}', { nombre: socio.nombre.split(' ')[0] });
     // Si ha entrado un sello nuevo mientras está abierta, se anima
     var desde = sellosVistos !== null && socio.sellos > sellosVistos ? Math.min(sellosVistos, necesarios) : undefined;
     pintarSellos($('tarjeta-sellos'), puestos, necesarios, desde);
     sellosVistos = socio.sellos;
-    $('tarjeta-sellos').setAttribute('aria-label', puestos + ' de ' + necesarios + ' sellos');
+    $('tarjeta-sellos').setAttribute('aria-label', t('{n} de {m} sellos', { n: puestos, m: necesarios }));
     $('tarjeta-barra').style.transform = 'scaleX(' + (puestos / necesarios).toFixed(3) + ')';
     var estadoEl = $('tarjeta-estado');
     estadoEl.classList.toggle('es-premio', completa);
     var faltan = necesarios - socio.sellos;
     estadoEl.textContent = completa
-      ? '¡Tarjeta completa! Tienes ' + socio.premio + '. Enseña el QR al pedir.'
-      : faltan === 1 ? 'Te falta 1 sello para ' + socio.premio + '.'
-      : 'Llevas ' + socio.sellos + ' de ' + necesarios + '. Te faltan ' + faltan + ' sellos para ' + socio.premio + '.';
+      ? t('¡Tarjeta completa! Tienes {premio}. Enseña el QR al pedir.', { premio: premio })
+      : faltan === 1 ? t('Te falta 1 sello para {premio}.', { premio: premio })
+      : t('Llevas {n} de {m}. Te faltan {k} sellos para {premio}.', { n: socio.sellos, m: necesarios, k: faltan, premio: premio });
     pintarQR($('tarjeta-qr'), socio.codigo);
     $('tarjeta-codigo').textContent = codigoBonito(socio.codigo);
     pintarMovimientos($('tarjeta-historial'), socio.historial, 'Aún no hay movimientos.');
-    var total = socio.total === 1 ? '1 desayuno' : socio.total + ' desayunos';
-    $('tarjeta-total').textContent = total + ' con nosotros · socio desde ' + fMesAnio.format(new Date(socio.desde));
+    var desde = fMesAnio.format(new Date(socio.desde));
+    $('tarjeta-total').textContent = socio.total === 1
+      ? t('1 desayuno con nosotros · socio desde {fecha}', { fecha: desde })
+      : t('{n} desayunos con nosotros · socio desde {fecha}', { n: socio.total, fecha: desde });
   }
 
   function pintarClub() {
@@ -1475,15 +1514,16 @@
     pintarSellos($('club-muestra-sellos'), Math.min(4, c.sellos - 1), c.sellos);
     var pie = document.querySelector('.club__carton-pie');
     if (pie) {
-      pie.firstChild.textContent = Math.min(4, c.sellos - 1) + ' de ' + c.sellos;
-      pie.lastChild.textContent = 'Premio al completarla';
+      pie.firstChild.textContent = t('{n} de {m}', { n: Math.min(4, c.sellos - 1), m: c.sellos });
+      pie.lastChild.textContent = t('Premio al completarla');
     }
     $('club-acciones').hidden = !!socio;
     $('club-acciones-socio').hidden = !socio;
     if (socio) {
       var faltan = socio.necesarios - socio.sellos;
-      $('club-hola').textContent = 'Hola, ' + socio.nombre.split(' ')[0] + '. ' +
-        (faltan <= 0 ? 'Tienes ' + socio.premio + ' esperándote.' : 'Llevas ' + socio.sellos + ' de ' + socio.necesarios + ' sellos.');
+      $('club-hola').textContent = faltan <= 0
+        ? t('Hola, {nombre}. Tienes {premio} esperándote.', { nombre: socio.nombre.split(' ')[0], premio: c.premio || socio.premio })
+        : t('Hola, {nombre}. Llevas {n} de {m} sellos.', { nombre: socio.nombre.split(' ')[0], n: socio.sellos, m: socio.necesarios });
     }
     document.querySelectorAll('[data-enlace-club]').forEach(pintarEnlaceClub);
     document.querySelectorAll('[data-socio-boton]').forEach(function (b) { b.hidden = !socio; });
@@ -1658,7 +1698,7 @@
       cont.appendChild(s);
     }
     cont.setAttribute('role', 'img');
-    cont.setAttribute('aria-label', (n % 1 ? numeroBonito(n) : String(n)) + ' de 5 estrellas');
+    cont.setAttribute('aria-label', t('{n} de 5 estrellas', { n: n % 1 ? numeroBonito(n) : String(n) }));
   }
 
   function tarjetaResena(r) {
@@ -1672,6 +1712,8 @@
     cab.appendChild(fecha);
     li.appendChild(cab);
     var cita = el('blockquote', 'resena__texto');
+    cita.setAttribute('translate', 'no');   // lo que escribe la gente no se traduce
+    cita.lang = 'es';
     cita.appendChild(el('p', null, r.texto));
     li.appendChild(cita);
     var autor = el('div', 'resena__autor');
@@ -1679,14 +1721,19 @@
     inicial.setAttribute('aria-hidden', 'true');
     autor.appendChild(inicial);
     var quien = el('div', 'resena__quien');
-    quien.appendChild(el('span', 'resena__nombre', r.nombre));
+    var nombreAutor = el('span', 'resena__nombre', r.nombre);
+    nombreAutor.setAttribute('translate', 'no');
+    quien.appendChild(nombreAutor);
     if (r.socio) quien.appendChild(el('span', 'resena__socio', 'Socio del club'));
     autor.appendChild(quien);
     li.appendChild(autor);
     if (r.respuesta) {
       var resp = el('div', 'resena__respuesta');
       resp.appendChild(el('p', 'meta', 'Respuesta de SOÑO'));
-      resp.appendChild(el('p', null, r.respuesta));
+      var textoResp = el('p', null, r.respuesta);
+      textoResp.setAttribute('translate', 'no');
+      textoResp.lang = 'es';
+      resp.appendChild(textoResp);
       li.appendChild(resp);
     }
     return li;
@@ -1704,7 +1751,7 @@
     if (opiniones.total) {
       $('resenas-nota').textContent = numeroBonito(opiniones.media);
       dibujarEstrellas($('resenas-estrellas'), opiniones.media);
-      $('resenas-total').textContent = opiniones.total === 1 ? '1 reseña' : opiniones.total + ' reseñas';
+      $('resenas-total').textContent = opiniones.total === 1 ? t('1 reseña') : t('{n} reseñas', { n: opiniones.total });
     }
     listaResenas.innerHTML = '';
     listaResenas.scrollLeft = 0;
@@ -1896,13 +1943,15 @@
   /* Logo de la cabecera: un toque lleva al inicio; dos toques seguidos abren el panel de administración.
      También se entra con «#panel» al final de la dirección (por ejemplo gruposono.com/#panel). */
   function entrarAlPanel() {
+    // El panel va en castellano (y edita los textos en castellano): desde /gl o /en se va a la web en castellano
+    if (IDIOMA !== 'es') { recordarIdioma('es'); location.href = '/#panel'; return; }
     api('GET', '/api/sesion').then(function (r) {
       if (r.admin) abrirPanel(); else abrirLogin();
     }).catch(function () { abrirLogin(); });
   }
   function irAlInicio() {
     if (raiz.classList.contains('menu-abierto')) $('menu-boton').click();
-    if (enPaginaCarta) { location.href = '/'; return; }
+    if (enPaginaCarta) { location.href = ruta('/'); return; }
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
     window.scrollTo({ top: 0, behavior: sinMovimiento ? 'auto' : 'smooth' });
   }
@@ -1972,6 +2021,7 @@
     if (k === 'horario') return { dias: DIAS_SEMANA.map(function (dia) { return { dia: dia, texto: '' }; }), manana: [], tarde: [] };
     if (k === 'textos') return { menu: clonar(MENU_INICIAL), textos: {} };
     if (k === 'mes') return { items: [] };
+    if (k === 'traducciones') return { gl: {}, en: {} };
     return { direccion: '', email: '', telefono: '', instagram: '', whatsapp: '', abrimosPronto: true, paraLlevar: true, domicilio: true };
   }
   function normalizar(k, b) {
@@ -1980,6 +2030,7 @@
       if (!b.textos || typeof b.textos !== 'object') b.textos = {};
     }
     if (k === 'mes' && !Array.isArray(b.items)) b.items = [];
+    if (k === 'traducciones') ['gl', 'en'].forEach(function (i) { if (!b[i] || typeof b[i] !== 'object') b[i] = {}; });
     if (k === 'carta' && !Array.isArray(b.productos)) b.productos = [];
     if (k === 'carta' && !Array.isArray(b.categorias)) b.categorias = [];
     if (k === 'galeria' && (!Array.isArray(b.fotos) || !b.fotos.length)) b.fotos = vacio('galeria').fotos;
@@ -2076,6 +2127,7 @@
     if (pestana === 'horarios') panelHorarios();
     if (pestana === 'datos') panelDatos();
     if (pestana === 'textos') panelTextos();
+    if (pestana === 'idiomas') panelIdiomas();
     if (pestana === 'reservas') panelReservas();
     if (pestana === 'pedidos') panelPedidos();
     if (pestana === 'mensajes') panelMensajes();
@@ -2232,6 +2284,138 @@
         }));
       }
       cuerpo.appendChild(g);
+    });
+  }
+
+  /* Pestaña: idiomas
+     La web se ve también en gallego (/gl) y en inglés (/en). Lo fijo (botones, avisos, textos legales…)
+     ya viene traducido; aquí están las traducciones de lo que se escribe en el panel: textos, carta,
+     lo mejor del mes, fotos, horario, el premio del club y las zonas. Cada traducción va con su texto
+     en castellano: si ese texto cambia, hay que traducirlo otra vez (hasta entonces sale en castellano). */
+  var memoriaIdiomas = null;          // las traducciones que ya trae la web
+  var filtroIdiomas = null;           // 'faltan' o 'todo'
+  var NOMBRE_IDIOMA = { gl: 'Galego', en: 'English' };
+  function textosTraducibles() {
+    var lista = [];
+    var vistos = {};
+    function poner(grupo, que, es) {
+      es = String(es || '').trim();
+      if (!es || vistos[es]) return;
+      vistos[es] = true;
+      lista.push({ grupo: grupo, que: que, es: es });
+    }
+    var t = estado.textos || {};
+    var base = estado.textosBase || {};
+    (Array.isArray(t.menu) && t.menu.length ? t.menu : MENU_INICIAL).forEach(function (m) { poner('Textos', 'Menú', m.texto); });
+    GRUPOS_TEXTOS.forEach(function (g) {
+      g[1].forEach(function (c) { poner('Textos', g[0] + ' · ' + c[1].replace(/\. \{.*$/, ''), (t.textos && t.textos[c[0]]) || base[c[0]]); });
+    });
+    categorias().forEach(function (c) {
+      poner('Carta', 'Grupo', c.nombre);
+      poner('Carta', 'Grupo «' + c.nombre + '» · frase', c.desc);
+      productos().forEach(function (p) {
+        if (p.cat !== c.id) return;
+        poner('Carta', 'Producto', p.nombre);
+        poner('Carta', p.nombre + ' · descripción', p.desc);
+        (Array.isArray(p.etiquetas) ? p.etiquetas : []).forEach(function (x) { poner('Carta', 'Etiqueta', x); });
+      });
+    });
+    ((estado.mes && estado.mes.items) || []).forEach(function (x, i) {
+      poner('Lo mejor del mes', 'Destacado ' + (i + 1) + ' · etiqueta', x.etiqueta);
+      poner('Lo mejor del mes', 'Destacado ' + (i + 1) + ' · nombre', x.nombre);
+      poner('Lo mejor del mes', 'Destacado ' + (i + 1) + ' · texto', x.desc);
+    });
+    ((estado.galeria && estado.galeria.fotos) || []).forEach(function (f) { if (f.foto) poner('Fotos', 'Pie de foto', f.pie); });
+    ((estado.horario && estado.horario.dias) || []).forEach(function (d) { if (/[a-záéíóúñ]/i.test(d.texto || '')) poner('Horarios', d.dia, d.texto); });
+    var d = estado.datos || {};
+    if (d.club) poner('Club', 'Premio', d.club.premio);
+    (Array.isArray(d.zonas) ? d.zonas : []).forEach(function (z) { poner('Ajustes', 'Zona del local', z.nombre); });
+    return lista;
+  }
+  function panelIdiomas() {
+    if (!memoriaIdiomas) {
+      cuerpo.appendChild(el('p', 'estado-vacio', 'Cargando…'));
+      api('GET', '/api/idiomas').then(function (m) { memoriaIdiomas = m; if (pestana === 'idiomas') pintarPanel(); })
+        .catch(function (err) { if (!sesionCaducada(err)) mostrarEstado(err.message, true); });
+      return;
+    }
+    var b = borrador('traducciones');
+    var lista = textosTraducibles();
+    function valor(i, es) { return b[i][es] || memoriaIdiomas[i][es] || ''; }
+    var faltan = lista.filter(function (x) { return !valor('gl', x.es) || !valor('en', x.es); });
+    if (!filtroIdiomas) filtroIdiomas = faltan.length ? 'faltan' : 'todo';
+
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'La web también se ve en gallego y en inglés: cada visitante lo elige en el menú. Los botones, los avisos y los textos legales ya están traducidos. Aquí están las traducciones de lo que escribes en el panel. Si un texto no tiene traducción, sale en castellano.'));
+    cuerpo.appendChild(el('p', 'admin__ayuda', 'Si cambias un texto en castellano (en Textos, Carta…), hay que volver a traducirlo aquí.'));
+
+    var barra = el('div', 'acciones-mini idiomas-admin__barra');
+    [['faltan', 'Sin traducir (' + faltan.length + ')'], ['todo', 'Todo (' + lista.length + ')']].forEach(function (f) {
+      var bt = botonMini(f[1], function () { filtroIdiomas = f[0]; pintarPanel(); });
+      bt.setAttribute('aria-pressed', filtroIdiomas === f[0] ? 'true' : 'false');
+      barra.appendChild(bt);
+    });
+    if (faltan.length) {
+      barra.appendChild(botonMini('Copiar lo que falta', function () {
+        var txt = faltan.map(function (x) { return x.es; }).join('\n\n');
+        var hecho = function () { mostrarEstado('Copiado: ' + faltan.length + (faltan.length === 1 ? ' texto' : ' textos') + ' sin traducir.'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(hecho, function () { descargarTexto('sin-traducir.txt', txt); });
+        else descargarTexto('sin-traducir.txt', txt);
+      }));
+    }
+    var ver = el('span', 'idiomas-admin__ver');
+    ver.appendChild(document.createTextNode('Ver la web: '));
+    ['gl', 'en'].forEach(function (i, n) {
+      var a = el('a', null, NOMBRE_IDIOMA[i] + ' ↗');
+      a.href = '/' + i; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('translate', 'no');
+      if (n) ver.appendChild(document.createTextNode(' · '));
+      ver.appendChild(a);
+    });
+    barra.appendChild(ver);
+    cuerpo.appendChild(barra);
+
+    var mostrar = filtroIdiomas === 'faltan' ? faltan : lista;
+    if (!mostrar.length) {
+      cuerpo.appendChild(el('p', 'estado-vacio', filtroIdiomas === 'faltan' ? 'Todo está traducido.' : 'Todavía no hay textos que traducir.'));
+      return;
+    }
+    var grupoActual = null;
+    var seccion = null;
+    mostrar.forEach(function (x, n) {
+      if (x.grupo !== grupoActual) {
+        grupoActual = x.grupo;
+        seccion = el('section', 'admin__grupo idiomas-admin__grupo');
+        seccion.appendChild(el('h3', null, x.grupo));
+        cuerpo.appendChild(seccion);
+      }
+      var fila = el('div', 'idiomas-admin__fila');
+      var cab = el('div', 'idiomas-admin__es');
+      cab.appendChild(el('span', 'idiomas-admin__que', x.que));
+      cab.appendChild(el('p', null, x.es));
+      fila.appendChild(cab);
+      var campos = el('div', 'idiomas-admin__campos');
+      ['gl', 'en'].forEach(function (i) {
+        var id = 'adm-idioma-' + i + '-' + n;
+        var largo = x.es.length > 70 || x.es.indexOf('\n') !== -1;
+        var c = el('div', 'campo' + (valor(i, x.es) ? '' : ' idiomas-admin__falta'));
+        var l = el('label', null, NOMBRE_IDIOMA[i]); l.htmlFor = id;
+        var e = el(largo ? 'textarea' : 'input'); e.id = id;
+        if (!largo) e.type = 'text';
+        e.value = valor(i, x.es);
+        e.lang = i;
+        e.setAttribute('translate', 'no');
+        e.maxLength = 1200;
+        e.placeholder = 'Sin traducir: sale en castellano';
+        e.addEventListener('input', function () {
+          var v = String(e.value || '').replace(/\r\n?/g, '\n').trim();
+          if (!v || v === memoriaIdiomas[i][x.es]) delete b[i][x.es]; else b[i][x.es] = v;
+          c.classList.toggle('idiomas-admin__falta', !v && !memoriaIdiomas[i][x.es]);
+          marcar();
+        });
+        c.appendChild(l); c.appendChild(e);
+        campos.appendChild(c);
+      });
+      fila.appendChild(campos);
+      seccion.appendChild(fila);
     });
   }
 
@@ -4203,6 +4387,16 @@
         if (!it.producto && texto(it.precio) && !RE_PRECIO.test(texto(it.precio))) return 'Revisa el precio de «' + texto(it.nombre) + '»: escribe solo el número, por ejemplo 2,50.';
       }
     }
+    if (k === 'traducciones') {
+      // Los textos del club llevan {premio} y {sellos}: la traducción tiene que llevarlos también
+      var malas = [];
+      ['gl', 'en'].forEach(function (i) {
+        Object.keys(b[i]).forEach(function (es) {
+          (es.match(/\{(premio|sellos)\}/g) || []).forEach(function (h) { if (b[i][es].indexOf(h) === -1) malas.push(h); });
+        });
+      });
+      if (malas.length) return 'Una traducción del club no lleva ' + malas[0] + '. Escríbelo tal cual, entre llaves, donde tenga que ir.';
+    }
     if (k === 'horario') {
       var todas = b.manana.concat(b.tarde);
       for (var j = 0; j < todas.length; j++) {
@@ -4584,6 +4778,7 @@
     /* ---- Mensajes ---- */
     function burbuja(quien, partes, acciones) {
       var m = el('div', 'asistente__msg asistente__msg--' + quien);
+      if (quien === 'yo' && escrito) m.setAttribute('translate', 'no');
       var b = el('div', 'asistente__burbuja');
       (Array.isArray(partes) ? partes : [partes]).forEach(function (p) {
         if (!p) return;
@@ -4626,7 +4821,7 @@
       cerrarPanel();
       var s = $(id);
       if (s && !s.hidden && getComputedStyle(s).display !== 'none') s.scrollIntoView({ behavior: sinMovimiento ? 'auto' : 'smooth', block: 'start' });
-      else location.href = '/#' + id;
+      else location.href = ruta('/#' + id);
     }
 
     /* ---- Respuestas ---- */
@@ -4646,8 +4841,8 @@
       var hoy = DIAS_SEMANA[(new Date().getDay() + 6) % 7];
       var deHoy = dias.filter(function (x) { return x.dia === hoy; })[0];
       return {
-        partes: [deHoy ? 'Hoy, ' + hoy.toLowerCase() + ': ' + texto(deHoy.texto) + '.' : 'Este es nuestro horario:',
-          listaHtml(dias.map(function (x) { return x.dia + ': ' + texto(x.texto); }))],
+        partes: [deHoy ? t('Hoy, {dia}: {horario}.', { dia: IDIOMA === 'en' ? tr(hoy) : tr(hoy).toLowerCase(), horario: texto(deHoy.texto) }) : 'Este es nuestro horario:',
+          listaHtml(dias.map(function (x) { return tr(x.dia) + ': ' + texto(x.texto); }))],
         acciones: [accion('Reservar mesa', function () { cerrarPanel(); abrir(modalReserva); })]
       };
     }
@@ -4655,7 +4850,7 @@
       var dir = texto((estado.datos || {}).direccion);
       if (!dir) return contacto('La dirección está aún por confirmar. Mientras, puedes preguntarnos:');
       return {
-        partes: ['Estamos en ' + dir + '. ¡Te esperamos!'],
+        partes: [t('Estamos en {direccion}. ¡Te esperamos!', { direccion: dir })],
         acciones: [enlace('Cómo llegar', 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('SOÑO ' + dir), true)]
       };
     }
@@ -4676,26 +4871,26 @@
       };
     }
     function enlaceCarta() {
-      if (cartaAparte() && !enPaginaCarta) return enlace('Ver la carta', '/carta');
+      if (cartaAparte() && !enPaginaCarta) return enlace('Ver la carta', ruta('/carta'));
       return accion('Ver la carta', function () { irA('carta'); });
     }
     function carta() {
       var n = productos().length;
       return {
-        partes: [n ? 'Tenemos ' + n + ' cosas ricas en la carta. Toca cualquier producto para ver la descripción y los alérgenos.' : 'La carta está en preparación.',
+        partes: [n ? t('Tenemos {n} cosas ricas en la carta. Toca cualquier producto para ver la descripción y los alérgenos.', { n: n }) : 'La carta está en preparación.',
           'También puedes preguntarme por uno: «¿cuánto cuesta el capuchino?»'],
         acciones: [enlaceCarta()]
       };
     }
     function verProducto(p) {
-      return accion('Ver ' + p.nombre, function () {
+      return accion(t('Ver {nombre}', { nombre: p.nombre }), function () {
         cerrarPanel();
         var i = productos().indexOf(p);
         if (i >= 0) { mostrarProducto(i); abrir(modalProducto); }
       });
     }
     function nombresAlergenos(ids) {
-      return ALERGENOS.filter(function (a) { return ids.indexOf(a.id) !== -1; }).map(function (a) { return a.nombre.toLowerCase(); });
+      return ALERGENOS.filter(function (a) { return ids.indexOf(a.id) !== -1; }).map(function (a) { return tr(a.nombre).toLowerCase(); });
     }
     function producto(p, alergenos) {
       var lleva = Array.isArray(p.alergenos) ? p.alergenos : [];
@@ -4703,9 +4898,9 @@
       if (texto(p.desc)) partes.push(texto(p.desc));
       if (alergenos.length) {
         var si = alergenos.filter(function (a) { return lleva.indexOf(a) !== -1; });
-        partes.push(si.length ? 'Ojo: lleva ' + nombresAlergenos(si).join(', ') + '.' : 'No lleva ' + nombresAlergenos(alergenos).join(' ni ') + ' según la carta.');
+        partes.push(si.length ? t('Ojo: lleva {lista}.', { lista: nombresAlergenos(si).join(', ') }) : t('No lleva {lista} según la carta.', { lista: nombresAlergenos(alergenos).join(t(' ni ')) }));
       } else {
-        partes.push(lleva.length ? 'Alérgenos: ' + nombresAlergenos(lleva).join(', ') + '.' : 'No tiene alérgenos marcados en la carta.');
+        partes.push(lleva.length ? t('Alérgenos: {lista}.', { lista: nombresAlergenos(lleva).join(', ') }) : 'No tiene alérgenos marcados en la carta.');
       }
       partes.push(nota('Si tienes una alergia, díselo también a quien te atienda.'));
       return { partes: partes, acciones: [verProducto(p)] };
@@ -4716,11 +4911,11 @@
         var lleva = Array.isArray(p.alergenos) ? p.alergenos : [];
         return !ids.some(function (a) { return lleva.indexOf(a) !== -1; });
       });
-      if (!aptos.length) return contacto('Según la carta, ahora mismo todo lleva ' + nombres.join(' o ') + '. Pregúntanos y vemos qué podemos hacer:');
+      if (!aptos.length) return contacto(t('Según la carta, ahora mismo todo lleva {lista}. Pregúntanos y vemos qué podemos hacer:', { lista: nombres.join(t(' o ')) }));
       var muestra = aptos.slice(0, 8).map(function (p) { return p.nombre + ' · ' + precioBonito(p.precio); });
       return {
-        partes: ['Sin ' + nombres.join(' ni ') + ' tienes:', listaHtml(muestra),
-          aptos.length > 8 ? 'Y ' + (aptos.length - 8) + ' más en la carta.' : '',
+        partes: [t('Sin {lista} tienes:', { lista: nombres.join(t(' ni ')) }), listaHtml(muestra),
+          aptos.length > 8 ? t('Y {n} más en la carta.', { n: aptos.length - 8 }) : '',
           nota('Es lo que marca la carta. Si tienes una alergia, díselo también a quien te atienda.')],
         acciones: [enlaceCarta()]
       };
@@ -4736,7 +4931,7 @@
       var c = ajustesClub();
       if (!c.activo) return { partes: ['Ahora mismo el club de desayunos no está en marcha. ¡Muy pronto!'] };
       return {
-        partes: ['Hazte socio gratis del Club SOÑO: cada desayuno es un sello y con ' + c.sellos + ' sellos te llevas ' + c.premio + '. Solo tienes que enseñar el QR de tu tarjeta al pedir.'],
+        partes: [t('Hazte socio gratis del Club SOÑO: cada desayuno es un sello y con {n} sellos te llevas {premio}. Solo tienes que enseñar el QR de tu tarjeta al pedir.', { n: c.sellos, premio: c.premio })],
         acciones: [socio ? accion('Ver mi tarjeta', function () { cerrarPanel(); abrirTarjeta(); })
           : accion('Unirme al club', function () { cerrarPanel(); abrirAccesoClub('alta'); })]
       };
@@ -4753,7 +4948,7 @@
       if (!lista.length) return carta();
       return {
         partes: ['Este mes te recomendamos:', listaHtml(lista.map(function (d) { return d.etiqueta + ': ' + d.nombre + (d.precio ? ' · ' + precioBonito(d.precio) : ''); }))],
-        acciones: [cartaAparte() && !enPaginaCarta ? enlace('Ver lo mejor del mes', '/carta#mes') : accion('Ver lo mejor del mes', function () { irA('mes'); })]
+        acciones: [cartaAparte() && !enPaginaCarta ? enlace('Ver lo mejor del mes', ruta('/carta#mes')) : accion('Ver lo mejor del mes', function () { irA('mes'); })]
           .concat(lista.filter(function (d) { return d.producto; }).slice(0, 2).map(function (d) { return verProducto(d.producto); }))
       };
     }
@@ -4765,11 +4960,13 @@
     }
 
     /* ---- Entender la pregunta ---- */
+    /* Palabras en castellano, gallego e inglés */
     var PALABRAS_ALERGENOS = [
-      ['gluten', /gluten|celiac|trigo|harina/], ['lacteos', /lactosa|lacteo|leche(?! de (avena|soja|almendra|coco|arroz))|queso|nata|mantequilla/],
-      ['huevos', /huevo/], ['frutos', /frutos secos|fruto seco|nuez|nueces|almendra|avellana|pistacho|anacardo/],
-      ['cacahuetes', /cacahuete|mani\b/], ['soja', /soja/], ['sesamo', /sesamo/], ['apio', /apio/], ['mostaza', /mostaza/],
-      ['sulfitos', /sulfito/], ['pescado', /pescado/], ['crustaceos', /crustaceo|marisco|gamba/], ['moluscos', /molusco/], ['altramuces', /altramuz/]
+      ['gluten', /glute|celiac|celiaq|coeliac|trigo|harina|farina|wheat|flour/],
+      ['lacteos', /lactosa|lactose|lacteo|dairy|leche(?! de (avena|soja|almendra|coco|arroz))|leite(?! de (avea|soia|soxa|amendoa|coco|arroz))|milk|queso|queixo|cheese|nata|cream|mantequilla|manteiga|butter/],
+      ['huevos', /huevo|\bovos?\b|\beggs?\b/], ['frutos', /frutos secos|fruto seco|froitos secos|froito seco|\bnuts?\b|nuez|nueces|\bnoz|noces|almendra|amendoa|almond|avellana|abelan|hazelnut|pistach|anacardo|cashew|walnut/],
+      ['cacahuetes', /cacahuete|cacahuet|peanut|mani\b/], ['soja', /soja|soia|soxa|\bsoy/], ['sesamo', /sesamo|sesame/], ['apio', /apio|celery/], ['mostaza', /mostaza|mostarda|mustard/],
+      ['sulfitos', /sulfito|sulphite|sulfite/], ['pescado', /pescado|peixe|\bfish/], ['crustaceos', /crustaceo|marisco|gamba|shellfish|prawn|shrimp/], ['moluscos', /molusco|mollusc/], ['altramuces', /altramuz|chicharo|lupin/]
     ];
     function buscarProducto(q) {
       var mejor = null;
@@ -4797,12 +4994,12 @@
     function entender(original) {
       var q = ' ' + norm(original) + ' ';
       if (!q.trim()) return ayuda();
-      if (/ (hola|buenas|buenos dias|buenas tardes|hey|ey) /.test(q) && q.trim().split(' ').length <= 3) {
+      if (/ (hola|buenas|buenos dias|buenas tardes|ola|boas|bos dias|boas tardes|hello|hi|hey|ey|good morning|good afternoon) /.test(q) && q.trim().split(' ').length <= 3) {
         return ayuda('¡Hola! ☕ ¿En qué te ayudo? Pregúntame por el horario, la carta, los alérgenos, reservas o pedidos.');
       }
-      if (/ (gracias|genial|perfecto|vale|ok|guay) /.test(q) && q.trim().split(' ').length <= 4) return { partes: ['¡A ti! Si necesitas algo más, aquí estoy ☕'] };
-      if (/(trabaj|empleo|curricul| cv |vacante|contrat|currela|camarer)/.test(q)) return empleo();
-      if (/(hablar con|persona|llamar|telefono|whatsapp|contact|email|correo|escribir)/.test(q)) return contacto();
+      if (/ (gracias|grazas|thanks|thank you|thx|cheers|genial|perfecto|great|perfect|vale|ok|guay) /.test(q) && q.trim().split(' ').length <= 4) return { partes: ['¡A ti! Si necesitas algo más, aquí estoy ☕'] };
+      if (/(trabaj|traball|empleo|emprego|curricul| cv |resume|vacante|vacancy|contrat|currela|camarer|waiter|barista|\bjobs?\b|hiring|\bwork (for|with|at)|work here)/.test(q)) return empleo();
+      if (/(hablar con|falar con|talk to|speak to|persona|person|human|llamar|chamar|\bcall\b|telefono|phone|whatsapp|contact|email|correo|escribir|escribi|\bwrite\b)/.test(q)) return contacto();
       var p = buscarProducto(q);
       if (p && p.varios) {
         return {
@@ -4811,27 +5008,31 @@
         };
       }
       var qSin = p ? q.replace(norm(p.nombre), ' ') : q;
-      var ids = PALABRAS_ALERGENOS.filter(function (x) { return x[1].test(qSin); }).map(function (x) { return x[0]; });
+      var qLeche = qSin.replace(/(oat|soy|almond|coconut|rice) milk/g, ' ');   // «oat milk» no es leche de vaca
+      var ids = PALABRAS_ALERGENOS.filter(function (x) { return x[1].test(x[0] === 'lacteos' ? qLeche : qSin); }).map(function (x) { return x[0]; });
       if (p) return producto(p, ids);
       if (ids.length) return sinAlergenos(ids);
-      if (/(del mes|recomienda|recomendais|recomendacion|sugerencia|especial|novedad)/.test(q)) return mesInfo();
-      if (/(alerg|intoleran|celiac)/.test(q)) return alergenosGeneral();
-      if (/(vegan|vegetarian)/.test(q)) return contacto('Eso no lo tenemos marcado en la carta todavía. Pregúntanos y te decimos qué puedes tomar:');
-      if (/(horario|hora|abr(is|e|en|ir)|cerr|abierto|cuando)/.test(q)) return horario();
-      if (/(donde|direcci|ubica|llegar|calle|mapa|esta(is|n) )/.test(q)) return donde();
-      if (/(reserv|mesa)/.test(q)) return reservar();
-      if (/(llevar|pedido|pedir|domicilio|envi|recoger|delivery)/.test(q)) return llevar();
-      if (/(club|sello|socio|tarjeta|premio|puntos)/.test(q)) return clubInfo();
-      if (/(carta|menu|precio|cuesta|cuanto|vale|comer|desayun|beber|cafe)/.test(q)) return carta();
+      if (/(del mes|do mes|of the month|recomienda|recomendais|recomendacion|recomenda|recommend|sugerencia|suxestion|suggest|especial|special|novedad|novidade|\bnew\b)/.test(q)) return mesInfo();
+      if (/(alerg|allerg|intoleran|celiac|celiaq|coeliac)/.test(q)) return alergenosGeneral();
+      if (/(vegan|vegetarian|vexetarian)/.test(q)) return contacto('Eso no lo tenemos marcado en la carta todavía. Pregúntanos y te decimos qué puedes tomar:');
+      if (/(horario|hora|abr(is|e|en|ir)|cerr|abierto|aberto|pech|cuando|cando|opening|\bopen\b|close|hours|when)/.test(q)) return horario();
+      if (/(donde|onde|where|direcci|enderezo|address|ubica|locat|llegar|chegar|get there|calle|\brua\b|street|mapa|\bmap\b|esta(is|n) )/.test(q)) return donde();
+      if (/(reserv|mesa|\bbook|table)/.test(q)) return reservar();
+      if (/(llevar|levar|pedido|pedir|\border|takeaway|take away|domicilio|envi|recoger|recoller|deliver|pick up)/.test(q)) return llevar();
+      if (/(club|sello|selo|stamp|socio|member|tarjeta|tarxeta|\bcard|premio|reward|puntos|points)/.test(q)) return clubInfo();
+      if (/(carta|menu|precio|prezo|price|cuesta|custa|\bcost|cuanto|canto|how much|vale|comer|\beat|desayun|almorz|breakfast|beber|drink|cafe|coffee)/.test(q)) return carta();
       return contacto('Uy, eso no lo sé 😅. Pregúntame por el horario, la carta, los alérgenos, reservas o pedidos. O habla directamente con nosotros:');
     }
 
     /* ---- Panel ---- */
-    function preguntar(t) {
-      t = String(t || '').trim();
-      if (!t) return;
-      burbuja('yo', t);
-      responder(entender(t));
+    var escrito = false;   // lo ha escrito la persona (no es un botón)
+    function preguntar(q, aMano) {
+      q = String(q || '').trim();
+      if (!q) return;
+      escrito = !!aMano;
+      burbuja('yo', q);
+      escrito = false;
+      responder(entender(q));
     }
     function pintarChips() {
       chips.innerHTML = '';
@@ -4855,7 +5056,7 @@
       pintarChips();
       if (!empezado) {
         empezado = true;
-        burbuja('bot', ['¡Hola! Soy ' + a.nombre + ', el ayudante de SOÑO ☕', 'Pregúntame por el horario, la carta, los alérgenos, las reservas o los pedidos, o toca una de las preguntas de abajo.']);
+        burbuja('bot', [t('¡Hola! Soy {nombre}, el ayudante de SOÑO ☕', { nombre: a.nombre }), 'Pregúntame por el horario, la carta, los alérgenos, las reservas o los pedidos, o toca una de las preguntas de abajo.']);
       }
       if (!tactil) entrada.focus(); else $('asistente-cerrar').focus();
     }
@@ -4872,9 +5073,9 @@
     panel.addEventListener('keydown', function (e) { if (e.key === 'Escape') { cerrarPanel(); boton.focus(); } });
     form.addEventListener('submit', function (e) {
       e.preventDefault();
-      var t = entrada.value;
+      var q = entrada.value;
       entrada.value = '';
-      preguntar(t);
+      preguntar(q, true);
     });
 
     /* Se enseña cuando ya se ha elegido en el aviso de cookies (así no se tapan) y si está activo en Ajustes */
@@ -4978,8 +5179,8 @@
 
   /* ---------- Arranque ---------- */
   pintarTodo();
-  api('GET', '/api/contenido').then(function (c) {
-    estado = { carta: c.carta, galeria: c.galeria, horario: c.horario, datos: c.datos, textos: c.textos, textosBase: c.textosBase, mes: c.mes };
+  api('GET', '/api/contenido' + (IDIOMA !== 'es' ? '?idioma=' + IDIOMA : '')).then(function (c) {
+    estado = { carta: c.carta, galeria: c.galeria, horario: c.horario, datos: c.datos, textos: c.textos, textosBase: c.textosBase, mes: c.mes, traducciones: c.traducciones };
     cargado = true;
     pintarTodo();
     cargarResenas();
@@ -4989,7 +5190,7 @@
     if (location.hash === '#trabaja') irAEmpleo();
     if (location.hash === '#panel') { history.replaceState(null, '', location.pathname + location.search); entrarAlPanel(); }
     // Si la carta va en su propia página, un enlace antiguo a «/#carta» lleva allí
-    if (location.hash === '#carta' && cartaAparte() && !enPaginaCarta) location.replace('/carta');
+    if (location.hash === '#carta' && cartaAparte() && !enPaginaCarta) location.replace(ruta('/carta'));
   }).catch(function () {
     cargado = true;
     sinDatos = true;
